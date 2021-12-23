@@ -17,20 +17,20 @@
  */
 package org.apache.bookkeeper.client;
 
-import com.google.common.collect.ImmutableMap;
-import org.apache.bookkeeper.net.BookieSocketAddress;
-import org.apache.commons.lang3.ArrayUtils;
-
-import java.util.BitSet;
-import java.util.Map;
-import java.util.Arrays;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableMap;
 
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
 
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Map;
+
+import org.apache.bookkeeper.net.BookieId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A specific {@link DistributionSchedule} that places entries in round-robin
@@ -39,7 +39,8 @@ import io.netty.util.Recycler.Handle;
  * on.
  *
  */
-class RoundRobinDistributionSchedule implements DistributionSchedule {
+public class RoundRobinDistributionSchedule implements DistributionSchedule {
+    private static final Logger LOG = LoggerFactory.getLogger(RoundRobinDistributionSchedule.class);
     private final int writeQuorumSize;
     private final int ackQuorumSize;
     private final int ensembleSize;
@@ -53,6 +54,13 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
     @Override
     public WriteSet getWriteSet(long entryId) {
         return WriteSetImpl.create(ensembleSize, writeQuorumSize, entryId);
+    }
+
+    @Override
+    public WriteSet getEnsembleSet(long entryId) {
+        // for long poll reads and force ledger , we are trying all the bookies in the ensemble
+        // so we create a `WriteSet` with `writeQuorumSize == ensembleSize`.
+        return WriteSetImpl.create(ensembleSize, ensembleSize /* writeQuorumSize */, entryId);
     }
 
     @VisibleForTesting
@@ -70,8 +78,8 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         int size;
 
         private final Handle<WriteSetImpl> recyclerHandle;
-        private static final Recycler<WriteSetImpl> RECYCLER
-            = new Recycler<WriteSetImpl>() {
+        private static final Recycler<WriteSetImpl> RECYCLER = new Recycler<WriteSetImpl>() {
+                    @Override
                     protected WriteSetImpl newObject(
                             Recycler.Handle<WriteSetImpl> handle) {
                         return new WriteSetImpl(handle);
@@ -94,7 +102,7 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
                            long entryId) {
             setSize(writeQuorumSize);
             for (int w = 0; w < writeQuorumSize; w++) {
-                set(w, (int)((entryId + w) % ensembleSize));
+                set(w, (int) ((entryId + w) % ensembleSize));
             }
         }
 
@@ -111,7 +119,9 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         }
 
         @Override
-        public int size() { return size; }
+        public int size() {
+            return size;
+        }
 
         @Override
         public boolean contains(int i) {
@@ -153,7 +163,7 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
                 int oldSize = size;
                 setSize(maxIndex);
                 for (int i = 0, j = oldSize;
-                     i < maxIndex && j < maxIndex; i++) {
+                    i < maxIndex && j < maxIndex; i++) {
                     if (!contains(i)) {
                         set(j, i);
                         j++;
@@ -169,13 +179,13 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
             if (from > to) {
                 int tmp = array[from];
                 for (int i = from; i > to; i--) {
-                    array[i] = array[i-1];
+                    array[i] = array[i - 1];
                 }
                 array[to] = tmp;
             } else if (from < to) {
                 int tmp = array[from];
                 for (int i = from; i < to; i++) {
-                    array[i] = array[i+1];
+                    array[i] = array[i + 1];
                 }
                 array[to] = tmp;
             }
@@ -208,7 +218,7 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         @Override
         public boolean equals(Object other) {
             if (other instanceof WriteSetImpl) {
-                WriteSetImpl o = (WriteSetImpl)other;
+                WriteSetImpl o = (WriteSetImpl) other;
                 if (o.size() != size()) {
                     return false;
                 }
@@ -246,15 +256,21 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         return AckSetImpl.create(ensembleSize, writeQuorumSize, ackQuorumSize);
     }
 
+    @Override
+    public AckSet getEnsembleAckSet() {
+        return AckSetImpl.create(ensembleSize, ensembleSize, ensembleSize);
+    }
+
     private static class AckSetImpl implements AckSet {
         private int writeQuorumSize;
         private int ackQuorumSize;
         private final BitSet ackSet = new BitSet();
         // grows on reset()
-        private BookieSocketAddress[] failureMap = new BookieSocketAddress[0];
+        private BookieId[] failureMap = new BookieId[0];
 
         private final Handle<AckSetImpl> recyclerHandle;
         private static final Recycler<AckSetImpl> RECYCLER = new Recycler<AckSetImpl>() {
+            @Override
             protected AckSetImpl newObject(Recycler.Handle<AckSetImpl> handle) {
                 return new AckSetImpl(handle);
             }
@@ -279,7 +295,7 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
             this.writeQuorumSize = writeQuorumSize;
             ackSet.clear();
             if (failureMap.length < ensembleSize) {
-                failureMap = new BookieSocketAddress[ensembleSize];
+                failureMap = new BookieId[ensembleSize];
             }
             Arrays.fill(failureMap, null);
         }
@@ -293,16 +309,15 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
 
         @Override
         public boolean failBookieAndCheck(int bookieIndexHeardFrom,
-                                          BookieSocketAddress address) {
+                                          BookieId address) {
             ackSet.clear(bookieIndexHeardFrom);
             failureMap[bookieIndexHeardFrom] = address;
             return failed() > (writeQuorumSize - ackQuorumSize);
         }
 
         @Override
-        public Map<Integer, BookieSocketAddress> getFailedBookies() {
-            ImmutableMap.Builder<Integer, BookieSocketAddress> builder
-                = new ImmutableMap.Builder<>();
+        public Map<Integer, BookieId> getFailedBookies() {
+            ImmutableMap.Builder<Integer, BookieId> builder = new ImmutableMap.Builder<>();
             for (int i = 0; i < failureMap.length; i++) {
                 if (failureMap[i] != null) {
                     builder.put(i, failureMap[i]);
@@ -360,28 +375,42 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         public synchronized boolean checkCovered() {
             // now check if there are any write quorums, with |ackQuorum| nodes available
             for (int i = 0; i < ensembleSize; i++) {
-                int nodesNotCovered = 0;
-                int nodesOkay = 0;
-                int nodesUninitialized = 0;
+                /* Nodes which have either responded with an error other than NoSuch{Entry,Ledger},
+                   or have not responded at all. We cannot know if these nodes ever accepted a entry. */
+                int nodesUnknown = 0;
+
                 for (int j = 0; j < writeQuorumSize; j++) {
                     int nodeIndex = (i + j) % ensembleSize;
-                    if (covered[nodeIndex] == BKException.Code.OK) {
-                        nodesOkay++;
-                    } else if (covered[nodeIndex] != BKException.Code.NoSuchEntryException &&
-                            covered[nodeIndex] != BKException.Code.NoSuchLedgerExistsException) {
-                        nodesNotCovered++;
-                    } else if (covered[nodeIndex] == BKException.Code.UNINITIALIZED) {
-                        nodesUninitialized++;
+                    if (covered[nodeIndex] != BKException.Code.OK
+                        && covered[nodeIndex] != BKException.Code.NoSuchEntryException
+                        && covered[nodeIndex] != BKException.Code.NoSuchLedgerExistsException) {
+                        nodesUnknown++;
                     }
                 }
-                // if we haven't seen any OK responses and there are still nodes not heard from,
-                // let's wait until
-                if (nodesNotCovered >= ackQuorumSize ||
-                        (nodesOkay == 0 && nodesUninitialized > 0)) {
+
+                /* If nodesUnknown is greater than the ack quorum size, then
+                   it is possible those two unknown nodes accepted an entry which
+                   we do not know about */
+                if (nodesUnknown >= ackQuorumSize) {
                     return false;
                 }
             }
             return true;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder buffer = new StringBuilder();
+            buffer.append("QuorumCoverage(e:").append(ensembleSize)
+                .append(",w:").append(writeQuorumSize)
+                .append(",a:").append(ackQuorumSize)
+                .append(") = [");
+            int i = 0;
+            for (; i < covered.length - 1; i++) {
+                buffer.append(covered[i]).append(", ");
+            }
+            buffer.append(covered[i]).append("]");
+            return buffer.toString();
         }
     }
 
@@ -398,5 +427,32 @@ class RoundRobinDistributionSchedule implements DistributionSchedule {
         } finally {
             w.recycle();
         }
+    }
+
+    @Override
+    public BitSet getEntriesStripedToTheBookie(int bookieIndex, long startEntryId, long lastEntryId) {
+        if ((startEntryId < 0) || (lastEntryId < 0) || (bookieIndex < 0) || (bookieIndex >= ensembleSize)
+                || (lastEntryId < startEntryId)) {
+            LOG.error(
+                    "Illegal arguments for getEntriesStripedToTheBookie, bookieIndex : {},"
+                            + " ensembleSize : {}, startEntryId : {}, lastEntryId : {}",
+                    bookieIndex, ensembleSize, startEntryId, lastEntryId);
+            throw new IllegalArgumentException("Illegal arguments for getEntriesStripedToTheBookie");
+        }
+        BitSet entriesStripedToTheBookie = new BitSet((int) (lastEntryId - startEntryId + 1));
+        for (long entryId = startEntryId; entryId <= lastEntryId; entryId++) {
+            int modValOfFirstReplica = (int) (entryId % ensembleSize);
+            int modValOfLastReplica = (int) ((entryId + writeQuorumSize - 1) % ensembleSize);
+            if (modValOfLastReplica >= modValOfFirstReplica) {
+                if ((bookieIndex >= modValOfFirstReplica) && (bookieIndex <= modValOfLastReplica)) {
+                    entriesStripedToTheBookie.set((int) (entryId - startEntryId));
+                }
+            } else {
+                if ((bookieIndex >= modValOfFirstReplica) || (bookieIndex <= modValOfLastReplica)) {
+                    entriesStripedToTheBookie.set((int) (entryId - startEntryId));
+                }
+            }
+        }
+        return entriesStripedToTheBookie;
     }
 }

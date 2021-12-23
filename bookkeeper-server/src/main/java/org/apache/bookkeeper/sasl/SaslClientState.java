@@ -37,6 +37,9 @@ import javax.security.sasl.SaslException;
 import org.apache.zookeeper.server.auth.KerberosName;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A SASL Client State data object.
+ */
 public class SaslClientState {
 
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(SaslClientState.class);
@@ -47,7 +50,9 @@ public class SaslClientState {
     private String password;
 
     public SaslClientState(String serverHostname, Subject subject) throws SaslException {
-        String serverPrincipal = SaslConstants.SASL_BOOKKEEPER_PROTOCOL + "/" + serverHostname;
+        String saslServiceName = System.getProperty(SaslConstants.SASL_SERVICE_NAME,
+                                                    SaslConstants.SASL_SERVICE_NAME_DEFAULT);
+        String serverPrincipal = saslServiceName + "/" + serverHostname;
         this.clientSubject = subject;
         if (clientSubject == null) {
             throw new SaslException("Cannot create JAAS Sujbect for SASL");
@@ -100,8 +105,7 @@ public class SaslClientState {
         }
         if (clientSubject != null) {
             try {
-                final byte[] retval
-                    = Subject.doAs(clientSubject, new PrivilegedExceptionAction<byte[]>() {
+                final byte[] retval = Subject.doAs(clientSubject, new PrivilegedExceptionAction<byte[]>() {
                         @Override
                         public byte[] run() throws SaslException {
                             return saslClient.evaluateChallenge(saslToken);

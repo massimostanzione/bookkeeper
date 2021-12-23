@@ -27,26 +27,31 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.Iterator;
+=======
+import java.util.Iterator;
+import java.util.List;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.api.LedgerEntry;
 import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Unit tests for parallel reading
+ * Unit tests for parallel reading.
  */
 public class TestParallelRead extends BookKeeperClusterTestCase {
 
-    static Logger LOG = LoggerFactory.getLogger(TestParallelRead.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TestParallelRead.class);
 
     final DigestType digestType;
     final byte[] passwd = "parallel-read".getBytes();
@@ -66,6 +71,17 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         return lh.getId();
     }
 
+<<<<<<< HEAD
+=======
+    PendingReadOp createReadOp(LedgerHandle lh, long from, long to) {
+        return new PendingReadOp(lh, bkc.getClientCtx(), from, to, false);
+    }
+
+    PendingReadOp createRecoveryReadOp(LedgerHandle lh, long from, long to) {
+        return new PendingReadOp(lh, bkc.getClientCtx(), from, to, true);
+    }
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     @Test
     public void testNormalParallelRead() throws Exception {
         int numEntries = 10;
@@ -75,8 +91,12 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
 
         // read single entry
         for (int i = 0; i < numEntries; i++) {
+<<<<<<< HEAD
             PendingReadOp readOp =
                     new PendingReadOp(lh, lh.bk.scheduler, i, i);
+=======
+            PendingReadOp readOp = createReadOp(lh, i, i);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             readOp.parallelRead(true).submit();
             Iterator<LedgerEntry> entries = readOp.future().get().iterator();
             assertTrue(entries.hasNext());
@@ -88,8 +108,12 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         }
 
         // read multiple entries
+<<<<<<< HEAD
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
+=======
+        PendingReadOp readOp = createReadOp(lh, 0, numEntries - 1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         Iterator<LedgerEntry> iterator = readOp.future().get().iterator();
 
@@ -125,13 +149,21 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         LedgerHandle lh = bkc.openLedger(id, digestType, passwd);
 
         // read single entry
+<<<<<<< HEAD
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 11, 11);
+=======
+        PendingReadOp readOp = createReadOp(lh, 11, 11);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.NoSuchEntryException);
 
         // read multiple entries
+<<<<<<< HEAD
         readOp = new PendingReadOp(lh, lh.bk.scheduler, 8, 11);
+=======
+        readOp = createReadOp(lh, 8, 11);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.NoSuchEntryException);
 
@@ -139,28 +171,31 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
     }
 
     @Test
-    public void testFailParallelReadMissingEntryImmediately() throws Exception {
+    public void testFailParallelRecoveryReadMissingEntryImmediately() throws Exception {
         int numEntries = 1;
 
         long id = getLedgerToRead(5, 5, 3, numEntries);
 
         ClientConfiguration newConf = new ClientConfiguration()
             .setReadEntryTimeout(30000);
-        newConf.setZkServers(zkUtil.getZooKeeperConnectString());
+        newConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
         BookKeeper newBk = new BookKeeper(newConf);
 
         LedgerHandle lh = bkc.openLedger(id, digestType, passwd);
 
-        ArrayList<BookieSocketAddress> ensemble =
-                lh.getLedgerMetadata().getEnsemble(10);
+        List<BookieId> ensemble = lh.getLedgerMetadata().getEnsembleAt(10);
         CountDownLatch latch1 = new CountDownLatch(1);
         CountDownLatch latch2 = new CountDownLatch(1);
         // sleep two bookie
         sleepBookie(ensemble.get(0), latch1);
         sleepBookie(ensemble.get(1), latch2);
 
+<<<<<<< HEAD
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 10, 10);
+=======
+        PendingReadOp readOp = createRecoveryReadOp(lh, 10, 10);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         // would fail immediately if found missing entries don't cover ack quorum
         expectFail(readOp.future(), Code.NoSuchEntryException);
@@ -179,20 +214,23 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
 
         ClientConfiguration newConf = new ClientConfiguration()
             .setReadEntryTimeout(30000);
-        newConf.setZkServers(zkUtil.getZooKeeperConnectString());
+        newConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
         BookKeeper newBk = new BookKeeper(newConf);
 
         LedgerHandle lh = bkc.openLedger(id, digestType, passwd);
 
-        ArrayList<BookieSocketAddress> ensemble =
-                lh.getLedgerMetadata().getEnsemble(5);
+        List<BookieId> ensemble = lh.getLedgerMetadata().getEnsembleAt(5);
         // kill two bookies
         killBookie(ensemble.get(0));
         killBookie(ensemble.get(1));
 
         // read multiple entries
+<<<<<<< HEAD
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
+=======
+        PendingReadOp readOp = createReadOp(lh, 0, numEntries - 1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         Iterator<LedgerEntry> entries = readOp.future().get().iterator();
 
@@ -217,21 +255,24 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
 
         ClientConfiguration newConf = new ClientConfiguration()
             .setReadEntryTimeout(30000);
-        newConf.setZkServers(zkUtil.getZooKeeperConnectString());
+        newConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
         BookKeeper newBk = new BookKeeper(newConf);
 
         LedgerHandle lh = bkc.openLedger(id, digestType, passwd);
 
-        ArrayList<BookieSocketAddress> ensemble =
-                lh.getLedgerMetadata().getEnsemble(5);
+        List<BookieId> ensemble = lh.getLedgerMetadata().getEnsembleAt(5);
         // kill two bookies
         killBookie(ensemble.get(0));
         killBookie(ensemble.get(1));
         killBookie(ensemble.get(2));
 
         // read multiple entries
+<<<<<<< HEAD
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
+=======
+        PendingReadOp readOp = createReadOp(lh, 0, numEntries - 1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.BookieHandleNotAvailableException);
 

@@ -21,9 +21,12 @@
 
 package org.apache.bookkeeper.bookie;
 
-import java.io.IOException;
+import io.netty.buffer.ByteBufAllocator;
 
+import java.io.IOException;
+import java.util.function.Supplier;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.discover.BookieServiceInfo;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -35,15 +38,16 @@ import org.slf4j.LoggerFactory;
  * ReadOnlyBookie is force started as readonly, and will not change to writable.
  * </p>
  */
-public class ReadOnlyBookie extends Bookie {
+public class ReadOnlyBookie extends BookieImpl {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReadOnlyBookie.class);
 
-    public ReadOnlyBookie(ServerConfiguration conf, StatsLogger statsLogger)
+    public ReadOnlyBookie(ServerConfiguration conf, StatsLogger statsLogger,
+            ByteBufAllocator allocator, Supplier<BookieServiceInfo> bookieServiceInfoProvider)
             throws IOException, KeeperException, InterruptedException, BookieException {
-        super(conf, statsLogger);
+        super(conf, statsLogger, allocator, bookieServiceInfoProvider);
         if (conf.isReadOnlyModeEnabled()) {
-            forceReadOnly.set(true);
+            stateManager.forceToReadOnly();
         } else {
             String err = "Try to init ReadOnly Bookie, while ReadOnly mode is not enabled";
             LOG.error(err);
@@ -53,14 +57,21 @@ public class ReadOnlyBookie extends Bookie {
     }
 
     @Override
-    public void doTransitionToWritableMode() {
-        // no-op
-        LOG.info("Skip transition to writable mode for readonly bookie");
-    }
+    StateManager initializeStateManager() throws IOException {
+        return new BookieStateManager(conf, statsLogger, metadataDriver, getLedgerDirsManager(),
+                                      bookieServiceInfoProvider) {
 
-    @Override
-    public void doTransitionToReadOnlyMode() {
-        // no-op
-        LOG.info("Skip transition to readonly mode for readonly bookie");
+            @Override
+            public void doTransitionToWritableMode() {
+                // no-op
+                LOG.info("Skip transition to writable mode for readonly bookie");
+            }
+
+            @Override
+            public void doTransitionToReadOnlyMode() {
+                // no-op
+                LOG.info("Skip transition to readonly mode for readonly bookie");
+            }
+        };
     }
 }

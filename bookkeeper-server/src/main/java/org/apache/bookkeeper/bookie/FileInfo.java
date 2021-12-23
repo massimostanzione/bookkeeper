@@ -21,7 +21,8 @@
 
 package org.apache.bookkeeper.bookie;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.bookkeeper.bookie.LastAddConfirmedUpdateNotification.WATCHER_RECYCLER;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
@@ -32,9 +33,9 @@ import java.io.RandomAccessFile;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Observable;
-import java.util.Observer;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.bookkeeper.common.util.Watchable;
+import org.apache.bookkeeper.common.util.Watcher;
+import org.apache.bookkeeper.proto.checksum.DigestManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * in entry loggers.
  * </p>
  */
-class FileInfo extends Observable {
+class FileInfo extends Watchable<LastAddConfirmedUpdateNotification> {
     private static final Logger LOG = LoggerFactory.getLogger(FileInfo.class);
 
     static final int NO_MASTER_KEY = -1;
@@ -74,13 +75,18 @@ class FileInfo extends Observable {
      * The fingerprint of a ledger index file.
      */
     public static final int SIGNATURE = ByteBuffer.wrap("BKLE".getBytes(UTF_8)).getInt();
-    public static final int HEADER_VERSION = 0;
+
+    // No explicitLac
+    static final int V0 = 0;
+    // Adding explicitLac
+    static final int V1 = 1;
+    // current version of FileInfo header is V1
+    public static final int CURRENT_HEADER_VERSION = V1;
 
     static final long START_OF_DATA = 1024;
     private long size;
-    private AtomicInteger useCount = new AtomicInteger(0);
     private boolean isClosed;
-    private long sizeSinceLastwrite;
+    private long sizeSinceLastWrite;
 
     // bit map for states of the ledger.
     private int stateBits;
@@ -92,11 +98,19 @@ class FileInfo extends Observable {
     // file access mode
     protected String mode;
 
-    public FileInfo(File lf, byte[] masterKey) throws IOException {
-        this.lf = lf;
+    // this FileInfo Header Version
+    int headerVersion;
 
+    private boolean deleted;
+
+    public FileInfo(File lf, byte[] masterKey, int fileInfoVersionToWrite) throws IOException {
+        super(WATCHER_RECYCLER);
+
+        this.lf = lf;
         this.masterKey = masterKey;
         mode = "rw";
+        this.headerVersion = fileInfoVersionToWrite;
+        this.deleted = false;
     }
 
     synchronized Long getLastAddConfirmed() {
@@ -105,10 +119,11 @@ class FileInfo extends Observable {
 
     long setLastAddConfirmed(long lac) {
         long lacToReturn;
+        boolean changed = false;
         synchronized (this) {
             if (null == this.lac || this.lac < lac) {
                 this.lac = lac;
-                setChanged();
+                changed = true;
             }
             lacToReturn = this.lac;
         }
@@ -116,30 +131,39 @@ class FileInfo extends Observable {
             LOG.trace("Updating LAC {} , {}", lacToReturn, lac);
         }
 
-
-        notifyObservers(new LastAddConfirmedUpdateNotification(lacToReturn));
+        if (changed) {
+            notifyWatchers(LastAddConfirmedUpdateNotification.FUNC, lacToReturn);
+        }
         return lacToReturn;
     }
 
-    synchronized Observable waitForLastAddConfirmedUpdate(long previousLAC, Observer observe) {
-        if ((null != lac && lac > previousLAC)
-                || isClosed || ((stateBits & STATE_FENCED_BIT) == STATE_FENCED_BIT)) {
+    synchronized boolean waitForLastAddConfirmedUpdate(long previousLAC,
+                                                       Watcher<LastAddConfirmedUpdateNotification> watcher) {
+        if ((null != lac && lac > previousLAC) || isClosed) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Wait For LAC {} , {}", this.lac, previousLAC);
             }
-            return null;
+            return false;
         }
 
-        addObserver(observe);
-        return this;
+        addWatcher(watcher);
+        return true;
+    }
+
+    synchronized void cancelWaitForLastAddConfirmedUpdate(Watcher<LastAddConfirmedUpdateNotification> watcher) {
+        deleteWatcher(watcher);
+    }
+
+    public boolean isClosed() {
+        return isClosed;
     }
 
     public synchronized File getLf() {
         return lf;
     }
 
-    public long getSizeSinceLastwrite() {
-        return sizeSinceLastwrite;
+    public long getSizeSinceLastWrite() {
+        return sizeSinceLastWrite;
     }
 
     public ByteBuf getExplicitLac() {
@@ -160,6 +184,7 @@ class FileInfo extends Observable {
     }
 
     public void setExplicitLac(ByteBuf lac) {
+        long explicitLacValue;
         synchronized (this) {
             if (explicitLac == null) {
                 explicitLac = ByteBuffer.allocate(lac.capacity());
@@ -169,13 +194,14 @@ class FileInfo extends Observable {
 
             // skip the ledger id
             explicitLac.getLong();
-            long explicitLacValue = explicitLac.getLong();
-            setLastAddConfirmed(explicitLacValue);
+            explicitLacValue = explicitLac.getLong();
             explicitLac.rewind();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("fileInfo:SetLac: {}", explicitLac);
             }
+            needFlushHeader = true;
         }
+        setLastAddConfirmed(explicitLacValue);
     }
 
     public synchronized void readHeader() throws IOException {
@@ -186,7 +212,7 @@ class FileInfo extends Observable {
 
             fc = new RandomAccessFile(lf, mode).getChannel();
             size = fc.size();
-            sizeSinceLastwrite = size;
+            sizeSinceLastWrite = size;
 
             // avoid hang on reading partial index
             ByteBuffer bb = ByteBuffer.allocate((int) (Math.min(size, START_OF_DATA)));
@@ -198,9 +224,11 @@ class FileInfo extends Observable {
                 throw new IOException("Missing ledger signature while reading header for " + lf);
             }
             int version = bb.getInt();
-            if (version != HEADER_VERSION) {
+            if (version > CURRENT_HEADER_VERSION) {
                 throw new IOException("Incompatible ledger version " + version + " while reading header for " + lf);
             }
+            this.headerVersion = version;
+
             int length = bb.getInt();
             if (length < 0) {
                 throw new IOException("Length " + length + " is invalid while reading header for " + lf);
@@ -210,9 +238,38 @@ class FileInfo extends Observable {
             masterKey = new byte[length];
             bb.get(masterKey);
             stateBits = bb.getInt();
+
+            if (this.headerVersion >= V1) {
+                int explicitLacBufLength = bb.getInt();
+                if (explicitLacBufLength == 0) {
+                    explicitLac = null;
+                } else if (explicitLacBufLength >= DigestManager.LAC_METADATA_LENGTH) {
+                    if (explicitLac == null) {
+                        explicitLac = ByteBuffer.allocate(explicitLacBufLength);
+                    }
+                    byte[] explicitLacBufArray = new byte[explicitLacBufLength];
+                    bb.get(explicitLacBufArray);
+                    explicitLac.put(explicitLacBufArray);
+                    explicitLac.rewind();
+                } else {
+                    throw new IOException("ExplicitLacBufLength " + explicitLacBufLength
+                            + " is invalid while reading header for " + lf);
+                }
+            }
+
             needFlushHeader = false;
         } else {
             throw new IOException("Ledger index file " + lf + " does not exist");
+        }
+    }
+
+    public synchronized boolean isDeleted() {
+        return deleted;
+    }
+
+    public static class FileInfoDeletedException extends IOException {
+        FileInfoDeletedException() {
+            super("FileInfo already deleted");
         }
     }
 
@@ -223,6 +280,9 @@ class FileInfo extends Observable {
 
     private synchronized void checkOpen(boolean create, boolean openBeforeClose)
             throws IOException {
+        if (deleted) {
+            throw new FileInfoDeletedException();
+        }
         if (fc != null) {
             return;
         }
@@ -249,7 +309,7 @@ class FileInfo extends Observable {
             try {
                 readHeader();
             } catch (BufferUnderflowException buf) {
-                LOG.warn("Exception when reading header of {} : {}", lf, buf);
+                LOG.warn("Exception when reading header of {}.", lf, buf);
                 if (null != masterKey) {
                     LOG.warn("Attempting to write header of {} again.", lf);
                     writeHeader();
@@ -263,10 +323,20 @@ class FileInfo extends Observable {
     private void writeHeader() throws IOException {
         ByteBuffer bb = ByteBuffer.allocate((int) START_OF_DATA);
         bb.putInt(SIGNATURE);
-        bb.putInt(HEADER_VERSION);
+        bb.putInt(this.headerVersion);
         bb.putInt(masterKey.length);
         bb.put(masterKey);
         bb.putInt(stateBits);
+        if (this.headerVersion >= V1) {
+            if (explicitLac != null) {
+                explicitLac.rewind();
+                bb.putInt(explicitLac.capacity());
+                bb.put(explicitLac);
+                explicitLac.rewind();
+            } else {
+                bb.putInt(0);
+            }
+        }
         bb.rewind();
         fc.position(0);
         fc.write(bb);
@@ -283,6 +353,7 @@ class FileInfo extends Observable {
      */
     public boolean setFenced() throws IOException {
         boolean returnVal = false;
+        boolean changed = false;
         synchronized (this) {
             checkOpen(false);
             if (LOG.isDebugEnabled()) {
@@ -292,13 +363,13 @@ class FileInfo extends Observable {
                 // not fenced yet
                 stateBits |= STATE_FENCED_BIT;
                 needFlushHeader = true;
-                synchronized (this) {
-                    setChanged();
-                }
+                changed = true;
                 returnVal = true;
             }
         }
-        notifyObservers(new LastAddConfirmedUpdateNotification(Long.MAX_VALUE));
+        if (changed) {
+            notifyWatchers(LastAddConfirmedUpdateNotification.FUNC, Long.MAX_VALUE);
+        }
         return returnVal;
     }
 
@@ -379,20 +450,27 @@ class FileInfo extends Observable {
      *          if set to false, the index is not forced to create.
      */
     public void close(boolean force) throws IOException {
+        boolean changed = false;
         synchronized (this) {
+            if (isClosed) {
+                return;
+            }
             isClosed = true;
             checkOpen(force, true);
-            // Any time when we force close a file, we should try to flush header. otherwise, we might lose fence bit.
+            // Any time when we force close a file, we should try to flush header.
+            // otherwise, we might lose fence bit.
             if (force) {
                 flushHeader();
             }
-            setChanged();
-            if (useCount.get() == 0 && fc != null) {
+            changed = true;
+            if (fc != null) {
                 fc.close();
-                fc = null;
             }
+            fc = null;
         }
-        notifyObservers(new LastAddConfirmedUpdateNotification(Long.MAX_VALUE));
+        if (changed) {
+            notifyWatchers(LastAddConfirmedUpdateNotification.FUNC, Long.MAX_VALUE);
+        }
     }
 
     public synchronized long write(ByteBuffer[] buffs, long position) throws IOException {
@@ -414,7 +492,7 @@ class FileInfo extends Observable {
                 size = newsize;
             }
         }
-        sizeSinceLastwrite = fc.size();
+        sizeSinceLastWrite = fc.size();
         return total;
     }
 
@@ -478,27 +556,8 @@ class FileInfo extends Observable {
         return masterKey;
     }
 
-    public void use() {
-        useCount.incrementAndGet();
-    }
-
-    @VisibleForTesting
-    int getUseCount() {
-        return useCount.get();
-    }
-
-    public synchronized void release() {
-        int count = useCount.decrementAndGet();
-        if (isClosed && (count == 0) && fc != null) {
-            try {
-                fc.close();
-            } catch (IOException e) {
-                LOG.error("Error closing file channel", e);
-            }
-        }
-    }
-
     public synchronized boolean delete() {
+        deleted = true;
         return lf.delete();
     }
 
@@ -508,7 +567,7 @@ class FileInfo extends Observable {
             return;
         }
         if (!parent.mkdirs()) {
-            throw new IOException("Counldn't mkdirs for " + parent);
+            throw new IOException("Couldn't mkdirs for " + parent);
         }
     }
 

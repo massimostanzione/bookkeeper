@@ -26,8 +26,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.bookkeeper.conf.AbstractConfiguration;
 
+import org.apache.bookkeeper.conf.AbstractConfiguration;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.AsyncCallback.StringCallback;
@@ -36,8 +36,8 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ public class ZkUtils {
     /**
      * Asynchronously create zookeeper path recursively and optimistically.
      *
-     * @see #createFullPathOptimistic(ZooKeeper,String,byte[],List<ACL>,CreateMode)
+     * @see #createFullPathOptimistic(ZooKeeper, String, byte[], List, CreateMode)
      *
      * @param zk
      *          Zookeeper client
@@ -108,18 +108,17 @@ public class ZkUtils {
      * Asynchronously deletes zookeeper path recursively and optimistically.
      * This method is used for deleting the leaf nodes and its corresponding
      * parents if they don't have anymore children after deleting the child
-     * node. For this to work as expected, provided znodeVersion should be -1,
-     * so that there wont be version mismatches with any of the parent nodes. If
+     * node. For deleting the parent nodes it uses -1 as znodeversion. If
      * it fails to delete the leafnode then it will callback with the received
      * error code, but it fails to delete the parent node for whatsoever reason
      * it stops proceeding further and it will callback with ok error code.
-     * 
+     *
      * @param zk
      *            Zookeeper client
      * @param originalPath
      *            Zookeeper full path
      * @param znodeVersion
-     *            version of the node
+     *            the expected node version of the leafnode
      * @param callback
      *            callback
      * @param leafNodePath
@@ -134,8 +133,17 @@ public class ZkUtils {
             public void processResult(int rc, String path, Object ctx) {
                 if (rc == Code.OK.intValue()) {
                     String parent = new File(originalPath).getParent().replace("\\", "/");
-                    asyncDeleteFullPathOptimistic(zk, parent, znodeVersion, callback, leafNodePath);
+                    zk.getData(parent, false, (dRc, dPath, dCtx, data, stat) -> {
+                        if (Code.OK.intValue() == dRc && (stat != null && stat.getNumChildren() == 0)) {
+                            asyncDeleteFullPathOptimistic(zk, parent, -1, callback, leafNodePath);
+                        } else {
+                            // parent node is not empty so, complete the
+                            // callback
+                            callback.processResult(Code.OK.intValue(), path, leafNodePath);
+                        }
+                    }, null);
                 } else {
+                    // parent node deletion fails.. so, complete the callback
                     if (path.equals(leafNodePath)) {
                         callback.processResult(rc, path, leafNodePath);
                     } else {
@@ -145,7 +153,7 @@ public class ZkUtils {
             }
         }, leafNodePath);
     }
-    
+
     /**
      * Create zookeeper path recursively and optimistically. This method can throw
      * any of the KeeperExceptions which can be thrown by ZooKeeper#create.
@@ -204,7 +212,7 @@ public class ZkUtils {
             throw KeeperException.create(Code.get(rc.get()));
         }
     }
-    
+
     private static class GetChildrenCtx {
         int rc;
         boolean done = false;
@@ -212,7 +220,7 @@ public class ZkUtils {
     }
 
     /**
-     * Sync get all children under single zk node
+     * Sync get all children under single zk node.
      *
      * @param zk
      *          zookeeper client
@@ -222,8 +230,8 @@ public class ZkUtils {
      * @throws InterruptedException
      * @throws IOException
      */
-    public static List<String> getChildrenInSingleNode(final ZooKeeper zk, final String node)
-            throws InterruptedException, IOException {
+    public static List<String> getChildrenInSingleNode(final ZooKeeper zk, final String node, long zkOpTimeoutMs)
+            throws InterruptedException, IOException, KeeperException.NoNodeException {
         final GetChildrenCtx ctx = new GetChildrenCtx();
         getChildrenInSingleNode(zk, node, new GenericCallback<List<String>>() {
             @Override
@@ -240,19 +248,32 @@ public class ZkUtils {
         });
 
         synchronized (ctx) {
+            long startTime = System.currentTimeMillis();
             while (!ctx.done) {
-                ctx.wait();
+                try {
+                    ctx.wait(zkOpTimeoutMs > 0 ? zkOpTimeoutMs : 0);
+                } catch (InterruptedException e) {
+                    ctx.rc = Code.OPERATIONTIMEOUT.intValue();
+                    ctx.done = true;
+                }
+                // timeout the process if get-children response not received
+                // zkOpTimeoutMs.
+                if (zkOpTimeoutMs > 0 && (System.currentTimeMillis() - startTime) >= zkOpTimeoutMs) {
+                    ctx.rc = Code.OPERATIONTIMEOUT.intValue();
+                    ctx.done = true;
+                }
             }
         }
-        if (Code.OK.intValue() != ctx.rc) {
+        if (Code.NONODE.intValue() == ctx.rc) {
+            throw new KeeperException.NoNodeException("Got NoNode on call to getChildren on path " + node);
+        } else if (Code.OK.intValue() != ctx.rc) {
             throw new IOException("Error on getting children from node " + node);
         }
         return ctx.children;
-
     }
 
     /**
-     * Async get direct children under single node
+     * Async get direct children under single node.
      *
      * @param zk
      *          zookeeper client
@@ -291,12 +312,12 @@ public class ZkUtils {
     }
 
     /**
-     * Compute ZooKeeper ACLs using actual configuration
+     * Compute ZooKeeper ACLs using actual configuration.
      *
      * @param conf Bookie or BookKeeper configuration
      */
     public static List<ACL> getACLs(AbstractConfiguration conf) {
-        return conf.isZkEnableSecurity() ? ZooDefs.Ids.CREATOR_ALL_ACL: ZooDefs.Ids.OPEN_ACL_UNSAFE;
+        return conf.isZkEnableSecurity() ? ZooDefs.Ids.CREATOR_ALL_ACL : ZooDefs.Ids.OPEN_ACL_UNSAFE;
     }
 
 }

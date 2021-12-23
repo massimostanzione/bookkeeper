@@ -17,6 +17,10 @@
  */
 package org.apache.bookkeeper.client;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
@@ -31,11 +35,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
+import org.apache.bookkeeper.bookie.BookieImpl;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
@@ -44,16 +49,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.junit.Assert.*;
-import static com.google.common.base.Charsets.UTF_8;
-
 /**
  * This class tests the ledger close logic.
  */
 @SuppressWarnings("deprecation")
 public class LedgerCloseTest extends BookKeeperClusterTestCase {
 
-    private final static Logger LOG = LoggerFactory.getLogger(LedgerCloseTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LedgerCloseTest.class);
 
     static final int READ_TIMEOUT = 1;
 
@@ -70,7 +72,8 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
     @Test
     public void testLedgerCloseWithConsistentLength() throws Exception {
         ClientConfiguration conf = new ClientConfiguration();
-        conf.setZkServers(zkUtil.getZooKeeperConnectString()).setReadTimeout(1);
+        conf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        conf.setReadTimeout(1);
 
         BookKeeper bkc = new BookKeeper(conf);
         LedgerHandle lh = bkc.createLedger(6, 3, DigestType.CRC32, new byte[] {});
@@ -89,7 +92,7 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
         assertEquals(i.get(), BKException.Code.NotEnoughBookiesException);
         assertEquals(0, lh.getLength());
         assertEquals(LedgerHandle.INVALID_ENTRY_ID, lh.getLastAddConfirmed());
-        startBKCluster();
+        startBKCluster(zkUtil.getMetadataServiceUri());
         LedgerHandle newLh = bkc.openLedger(lh.getId(), DigestType.CRC32, new byte[] {});
         assertEquals(0, newLh.getLength());
         assertEquals(LedgerHandle.INVALID_ENTRY_ID, newLh.getLastAddConfirmed());
@@ -143,12 +146,12 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
         final CountDownLatch recoverDoneLatch = new CountDownLatch(1);
         final CountDownLatch failedLatch = new CountDownLatch(1);
         // kill first bookie to replace with a unauthorize bookie
-        BookieSocketAddress bookie = lh.getLedgerMetadata().currentEnsemble.get(0);
+        BookieId bookie = lh.getCurrentEnsemble().get(0);
         ServerConfiguration conf = killBookie(bookie);
         // replace a unauthorize bookie
         startUnauthorizedBookie(conf, addDoneLatch);
         // kill second bookie to replace with a dead bookie
-        bookie = lh.getLedgerMetadata().currentEnsemble.get(1);
+        bookie = lh.getCurrentEnsemble().get(1);
         conf = killBookie(bookie);
         // replace a slow dead bookie
         startDeadBookie(conf, deadIOLatch);
@@ -166,6 +169,7 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
                         try {
                             recoverDoneLatch.await();
                         } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
                         }
                     }
                 }
@@ -193,13 +197,14 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
 
     private void startUnauthorizedBookie(ServerConfiguration conf, final CountDownLatch latch)
             throws Exception {
-        Bookie sBookie = new Bookie(conf) {
+        Bookie sBookie = new BookieImpl(conf) {
             @Override
-            public void addEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey)
+            public void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey)
                     throws IOException, BookieException {
                 try {
                     latch.await();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
                 throw BookieException.create(BookieException.Code.UnauthorizedAccessException);
             }
@@ -210,27 +215,26 @@ public class LedgerCloseTest extends BookKeeperClusterTestCase {
                 throw new IOException("Dead bookie for recovery adds.");
             }
         };
-        bsConfs.add(conf);
-        bs.add(startBookie(conf, sBookie));
+        startAndAddBookie(conf, sBookie);
     }
 
     // simulate slow adds, then become normal when recover,
     // so no ensemble change when recovering ledger on this bookie.
     private void startDeadBookie(ServerConfiguration conf, final CountDownLatch latch) throws Exception {
-        Bookie dBookie = new Bookie(conf) {
+        Bookie dBookie = new BookieImpl(conf) {
             @Override
-            public void addEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey)
+            public void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey)
                     throws IOException, BookieException {
                 try {
                     latch.await();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
                 // simulate slow adds.
                 throw new IOException("Dead bookie");
             }
         };
-        bsConfs.add(conf);
-        bs.add(startBookie(conf, dBookie));
+        startAndAddBookie(conf, dBookie);
     }
 
     @Test

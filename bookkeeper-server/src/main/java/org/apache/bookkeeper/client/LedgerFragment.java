@@ -19,22 +19,21 @@
  */
 package org.apache.bookkeeper.client;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
-import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.net.BookieId;
 
 /**
  * Represents the entries of a segment of a ledger which are stored on subset of
  * bookies in the segments bookie ensemble.
  *
- * Used for checking and recovery
+ * <p>Used for checking and recovery
  */
 public class LedgerFragment {
     private final Set<Integer> bookieIndexes;
-    private final List<BookieSocketAddress> ensemble;
+    private final List<BookieId> ensemble;
     private final long firstEntryId;
     private final long lastKnownEntryId;
     private final long ledgerId;
@@ -49,10 +48,10 @@ public class LedgerFragment {
         this.firstEntryId = firstEntryId;
         this.lastKnownEntryId = lastKnownEntryId;
         this.bookieIndexes = bookieIndexes;
-        this.ensemble = lh.getLedgerMetadata().getEnsemble(firstEntryId);
+        this.ensemble = lh.getLedgerMetadata().getEnsembleAt(firstEntryId);
         this.schedule = lh.getDistributionSchedule();
-        SortedMap<Long, ArrayList<BookieSocketAddress>> ensembles = lh
-                .getLedgerMetadata().getEnsembles();
+        SortedMap<Long, ? extends List<BookieId>> ensembles = lh
+                .getLedgerMetadata().getAllEnsembles();
         this.isLedgerClosed = lh.getLedgerMetadata().isClosed()
                 || !ensemble.equals(ensembles.get(ensembles.lastKey()));
     }
@@ -96,23 +95,23 @@ public class LedgerFragment {
         return ledgerId;
     }
 
-    long getFirstEntryId() {
+    public long getFirstEntryId() {
         return firstEntryId;
     }
 
-    long getLastKnownEntryId() {
+    public long getLastKnownEntryId() {
         return lastKnownEntryId;
     }
 
     /**
-     * Gets the failedBookie address
+     * Gets the failedBookie address.
      */
-    public BookieSocketAddress getAddress(int bookieIndex) {
+    public BookieId getAddress(int bookieIndex) {
         return ensemble.get(bookieIndex);
     }
 
-    public Set<BookieSocketAddress> getAddresses() {
-        Set<BookieSocketAddress> addresses = new HashSet<BookieSocketAddress>();
+    public Set<BookieId> getAddresses() {
+        Set<BookieId> addresses = new HashSet<BookieId>();
         for (int bookieIndex : bookieIndexes) {
             addresses.add(ensemble.get(bookieIndex));
         }
@@ -120,7 +119,7 @@ public class LedgerFragment {
     }
 
     /**
-     * Gets the failedBookie index
+     * Gets the failedBookie index.
      */
     public Set<Integer> getBookiesIndexes() {
         return bookieIndexes;
@@ -132,16 +131,18 @@ public class LedgerFragment {
      * @return entryId
      */
     public long getFirstStoredEntryId() {
-        Long firstEntry = null;
+        long firstEntry = LedgerHandle.INVALID_ENTRY_ID;
         for (int bookieIndex : bookieIndexes) {
             Long firstStoredEntryForBookie = getFirstStoredEntryId(bookieIndex);
-            if (null == firstEntry) {
-                firstEntry = firstStoredEntryForBookie;
-            } else if (null != firstStoredEntryForBookie) {
-                firstEntry = Math.min(firstEntry, firstStoredEntryForBookie);
+            if (firstStoredEntryForBookie != LedgerHandle.INVALID_ENTRY_ID) {
+                if (firstEntry == LedgerHandle.INVALID_ENTRY_ID) {
+                    firstEntry = firstStoredEntryForBookie;
+                } else {
+                    firstEntry = Math.min(firstEntry, firstStoredEntryForBookie);
+                }
             }
         }
-        return null == firstEntry ? LedgerHandle.INVALID_ENTRY_ID : firstEntry;
+        return firstEntry;
     }
 
     /**
@@ -170,16 +171,18 @@ public class LedgerFragment {
      * @return entryId
      */
     public long getLastStoredEntryId() {
-        Long lastEntry = null;
+        long lastEntry = LedgerHandle.INVALID_ENTRY_ID;
         for (int bookieIndex : bookieIndexes) {
             Long lastStoredEntryIdForBookie = getLastStoredEntryId(bookieIndex);
-            if (null == lastEntry) {
-                lastEntry = lastStoredEntryIdForBookie;
-            } else if (null != lastStoredEntryIdForBookie) {
-                lastEntry = Math.max(lastEntry, lastStoredEntryIdForBookie);
+            if (lastStoredEntryIdForBookie != LedgerHandle.INVALID_ENTRY_ID) {
+                if (lastEntry == LedgerHandle.INVALID_ENTRY_ID) {
+                    lastEntry = lastStoredEntryIdForBookie;
+                } else {
+                    lastEntry = Math.max(lastEntry, lastStoredEntryIdForBookie);
+                }
             }
         }
-        return null == lastEntry ? LedgerHandle.INVALID_ENTRY_ID : lastEntry;
+        return lastEntry;
     }
 
     /**
@@ -201,12 +204,16 @@ public class LedgerFragment {
         return LedgerHandle.INVALID_ENTRY_ID;
     }
 
+    public boolean isStoredEntryId(long entryId, int bookieIndex) {
+        return schedule.hasEntry(entryId, bookieIndex);
+    }
+
     /**
-     * Gets the ensemble of fragment
+     * Gets the ensemble of fragment.
      *
      * @return the ensemble for the segment which this fragment is a part of
      */
-    public List<BookieSocketAddress> getEnsemble() {
+    public List<BookieId> getEnsemble() {
         return this.ensemble;
     }
 

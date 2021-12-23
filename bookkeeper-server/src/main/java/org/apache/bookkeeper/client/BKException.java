@@ -20,6 +20,8 @@
  */
 package org.apache.bookkeeper.client;
 
+import java.util.function.Function;
+
 /**
  * Class the enumerates all the possible error conditions.
  *
@@ -28,12 +30,29 @@ package org.apache.bookkeeper.client;
 @SuppressWarnings("serial")
 public abstract class BKException extends org.apache.bookkeeper.client.api.BKException {
 
+    public static final Function<Throwable, BKException> HANDLER = cause -> {
+        if (cause == null) {
+            return null;
+        }
+        if (cause instanceof BKException) {
+            return (BKException) cause;
+        } else {
+            BKException ex = new BKUnexpectedConditionException();
+            ex.initCause(cause);
+            return ex;
+        }
+    };
+
     BKException(int code) {
         super(code);
     }
 
+    BKException(int code, Throwable cause) {
+        super(code, cause);
+    }
+
     /**
-     * Create an exception from an error code
+     * Create an exception from an error code.
      * @param code return error code
      * @return corresponding exception
      */
@@ -53,6 +72,8 @@ public abstract class BKException extends org.apache.bookkeeper.client.api.BKExc
             return new BKNotEnoughBookiesException();
         case Code.NoSuchLedgerExistsException:
             return new BKNoSuchLedgerExistsException();
+        case Code.NoSuchLedgerExistsOnMetadataServerException:
+            return new BKNoSuchLedgerExistsOnMetadataServerException();
         case Code.BookieHandleNotAvailableException:
             return new BKBookieHandleNotAvailableException();
         case Code.ZKException:
@@ -103,6 +124,8 @@ public abstract class BKException extends org.apache.bookkeeper.client.api.BKExc
             return new BKLedgerIdOverflowException();
         case Code.SecurityException:
             return new BKSecurityException();
+        case Code.MetadataSerializationException:
+            return new BKMetadataSerializationException();
         default:
             return new BKUnexpectedConditionException();
         }
@@ -115,200 +138,368 @@ public abstract class BKException extends org.apache.bookkeeper.client.api.BKExc
     public interface Code extends org.apache.bookkeeper.client.api.BKException.Code {
     }
 
+    /**
+     * Bookkeeper security exception.
+     */
     public static class BKSecurityException extends BKException {
         public BKSecurityException() {
-            super(Code.SecurityException);
+            super(BKException.Code.SecurityException);
         }
     }
+
+    /**
+     * Bookkeeper read exception.
+     */
     public static class BKReadException extends BKException {
         public BKReadException() {
-            super(Code.ReadException);
+            super(BKException.Code.ReadException);
         }
     }
 
+    /**
+     * Bookkeeper no such entry exception.
+     */
     public static class BKNoSuchEntryException extends BKException {
         public BKNoSuchEntryException() {
-            super(Code.NoSuchEntryException);
+            super(BKException.Code.NoSuchEntryException);
         }
     }
 
+    /**
+     * Bookkeeper quorum exception.
+     */
     public static class BKQuorumException extends BKException {
         public BKQuorumException() {
-            super(Code.QuorumException);
+            super(BKException.Code.QuorumException);
         }
     }
 
+    /**
+     * Bookkeeper bookie exception.
+     */
     public static class BKBookieException extends BKException {
         public BKBookieException() {
-            super(Code.NoBookieAvailableException);
+            super(BKException.Code.NoBookieAvailableException);
         }
     }
 
+    /**
+     * Bookkeeper digest not initialized exception.
+     */
     public static class BKDigestNotInitializedException extends BKException {
         public BKDigestNotInitializedException() {
-            super(Code.DigestNotInitializedException);
+            super(BKException.Code.DigestNotInitializedException);
         }
     }
 
+    /**
+     * Bookkeeper digest match exception.
+     */
     public static class BKDigestMatchException extends BKException {
         public BKDigestMatchException() {
-            super(Code.DigestMatchException);
+            super(BKException.Code.DigestMatchException);
         }
     }
 
+    /**
+     * Bookkeeper illegal operation exception.
+     */
     public static class BKIllegalOpException extends BKException {
         public BKIllegalOpException() {
-            super(Code.IllegalOpException);
+            super(BKException.Code.IllegalOpException);
         }
     }
 
+    /**
+     * Bookkeeper add entry quorum timeout exception.
+     */
     public static class BKAddEntryQuorumTimeoutException extends BKException {
         public BKAddEntryQuorumTimeoutException() {
-            super(Code.AddEntryQuorumTimeoutException);
+            super(BKException.Code.AddEntryQuorumTimeoutException);
         }
     }
 
+    /**
+     * Bookkeeper duplicate entry id exception.
+     */
     public static class BKDuplicateEntryIdException extends BKException {
         public BKDuplicateEntryIdException() {
-            super(Code.DuplicateEntryIdException);
+            super(BKException.Code.DuplicateEntryIdException);
         }
     }
 
+    /**
+     * Bookkeeper unexpected condition exception.
+     */
     public static class BKUnexpectedConditionException extends BKException {
         public BKUnexpectedConditionException() {
-            super(Code.UnexpectedConditionException);
+            super(BKException.Code.UnexpectedConditionException);
         }
     }
 
+    /**
+     * Bookkeeper not enough bookies exception.
+     */
     public static class BKNotEnoughBookiesException extends BKException {
         public BKNotEnoughBookiesException() {
-            super(Code.NotEnoughBookiesException);
+            super(BKException.Code.NotEnoughBookiesException);
+        }
+        public BKNotEnoughBookiesException(Throwable cause) {
+            super(BKException.Code.NotEnoughBookiesException, cause);
         }
     }
 
+    /**
+     * Bookkeeper write exception.
+     */
     public static class BKWriteException extends BKException {
         public BKWriteException() {
-            super(Code.WriteException);
+            super(BKException.Code.WriteException);
         }
     }
 
+    /**
+     * Bookkeeper protocol version exception.
+     */
     public static class BKProtocolVersionException extends BKException {
         public BKProtocolVersionException() {
-            super(Code.ProtocolVersionException);
+            super(BKException.Code.ProtocolVersionException);
         }
     }
 
+    /**
+     * Bookkeeper metadata version exception.
+     */
     public static class BKMetadataVersionException extends BKException {
         public BKMetadataVersionException() {
-            super(Code.MetadataVersionException);
+            super(BKException.Code.MetadataVersionException);
         }
     }
 
+    /**
+     * Bookkeeper no such ledger exists exception.
+     */
     public static class BKNoSuchLedgerExistsException extends BKException {
         public BKNoSuchLedgerExistsException() {
-            super(Code.NoSuchLedgerExistsException);
+            super(BKException.Code.NoSuchLedgerExistsException);
+        }
+    }
+    /**
+     * Bookkeeper no such ledger exists on metadata server exception.
+     */
+    public static class BKNoSuchLedgerExistsOnMetadataServerException extends BKException {
+        public BKNoSuchLedgerExistsOnMetadataServerException() {
+            super(Code.NoSuchLedgerExistsOnMetadataServerException);
         }
     }
 
+    /**
+     * Bookkeeper bookie handle not available exception.
+     */
     public static class BKBookieHandleNotAvailableException extends BKException {
         public BKBookieHandleNotAvailableException() {
-            super(Code.BookieHandleNotAvailableException);
+            super(BKException.Code.BookieHandleNotAvailableException);
         }
     }
 
+    /**
+     * Zookeeper exception.
+     */
     public static class ZKException extends BKException {
         public ZKException() {
-            super(Code.ZKException);
+            super(BKException.Code.ZKException);
+        }
+
+        public ZKException(Throwable cause) {
+            super(BKException.Code.ZKException, cause);
         }
     }
 
+    /**
+     * Metastore exception.
+     */
     public static class MetaStoreException extends BKException {
         public MetaStoreException() {
-            super(Code.MetaStoreException);
+            super(BKException.Code.MetaStoreException);
+        }
+
+        public MetaStoreException(Throwable cause) {
+            super(BKException.Code.MetaStoreException, cause);
         }
     }
 
+    /**
+     * Bookkeeper ledger exist exception.
+     */
     public static class BKLedgerExistException extends BKException {
         public BKLedgerExistException() {
-            super(Code.LedgerExistException);
+            super(BKException.Code.LedgerExistException);
         }
     }
 
+    /**
+     * Bookkeeper ledger recovery exception.
+     */
     public static class BKLedgerRecoveryException extends BKException {
         public BKLedgerRecoveryException() {
-            super(Code.LedgerRecoveryException);
+            super(BKException.Code.LedgerRecoveryException);
         }
     }
 
+    /**
+     * Bookkeeper ledger closed exception.
+     */
     public static class BKLedgerClosedException extends BKException {
         public BKLedgerClosedException() {
-            super(Code.LedgerClosedException);
+            super(BKException.Code.LedgerClosedException);
         }
     }
 
+    /**
+     * Bookkeeper incorrect parameter exception.
+     */
     public static class BKIncorrectParameterException extends BKException {
         public BKIncorrectParameterException() {
-            super(Code.IncorrectParameterException);
+            super(BKException.Code.IncorrectParameterException);
         }
     }
 
+    /**
+     * Bookkeeper interrupted exception.
+     */
     public static class BKInterruptedException extends BKException {
         public BKInterruptedException() {
-            super(Code.InterruptedException);
+            super(BKException.Code.InterruptedException);
         }
     }
 
+    /**
+     * Bookkeeper ledger fenced exception.
+     */
     public static class BKLedgerFencedException extends BKException {
         public BKLedgerFencedException() {
-            super(Code.LedgerFencedException);
+            super(BKException.Code.LedgerFencedException);
         }
     }
 
+    /**
+     * Bookkeeper unauthorized access exception.
+     */
     public static class BKUnauthorizedAccessException extends BKException {
         public BKUnauthorizedAccessException() {
-            super(Code.UnauthorizedAccessException);
+            super(BKException.Code.UnauthorizedAccessException);
         }
     }
 
+    /**
+     * Bookkeeper unclosed fragment exception.
+     */
     public static class BKUnclosedFragmentException extends BKException {
         public BKUnclosedFragmentException() {
-            super(Code.UnclosedFragmentException);
+            super(BKException.Code.UnclosedFragmentException);
         }
     }
 
+    /**
+     * Bookkeeper write on readonly bookie exception.
+     */
     public static class BKWriteOnReadOnlyBookieException extends BKException {
         public BKWriteOnReadOnlyBookieException() {
-            super(Code.WriteOnReadOnlyBookieException);
+            super(BKException.Code.WriteOnReadOnlyBookieException);
         }
     }
 
+    /**
+     * Bookkeeper too many requests exception.
+     */
+    public static class BKTooManyRequestsException extends BKException {
+        public BKTooManyRequestsException() {
+            super(BKException.Code.TooManyRequestsException);
+        }
+    }
+
+<<<<<<< HEAD
     public static class BKTooManyRequestsException extends BKException {
         public BKTooManyRequestsException() {
             super(Code.TooManyRequestsException);
         }
     }
 
+=======
+    /**
+     * Bookkeeper replication exception.
+     */
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     public static class BKReplicationException extends BKException {
         public BKReplicationException() {
-            super(Code.ReplicationException);
+            super(BKException.Code.ReplicationException);
         }
     }
 
+    /**
+     * Bookkeeper client closed exception.
+     */
     public static class BKClientClosedException extends BKException {
         public BKClientClosedException() {
-            super(Code.ClientClosedException);
+            super(BKException.Code.ClientClosedException);
         }
     }
 
+    /**
+     * Bookkeeper timeout exception.
+     */
     public static class BKTimeoutException extends BKException {
         public BKTimeoutException() {
-            super(Code.TimeoutException);
+            super(BKException.Code.TimeoutException);
         }
     }
 
+    /**
+     * Bookkeeper ledger id overflow exception.
+     */
     public static class BKLedgerIdOverflowException extends BKException {
         public BKLedgerIdOverflowException() {
-            super(Code.LedgerIdOverflowException);
+            super(BKException.Code.LedgerIdOverflowException);
         }
+    }
+
+    /**
+     * Bookkeeper metadata serialization exception.
+     */
+    public static class BKMetadataSerializationException extends BKException {
+        public BKMetadataSerializationException() {
+            super(BKException.Code.MetadataSerializationException);
+        }
+
+        public BKMetadataSerializationException(Throwable cause) {
+            super(BKException.Code.MetadataSerializationException, cause);
+        }
+    }
+
+    /**
+     * Extract an exception code from an BKException, or use a default if it's another type.
+     * The throwable is null, assume that no exception took place and return
+     * {@link BKException.Code.OK}.
+     */
+    public static int getExceptionCode(Throwable t, int defaultCode) {
+        if (t == null) {
+            return BKException.Code.OK;
+        } else if (t instanceof BKException) {
+            return ((BKException) t).getCode();
+        } else if (t.getCause() != null) {
+            return getExceptionCode(t.getCause(), defaultCode);
+        } else {
+            return defaultCode;
+        }
+    }
+
+    /**
+     * Extract an exception code from an BKException, or default to unexpected exception if throwable
+     * is not a BKException.
+     *
+     * @see #getExceptionCode(Throwable,int)
+     */
+    public static int getExceptionCode(Throwable t) {
+        return getExceptionCode(t, Code.UnexpectedConditionException);
     }
 }

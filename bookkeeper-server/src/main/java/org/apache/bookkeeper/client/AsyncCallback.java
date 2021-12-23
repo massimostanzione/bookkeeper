@@ -26,6 +26,30 @@ import org.apache.bookkeeper.common.annotation.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface AsyncCallback {
+    /**
+     * Async Callback for adding entries to ledgers with latency information.
+     *
+     * @since 4.7
+     */
+    @InterfaceAudience.Public
+    @InterfaceStability.Evolving
+    interface AddCallbackWithLatency {
+        /**
+         * Callback declaration which additionally passes quorum write complete latency.
+         *
+         * @param rc
+         *          return code
+         * @param lh
+         *          ledger handle
+         * @param entryId
+         *          entry identifier
+         * @param qwcLatency
+         *          QuorumWriteComplete Latency
+         * @param ctx
+         *          context object
+         */
+        void addCompleteWithLatency(int rc, LedgerHandle lh, long entryId, long qwcLatency, Object ctx);
+    }
 
     /**
      * Async Callback for adding entries to ledgers.
@@ -34,9 +58,9 @@ public interface AsyncCallback {
      */
     @InterfaceAudience.Public
     @InterfaceStability.Stable
-    interface AddCallback {
+    interface AddCallback extends AddCallbackWithLatency {
         /**
-         * Callback declaration
+         * Callback to implement if latency information is not desired.
          *
          * @param rc
          *          return code
@@ -48,6 +72,25 @@ public interface AsyncCallback {
          *          context object
          */
         void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx);
+
+        /**
+         * Callback declaration which additionally passes quorum write complete latency.
+         *
+         * @param rc
+         *          return code
+         * @param lh
+         *          ledger handle
+         * @param entryId
+         *          entry identifier
+         * @param qwcLatency
+         *          QuorumWriteComplete Latency
+         * @param ctx
+         *          context object
+         */
+        @Override
+        default void addCompleteWithLatency(int rc, LedgerHandle lh, long entryId, long qwcLatency, Object ctx) {
+            addComplete(rc, lh, entryId, ctx);
+        }
     }
 
     /**
@@ -59,7 +102,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface AddLacCallback {
         /**
-         * Callback declaration
+         * Callback declaration.
          *
          * @param rc
          *          return code
@@ -80,7 +123,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface CloseCallback {
         /**
-         * Callback definition
+         * Callback definition.
          *
          * @param rc
          *          return code
@@ -101,7 +144,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface CreateCallback {
         /**
-         * Declaration of callback method
+         * Declaration of callback method.
          *
          * @param rc
          *          return status
@@ -122,7 +165,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface OpenCallback {
         /**
-         * Callback for asynchronous call to open ledger
+         * Callback for asynchronous call to open ledger.
          *
          * @param rc
          *          Return code
@@ -144,7 +187,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface ReadCallback {
         /**
-         * Callback declaration
+         * Callback declaration.
          *
          * @param rc
          *          return code
@@ -168,7 +211,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface DeleteCallback {
         /**
-         * Callback definition for delete operations
+         * Callback definition for delete operations.
          *
          * @param rc
          *          return code
@@ -187,7 +230,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface ReadLastConfirmedCallback {
         /**
-         * Callback definition for bookie recover operations
+         * Callback definition for bookie recover operations.
          *
          * @param rc Return code
          * @param lastConfirmed The entry id of the last confirmed write or
@@ -209,7 +252,7 @@ public interface AsyncCallback {
     interface ReadLastConfirmedAndEntryCallback {
         /**
          * Callback definition for bookie operation that allows reading the last add confirmed
-         * along with an entry within the last add confirmed range
+         * along with an entry within the last add confirmed range.
          *
          * @param rc Return code
          * @param lastConfirmed The entry id of the last confirmed write or
@@ -231,7 +274,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface RecoverCallback {
         /**
-         * Callback definition for bookie recover operations
+         * Callback definition for bookie recover operations.
          *
          * @param rc
          *          return code
@@ -240,7 +283,7 @@ public interface AsyncCallback {
          */
         void recoverComplete(int rc, Object ctx);
     }
-    
+
     /**
      * Async Callback for checking if a ledger is closed.
      *
@@ -250,7 +293,7 @@ public interface AsyncCallback {
     @InterfaceStability.Stable
     interface IsClosedCallback {
         /**
-         * Callback definition for isClosed operation
+         * Callback definition for isClosed operation.
          *
          * @param rc
          *          return code

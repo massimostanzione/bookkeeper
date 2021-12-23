@@ -21,25 +21,27 @@
 
 package org.apache.bookkeeper.client;
 
-import static org.apache.bookkeeper.common.concurrent.FutureUtils.createFuture;
-import static org.apache.bookkeeper.common.concurrent.FutureUtils.completeExceptionally;
-
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import java.io.Serializable;
 import java.security.GeneralSecurityException;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.client.AsyncCallback.AddCallbackWithLatency;
 import org.apache.bookkeeper.client.SyncCallbackUtils.SyncAddCallback;
+import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.client.api.WriteAdvHandle;
+import org.apache.bookkeeper.client.api.WriteFlag;
 import org.apache.bookkeeper.util.SafeRunnable;
+import org.apache.bookkeeper.versioning.Versioned;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import org.apache.bookkeeper.client.api.WriteAdvHandle;
+
 
 /**
  * Ledger Advanced handle extends {@link LedgerHandle} to provide API to add entries with
@@ -47,17 +49,20 @@ import org.apache.bookkeeper.client.api.WriteAdvHandle;
  * ledger being written.
  */
 public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
-    final static Logger LOG = LoggerFactory.getLogger(LedgerHandleAdv.class);
+    static final Logger LOG = LoggerFactory.getLogger(LedgerHandleAdv.class);
 
     static class PendingOpsComparator implements Comparator<PendingAddOp>, Serializable {
+        @Override
         public int compare(PendingAddOp o1, PendingAddOp o2) {
             return Long.compare(o1.entryId, o2.entryId);
         }
     }
 
-    LedgerHandleAdv(BookKeeper bk, long ledgerId, LedgerMetadata metadata, DigestType digestType, byte[] password)
+    LedgerHandleAdv(ClientContext clientCtx,
+                    long ledgerId, Versioned<LedgerMetadata> metadata,
+                    BookKeeper.DigestType digestType, byte[] password, EnumSet<WriteFlag> writeFlags)
             throws GeneralSecurityException, NumberFormatException {
-        super(bk, ledgerId, metadata, digestType, password);
+        super(clientCtx, ledgerId, metadata, digestType, password, writeFlags);
         pendingAddOps = new PriorityBlockingQueue<PendingAddOp>(10, new PendingOpsComparator());
     }
 
@@ -69,6 +74,7 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
      *            entryId of the entry to add
      * @param data
      *            array of bytes to be written to the ledger
+     *            do not reuse the buffer, bk-client will release it appropriately
      * @return
      *            entryId that is just created.
      */
@@ -86,6 +92,7 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
      *            entryId of the entry to add
      * @param data
      *            array of bytes to be written to the ledger
+     *            do not reuse the buffer, bk-client will release it appropriately
      * @param offset
      *            offset from which to take bytes from data
      * @param length
@@ -116,6 +123,7 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
      *            entryId of the entry to add
      * @param data
      *            array of bytes to be written
+     *            do not reuse the buffer, bk-client will release it appropriately
      * @param cb
      *            object implementing callbackinterface
      * @param ctx
@@ -133,6 +141,7 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
      *            entryId of the entry to add
      * @param data
      *            array of bytes to be written
+     *            do not reuse the buffer, bk-client will release it appropriately
      * @param offset
      *            offset from which to take bytes from data
      * @param length
@@ -151,9 +160,51 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
         asyncAddEntry(entryId, Unpooled.wrappedBuffer(data, offset, length), cb, ctx);
     }
 
-    private void asyncAddEntry(final long entryId, ByteBuf data,
-            final AddCallback cb, final Object ctx) {
-        PendingAddOp op = PendingAddOp.create(this, data, cb, ctx);
+    /**
+     * Add entry asynchronously to an open ledger, using an offset and range.
+     *
+     * @param entryId
+     *            entryId of the entry to add
+     * @param data
+     *            array of bytes to be written
+     *            do not reuse the buffer, bk-client will release it appropriately
+     * @param offset
+     *            offset from which to take bytes from data
+     * @param length
+     *            number of bytes to take from data
+     * @param cb
+     *            object implementing callbackinterface
+     * @param ctx
+     *            some control object
+     * @throws ArrayIndexOutOfBoundsException
+     *             if offset or length is negative or offset and length sum to a
+     *             value higher than the length of data.
+     */
+    @Override
+    public void asyncAddEntry(final long entryId, final byte[] data, final int offset, final int length,
+                              final AddCallbackWithLatency cb, final Object ctx) {
+        asyncAddEntry(entryId, Unpooled.wrappedBuffer(data, offset, length), cb, ctx);
+    }
+
+    /**
+     * Add entry asynchronously to an open ledger, using an offset and range.
+     * This can be used only with {@link LedgerHandleAdv} returned through
+     * ledgers created with {@link createLedgerAdv(int, int, int, DigestType, byte[])}.
+     *
+     * @param entryId
+     *            entryId of the entry to add.
+     * @param data
+     *            io.netty.buffer.ByteBuf of bytes to be written
+     *            do not reuse the buffer, bk-client will release it appropriately
+     * @param cb
+     *            object implementing callbackinterface
+     * @param ctx
+     *            some control object
+     */
+    @Override
+    public void asyncAddEntry(final long entryId, ByteBuf data,
+                              final AddCallbackWithLatency cb, final Object ctx) {
+        PendingAddOp op = PendingAddOp.create(this, clientCtx, getCurrentEnsemble(), data, writeFlags, cb, ctx);
         op.setEntryId(entryId);
 
         if ((entryId <= this.lastAddConfirmed) || pendingAddOps.contains(op)) {
@@ -180,24 +231,24 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
             // synchronized on this to ensure that
             // the ledger isn't closed between checking and
             // updating lastAddPushed
-            if (metadata.isClosed()) {
-                wasClosed = true;
-            } else {
+            if (isHandleWritable()) {
                 long currentLength = addToLength(op.payload.readableBytes());
                 op.setLedgerLength(currentLength);
                 pendingAddOps.add(op);
+            } else {
+                wasClosed = true;
             }
         }
 
         if (wasClosed) {
             // make sure the callback is triggered in main worker pool
             try {
-                bk.getMainWorkerPool().submit(new SafeRunnable() {
+                clientCtx.getMainWorkerPool().submit(new SafeRunnable() {
                     @Override
                     public void safeRun() {
                         LOG.warn("Attempt to add to closed ledger: {}", ledgerId);
-                        op.cb.addComplete(BKException.Code.LedgerClosedException,
-                                LedgerHandleAdv.this, op.getEntryId(), op.ctx);
+                        op.cb.addCompleteWithLatency(BKException.Code.LedgerClosedException,
+                                LedgerHandleAdv.this, op.getEntryId(), 0, op.ctx);
                     }
                     @Override
                     public String toString() {
@@ -205,37 +256,44 @@ public class LedgerHandleAdv extends LedgerHandle implements WriteAdvHandle {
                     }
                 });
             } catch (RejectedExecutionException e) {
-                op.cb.addComplete(bk.getReturnRc(BKException.Code.InterruptedException),
-                        LedgerHandleAdv.this, op.getEntryId(), op.ctx);
+                op.cb.addCompleteWithLatency(BookKeeper.getReturnRc(clientCtx.getBookieClient(),
+                                                                    BKException.Code.InterruptedException),
+                        LedgerHandleAdv.this, op.getEntryId(), 0, op.ctx);
             }
             return;
         }
 
+        if (!waitForWritable(distributionSchedule.getWriteSet(op.getEntryId()),
+                    0, clientCtx.getConf().waitForWriteSetMs)) {
+            op.allowFailFastOnUnwritableChannel();
+        }
+
         try {
-            bk.getMainWorkerPool().submitOrdered(ledgerId, op);
+            clientCtx.getMainWorkerPool().executeOrdered(ledgerId, op);
         } catch (RejectedExecutionException e) {
-            op.cb.addComplete(bk.getReturnRc(BKException.Code.InterruptedException),
-                              LedgerHandleAdv.this, op.getEntryId(), op.ctx);
+            op.cb.addCompleteWithLatency(BookKeeper.getReturnRc(clientCtx.getBookieClient(),
+                                                                BKException.Code.InterruptedException),
+                              LedgerHandleAdv.this, op.getEntryId(), 0, op.ctx);
         }
     }
 
     @Override
-    public CompletableFuture<Long> write(long entryId, ByteBuf data) {
+    public CompletableFuture<Long> writeAsync(long entryId, ByteBuf data) {
         SyncAddCallback callback = new SyncAddCallback();
         asyncAddEntry(entryId, data, callback, data);
         return callback;
     }
 
     /**
-     * LedgerHandleAdv will not allow addEntry without providing an entryId
+     * LedgerHandleAdv will not allow addEntry without providing an entryId.
      */
     @Override
     public void asyncAddEntry(ByteBuf data, AddCallback cb, Object ctx) {
-        cb.addComplete(BKException.Code.IllegalOpException, this, LedgerHandle.INVALID_ENTRY_ID, ctx);
+        cb.addCompleteWithLatency(BKException.Code.IllegalOpException, this, LedgerHandle.INVALID_ENTRY_ID, 0, ctx);
     }
 
     /**
-     * LedgerHandleAdv will not allow addEntry without providing an entryId
+     * LedgerHandleAdv will not allow addEntry without providing an entryId.
      */
     @Override
     public void asyncAddEntry(final byte[] data, final int offset, final int length,

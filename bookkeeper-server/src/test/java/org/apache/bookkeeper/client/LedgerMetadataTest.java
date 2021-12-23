@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+<<<<<<< HEAD
 
 package org.apache.bookkeeper.client;
 
@@ -33,6 +34,27 @@ import org.junit.Test;
 
 /**
  * Unit test for ledger metadata
+=======
+package org.apache.bookkeeper.client;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import com.google.common.collect.Lists;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.junit.Test;
+
+/**
+ * Unit test for ledger metadata.
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
  */
 public class LedgerMetadataTest {
 
@@ -40,6 +62,7 @@ public class LedgerMetadataTest {
 
     @Test
     public void testGetters() {
+<<<<<<< HEAD
         org.apache.bookkeeper.client.api.LedgerMetadata metadata = new LedgerMetadata(
             3,
             2,
@@ -49,6 +72,19 @@ public class LedgerMetadataTest {
             Collections.emptyMap(),
             false);
 
+=======
+        List<BookieId> ensemble = Lists.newArrayList(new BookieSocketAddress("192.0.2.1", 1234).toBookieId(),
+                new BookieSocketAddress("192.0.2.2", 1234).toBookieId(),
+                new BookieSocketAddress("192.0.2.3", 1234).toBookieId());
+        org.apache.bookkeeper.client.api.LedgerMetadata metadata = LedgerMetadataBuilder.create()
+                .withEnsembleSize(3).withWriteQuorumSize(2).withAckQuorumSize(1)
+                .withDigestType(DigestType.CRC32.toApiDigestType()).withPassword(passwd)
+                .newEnsembleEntry(0L, ensemble)
+                .withId(100L)
+                .build();
+
+        assertEquals(100L, metadata.getLedgerId());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         assertEquals(3, metadata.getEnsembleSize());
         assertEquals(2, metadata.getWriteQuorumSize());
         assertEquals(1, metadata.getAckQuorumSize());
@@ -58,6 +94,7 @@ public class LedgerMetadataTest {
         assertEquals(-1L, metadata.getLastEntryId());
         assertEquals(0, metadata.getLength());
         assertFalse(metadata.isClosed());
+<<<<<<< HEAD
         assertTrue(metadata.getAllEnsembles().isEmpty());
 
         try {
@@ -154,4 +191,28 @@ public class LedgerMetadataTest {
         assertTrue(lm1.isConflictWith(lm2));
     }
 
+=======
+        assertEquals(1, metadata.getAllEnsembles().size());
+        assertEquals(ensemble, metadata.getAllEnsembles().get(0L));
+        assertEquals(ensemble, metadata.getEnsembleAt(99L));
+    }
+
+    @Test
+    public void testToString() {
+        List<BookieId> ensemble = Lists.newArrayList(new BookieSocketAddress("192.0.2.1", 1234).toBookieId(),
+                new BookieSocketAddress("192.0.2.2", 1234).toBookieId(),
+                new BookieSocketAddress("192.0.2.3", 1234).toBookieId());
+
+        LedgerMetadata lm1 = LedgerMetadataBuilder.create()
+                .withDigestType(DigestType.CRC32.toApiDigestType())
+                .withPassword(passwd)
+                .newEnsembleEntry(0L, ensemble)
+                .withId(100L)
+                .build();
+
+        assertTrue("toString should contain password value",
+                lm1.toString().contains(Base64.getEncoder().encodeToString(passwd)));
+        assertTrue("toSafeString should not contain password value", lm1.toSafeString().contains("OMITTED"));
+    }
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

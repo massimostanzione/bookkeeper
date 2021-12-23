@@ -10,10 +10,11 @@ Please refer to our [checkstyle rules](https://github.com/apache/bookkeeper/blob
 
 Apache BookKeeper code should follow the [Sun Java Coding Convention](http://www.oracle.com/technetwork/java/javase/documentation/codeconvtoc-136057.html), with the following additions.
 
-* Lines can be up to 120 characters long.
+* Lines can not be longer than 120 characters.
 * Indentation should be **4 spaces**. Tabs should never be used.
 * Use curly braces even for single-line ifs and elses.
-* No @author tags in any javadoc
+* No @author tags in any javadoc.
+* Use try-with-resources blocks whenever is possible.
 * **TODO**s should be associated to at least one issue. E.g. `// TODO: make this parameter configurable (https://github.com/apache/bookkeeper/issues/280)`
 
 ### Dependencies
@@ -24,6 +25,8 @@ Apache BookKeeper uses following libraries a lot:
 * [Netty](http://netty.io/): for network communications and memory buffer management.
 
 Please use these libraries whenever possible rather than introducing more dependencies. 
+
+Dependencies are bundled with our binary distributions, so we need to attach the relevant licenses. See [Third party dependencies and licensing](/community/licensing) for a guide on how to do this correctly.
 
 #### Future
 
@@ -41,7 +44,7 @@ We prefer using netty _ByteBuf_ over java nio _ByteBuffer_ for internal usage. A
 
 #### Logging levels
 
-- _INFO_ is the level you should assume the software will be run in. INFo messages are things which are not bad but which the user will definitely want to know about every time they occur.
+- _INFO_ is the level you should assume the software will be run in. INFO messages are things which are not bad but which the user will definitely want to know about every time they occur.
 - _TRACE_ and _DEBUG_ are both things you turn on when something is wrong and you want to figure out what is going on. _DEBUG_ should not be so fine grained that it will seriously affect performance of the program. _TRACE_ can be anything. Both _DEBUG_ and _TRACE_ statements should be considered to be wrapped in an _if (logger.isDebugEnabled)_ or _if (logger.isTraceEnabled)_ check to avoid performance degradation.
 - _WARN_ and _ERROR_ indicate something that is **BAD**. Use _WARN_ if you aren't totally sure it is bad, and _ERROR_ if you are.
 
@@ -74,7 +77,7 @@ Please log the _stack traces_ at **ERROR** level, but never at **INFO** level or
 Apache BookKeeper is a low latency system. So it is implemented as a purely asynchronous service. This is accomplished as follows:
 
 * All public classes should be **thread-safe**.
-* We prefer using [OrderedSafeExecutor](https://github.com/apache/bookkeeper/blob/master/bookkeeper-server/src/main/java/org/apache/bookkeeper/util/OrderedSafeExecutor.java) for executing any asynchronous actions. The mutations to same instance should be submitted to same thread to execute.
+* We prefer using [OrderedExecutor](https://github.com/apache/bookkeeper/blob/master/bookkeeper-common/src/main/java/org/apache/bookkeeper/common/util/OrderedExecutor.java) for executing any asynchronous actions. The mutations to same instance should be submitted to same thread to execute.
 * If synchronization and locking is required, they should be in a fine granularity way.
 * All threads should have proper meaningful name.
 * If a class is not threadsafe, it should be annotated [@NotThreadSafe](https://github.com/misberner/jsr-305/blob/master/ri/src/main/java/javax/annotation/concurrent/NotThreadSafe.java). The instances that use this class is responsible for its synchronization.

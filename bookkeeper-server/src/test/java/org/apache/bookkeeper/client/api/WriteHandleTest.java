@@ -19,7 +19,11 @@
 
 package org.apache.bookkeeper.client.api;
 
+<<<<<<< HEAD
 import static com.google.common.base.Charsets.UTF_8;
+=======
+import static java.nio.charset.StandardCharsets.UTF_8;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.junit.Assert.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -34,7 +38,10 @@ import io.netty.buffer.ByteBufUtil;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
 import lombok.extern.slf4j.Slf4j;
+<<<<<<< HEAD
 import org.apache.bookkeeper.common.concurrent.FutureUtils;
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -51,12 +58,20 @@ public class WriteHandleTest {
     private final WriteHandle handle = mock(WriteHandle.class);
     private final LinkedBlockingQueue<ByteBuf> entryQueue;
 
+<<<<<<< HEAD
     public WriteHandleTest() {
+=======
+    public WriteHandleTest() throws Exception {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         this.entryQueue = new LinkedBlockingQueue<>();
         doAnswer(invocationOnMock -> {
             ByteBuf buf = invocationOnMock.getArgument(0);
             entryQueue.add(buf);
+<<<<<<< HEAD
             return FutureUtils.value(-1L);
+=======
+            return -1L;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }).when(handle).append(any(ByteBuf.class));
         when(handle.append(any(byte[].class))).thenCallRealMethod();
         when(handle.append(any(byte[].class), anyInt(), anyInt())).thenCallRealMethod();

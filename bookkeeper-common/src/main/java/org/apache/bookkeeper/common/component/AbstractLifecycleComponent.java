@@ -19,11 +19,14 @@
 package org.apache.bookkeeper.common.component;
 
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.common.conf.ComponentConfiguration;
 import org.apache.bookkeeper.stats.StatsLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A mix of {@link AbstractComponent} and {@link LifecycleComponent}.
@@ -32,15 +35,23 @@ import org.apache.bookkeeper.stats.StatsLogger;
 public abstract class AbstractLifecycleComponent<ConfT extends ComponentConfiguration>
     extends AbstractComponent<ConfT> implements LifecycleComponent {
 
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractLifecycleComponent.class);
+
     protected final Lifecycle lifecycle = new Lifecycle();
     private final Set<LifecycleListener> listeners = new CopyOnWriteArraySet<>();
     protected final StatsLogger statsLogger;
+    protected volatile UncaughtExceptionHandler uncaughtExceptionHandler;
 
     protected AbstractLifecycleComponent(String componentName,
                                          ConfT conf,
                                          StatsLogger statsLogger) {
         super(componentName, conf);
         this.statsLogger = statsLogger;
+    }
+
+    @Override
+    public void setExceptionHandler(UncaughtExceptionHandler handler) {
+        this.uncaughtExceptionHandler = handler;
     }
 
     protected StatsLogger getStatsLogger() {
@@ -68,7 +79,17 @@ public abstract class AbstractLifecycleComponent<ConfT extends ComponentConfigur
             return;
         }
         listeners.forEach(LifecycleListener::beforeStart);
-        doStart();
+        try {
+            doStart();
+        } catch (Throwable exc) {
+            LOG.error("Failed to start Component: {}", getName(), exc);
+            if (uncaughtExceptionHandler != null) {
+                LOG.error("Calling uncaughtExceptionHandler");
+                uncaughtExceptionHandler.uncaughtException(Thread.currentThread(), exc);
+            } else {
+                throw exc;
+            }
+        }
         lifecycle.moveToStarted();
         listeners.forEach(LifecycleListener::afterStart);
     }

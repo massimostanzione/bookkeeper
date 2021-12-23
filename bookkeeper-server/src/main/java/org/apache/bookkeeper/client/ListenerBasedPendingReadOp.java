@@ -20,7 +20,10 @@
  */
 package org.apache.bookkeeper.client;
 
+<<<<<<< HEAD
 import java.util.concurrent.ScheduledExecutorService;
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryListener;
@@ -33,29 +36,17 @@ class ListenerBasedPendingReadOp extends PendingReadOp {
     final Object ctx;
 
     ListenerBasedPendingReadOp(LedgerHandle lh,
-                               ScheduledExecutorService scheduler,
-                               long startEntryId,
-                               long endEntryId,
-                               ReadEntryListener listener,
-                               Object ctx) {
-        this(
-            lh,
-            scheduler,
-            startEntryId,
-            endEntryId,
-            listener,
-            ctx,
-            false);
-    }
-
-    ListenerBasedPendingReadOp(LedgerHandle lh,
-                               ScheduledExecutorService scheduler,
+                               ClientContext clientCtx,
                                long startEntryId,
                                long endEntryId,
                                ReadEntryListener listener,
                                Object ctx,
                                boolean isRecoveryRead) {
+<<<<<<< HEAD
         super(lh, scheduler, startEntryId, endEntryId, isRecoveryRead);
+=======
+        super(lh, clientCtx, startEntryId, endEntryId, isRecoveryRead);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         this.listener = listener;
         this.ctx = ctx;
     }
@@ -71,11 +62,21 @@ class ListenerBasedPendingReadOp extends PendingReadOp {
             long latencyNanos = MathUtils.elapsedNanos(requestTimeNanos);
             LedgerEntry entry;
             if (BKException.Code.OK == request.getRc()) {
+<<<<<<< HEAD
                 readOpLogger.registerSuccessfulEvent(latencyNanos, TimeUnit.NANOSECONDS);
                 // callback with completed entry
                 entry = new LedgerEntry(request.entryImpl);
             } else {
                 readOpLogger.registerFailedEvent(latencyNanos, TimeUnit.NANOSECONDS);
+=======
+                clientCtx.getClientStats().getReadOpLogger()
+                    .registerSuccessfulEvent(latencyNanos, TimeUnit.NANOSECONDS);
+                // callback with completed entry
+                entry = new LedgerEntry(request.entryImpl);
+            } else {
+                clientCtx.getClientStats().getReadOpLogger()
+                    .registerFailedEvent(latencyNanos, TimeUnit.NANOSECONDS);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
                 entry = null;
             }
             request.close();

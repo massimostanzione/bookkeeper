@@ -44,7 +44,6 @@ import org.apache.bookkeeper.zookeeper.ZooWorker.ZooCallable;
 import org.apache.zookeeper.AsyncCallback.ACLCallback;
 import org.apache.zookeeper.AsyncCallback.Children2Callback;
 import org.apache.zookeeper.AsyncCallback.ChildrenCallback;
-import org.apache.zookeeper.AsyncCallback.Create2Callback;
 import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.AsyncCallback.MultiCallback;
 import org.apache.zookeeper.AsyncCallback.StatCallback;
@@ -68,7 +67,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Provide a zookeeper client to handle session expire.
  */
-public class ZooKeeperClient extends ZooKeeper implements Watcher {
+public class ZooKeeperClient extends ZooKeeper implements Watcher, AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(ZooKeeperClient.class);
 
@@ -77,6 +76,7 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
     // ZooKeeper client connection variables
     private final String connectString;
     private final int sessionTimeoutMs;
+    private final boolean allowReadOnlyMode;
 
     // state for the zookeeper client
     private final AtomicReference<ZooKeeper> zk = new AtomicReference<ZooKeeper>();
@@ -172,6 +172,7 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
         StatsLogger statsLogger = NullStatsLogger.INSTANCE;
         int retryExecThreadCount = DEFAULT_RETRY_EXECUTOR_THREAD_COUNT;
         double requestRateLimit = 0;
+        boolean allowReadOnlyMode = false;
 
         private Builder() {}
 
@@ -215,6 +216,11 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
             return this;
         }
 
+        public Builder allowReadOnlyMode(boolean allowReadOnlyMode) {
+            this.allowReadOnlyMode = allowReadOnlyMode;
+            return this;
+        }
+
         public ZooKeeperClient build() throws IOException, KeeperException, InterruptedException {
             checkNotNull(connectString);
             checkArgument(sessionTimeoutMs > 0);
@@ -222,8 +228,11 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
             checkArgument(retryExecThreadCount > 0);
 
             if (null == connectRetryPolicy) {
+                // Session expiry event is received by client only when zk quorum is well established.
+                // All other connection loss retries happen at zk client library transparently.
+                // Hence, we don't need to wait before retrying.
                 connectRetryPolicy =
-                        new BoundExponentialBackoffRetryPolicy(sessionTimeoutMs, sessionTimeoutMs, Integer.MAX_VALUE);
+                        new BoundExponentialBackoffRetryPolicy(0, 0, Integer.MAX_VALUE);
             }
             if (null == operationRetryPolicy) {
                 operationRetryPolicy =
@@ -243,7 +252,8 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
                     operationRetryPolicy,
                     statsLogger,
                     retryExecThreadCount,
-                    requestRateLimit
+                    requestRateLimit,
+                    allowReadOnlyMode
             );
             // Wait for connection to be established.
             try {
@@ -252,6 +262,7 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
                 client.close();
                 throw ke;
             } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
                 client.close();
                 throw ie;
             }
@@ -263,17 +274,19 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
         return new Builder();
     }
 
-    ZooKeeperClient(String connectString,
+    protected ZooKeeperClient(String connectString,
                     int sessionTimeoutMs,
                     ZooKeeperWatcherBase watcherManager,
                     RetryPolicy connectRetryPolicy,
                     RetryPolicy operationRetryPolicy,
                     StatsLogger statsLogger,
                     int retryExecThreadCount,
-                    double rate) throws IOException {
-        super(connectString, sessionTimeoutMs, watcherManager);
+                    double rate,
+                    boolean allowReadOnlyMode) throws IOException {
+        super(connectString, sessionTimeoutMs, watcherManager, allowReadOnlyMode);
         this.connectString = connectString;
         this.sessionTimeoutMs = sessionTimeoutMs;
+        this.allowReadOnlyMode =  allowReadOnlyMode;
         this.watcherManager = watcherManager;
         this.connectRetryPolicy = connectRetryPolicy;
         this.operationRetryPolicy = operationRetryPolicy;
@@ -319,12 +332,12 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
         }
     }
 
-    protected void waitForConnection() throws KeeperException, InterruptedException {
+    public void waitForConnection() throws KeeperException, InterruptedException {
         watcherManager.waitForConnection();
     }
 
     protected ZooKeeper createZooKeeper() throws IOException {
-        return new ZooKeeper(connectString, sessionTimeoutMs, watcherManager);
+        return new ZooKeeper(connectString, sessionTimeoutMs, watcherManager, allowReadOnlyMode);
     }
 
     @Override
@@ -725,74 +738,6 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
                         backOffAndRetry(that, worker.nextRetryWaitTime());
                     } else {
                         cb.processResult(rc, path, context, name);
-                    }
-                }
-
-            };
-
-            @Override
-            void zkRun() {
-                ZooKeeper zkHandle = zk.get();
-                if (null == zkHandle) {
-                    ZooKeeperClient.super.create(path, data, acl, createMode, createCb, worker);
-                } else {
-                    zkHandle.create(path, data, acl, createMode, createCb, worker);
-                }
-            }
-
-            @Override
-            public String toString() {
-                return String.format("create (%s, acl = %s, mode = %s)", path, acl, createMode);
-            }
-        };
-        // execute it immediately
-        proc.run();
-    }
-
-    @Override
-    public String create(final String path,
-                         final byte[] data,
-                         final List<ACL> acl,
-                         final CreateMode createMode,
-                         final Stat stat)
-            throws KeeperException, InterruptedException {
-        return ZooWorker.syncCallWithRetries(this, new ZooCallable<String>() {
-
-            @Override
-            public String call() throws KeeperException, InterruptedException {
-                ZooKeeper zkHandle = zk.get();
-                if (null == zkHandle) {
-                    return ZooKeeperClient.super.create(path, data, acl, createMode);
-                }
-                return zkHandle.create(path, data, acl, createMode);
-            }
-
-            @Override
-            public String toString() {
-                return String.format("create (%s, acl = %s, mode = %s)", path, acl, createMode);
-            }
-
-        }, operationRetryPolicy, rateLimiter, createStats);
-    }
-
-    @Override
-    public void create(final String path,
-                       final byte[] data,
-                       final List<ACL> acl,
-                       final CreateMode createMode,
-                       final Create2Callback cb,
-                       final Object context) {
-        final Runnable proc = new ZkRetryRunnable(operationRetryPolicy, rateLimiter, createStats) {
-
-            final Create2Callback createCb = new Create2Callback() {
-
-                @Override
-                public void processResult(int rc, String path, Object ctx, String name, Stat stat) {
-                    ZooWorker worker = (ZooWorker) ctx;
-                    if (allowRetry(worker, rc)) {
-                        backOffAndRetry(that, worker.nextRetryWaitTime());
-                    } else {
-                        cb.processResult(rc, path, context, name, stat);
                     }
                 }
 
@@ -1415,53 +1360,5 @@ public class ZooKeeperClient extends ZooKeeper implements Watcher {
         // execute it immediately
         proc.run();
     }
-
-    @Override
-    public void removeWatches(String path, Watcher watcher, WatcherType watcherType, boolean local)
-            throws InterruptedException, KeeperException {
-        ZooKeeper zkHandle = zk.get();
-        if (null == zkHandle) {
-            ZooKeeperClient.super.removeWatches(path, watcher, watcherType, local);
-        } else {
-            zkHandle.removeWatches(path, watcher, watcherType, local);
-        }
-    }
-
-    @Override
-    public void removeWatches(String path,
-                              Watcher watcher,
-                              WatcherType watcherType,
-                              boolean local,
-                              VoidCallback cb,
-                              Object ctx) {
-        ZooKeeper zkHandle = zk.get();
-        if (null == zkHandle) {
-            ZooKeeperClient.super.removeWatches(path, watcher, watcherType, local, cb, ctx);
-        } else {
-            zkHandle.removeWatches(path, watcher, watcherType, local, cb, ctx);
-        }
-    }
-
-    @Override
-    public void removeAllWatches(String path, WatcherType watcherType, boolean local)
-            throws InterruptedException, KeeperException {
-        ZooKeeper zkHandle = zk.get();
-        if (null == zkHandle) {
-            ZooKeeperClient.super.removeAllWatches(path, watcherType, local);
-        } else {
-            zkHandle.removeAllWatches(path, watcherType, local);
-        }
-    }
-
-    @Override
-    public void removeAllWatches(String path, WatcherType watcherType, boolean local, VoidCallback cb, Object ctx) {
-        ZooKeeper zkHandle = zk.get();
-        if (null == zkHandle) {
-            ZooKeeperClient.super.removeAllWatches(path, watcherType, local, cb, ctx);
-        } else {
-            zkHandle.removeAllWatches(path, watcherType, local, cb, ctx);
-        }
-    }
-
 
 }

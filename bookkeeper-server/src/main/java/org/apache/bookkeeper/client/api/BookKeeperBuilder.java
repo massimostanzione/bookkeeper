@@ -20,15 +20,19 @@
  */
 package org.apache.bookkeeper.client.api;
 
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import java.io.IOException;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.common.annotation.InterfaceAudience.Public;
 import org.apache.bookkeeper.common.annotation.InterfaceStability.Unstable;
 import org.apache.bookkeeper.feature.FeatureProvider;
 import org.apache.bookkeeper.net.DNSToSwitchMapping;
 import org.apache.bookkeeper.stats.StatsLogger;
-import org.apache.zookeeper.ZooKeeper;
 
 /**
  * BookKeeper Client Builder to build client instances.
@@ -49,13 +53,13 @@ public interface BookKeeperBuilder {
     BookKeeperBuilder eventLoopGroup(EventLoopGroup eventLoopGroup);
 
     /**
-     * Configure the bookkeeper client with a provided ZooKeeper client.
+     * Configure the bookkeeper client with a provided {@link ByteBufAllocator}.
      *
-     * @param zk an external {@link ZooKeeper} client to use by the bookkeeper client.
-     *
+     * @param allocator an external {@link ByteBufAllocator} to use by the bookkeeper client.
      * @return client builder.
+     * @since 4.9
      */
-    BookKeeperBuilder zk(ZooKeeper zk);
+    BookKeeperBuilder allocator(ByteBufAllocator allocator);
 
     /**
      * Configure the bookkeeper client with a provided {@link StatsLogger}.

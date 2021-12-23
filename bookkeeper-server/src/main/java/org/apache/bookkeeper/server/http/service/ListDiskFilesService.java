@@ -18,26 +18,28 @@
  */
 package org.apache.bookkeeper.server.http.service;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.bookkeeper.bookie.BookieShell.listFilesAndSort;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * HttpEndpointService that handle Bookkeeper list disk files related http request.
  *
- * The GET method will list all bookie files of type journal|entrylog|index in this bookie.
+ * <p>The GET method will list all bookie files of type journal|entrylog|index in this bookie.
  * The output would be like this:
  *  {
  *    "journal files" : "filename1 \t ...",
@@ -52,7 +54,7 @@ public class ListDiskFilesService implements HttpEndpointService {
     protected ServerConfiguration conf;
 
     public ListDiskFilesService(ServerConfiguration conf) {
-        Preconditions.checkNotNull(conf);
+        checkNotNull(conf);
         this.conf = conf;
     }
 
@@ -72,14 +74,14 @@ public class ListDiskFilesService implements HttpEndpointService {
              */
             Map<String, String> output = Maps.newHashMap();
 
-            boolean journal = params != null &&
-                params.containsKey("file_type")
+            boolean journal = params != null
+                && params.containsKey("file_type")
                 && params.get("file_type").equals("journal");
-            boolean entrylog = params != null &&
-                params.containsKey("file_type")
+            boolean entrylog = params != null
+                && params.containsKey("file_type")
                 && params.get("file_type").equals("entrylog");
-            boolean index = params != null &&
-                params.containsKey("file_type")
+            boolean index = params != null
+                && params.containsKey("file_type")
                 && params.get("file_type").equals("index");
             boolean all = false;
 
@@ -90,9 +92,9 @@ public class ListDiskFilesService implements HttpEndpointService {
             if (all || journal) {
                 File[] journalDirs = conf.getJournalDirs();
                 List<File> journalFiles = listFilesAndSort(journalDirs, "txn");
-                StringBuffer files = new StringBuffer();
+                StringBuilder files = new StringBuilder();
                 for (File journalFile : journalFiles) {
-                    files.append(journalFile.getName() + "\t");
+                    files.append(journalFile.getName()).append("\t");
                 }
                 output.put("journal files", files.toString());
             }
@@ -100,9 +102,9 @@ public class ListDiskFilesService implements HttpEndpointService {
             if (all || entrylog) {
                 File[] ledgerDirs = conf.getLedgerDirs();
                 List<File> ledgerFiles = listFilesAndSort(ledgerDirs, "log");
-                StringBuffer files = new StringBuffer();
+                StringBuilder files = new StringBuilder();
                 for (File ledgerFile : ledgerFiles) {
-                    files.append(ledgerFile.getName()+ "\t");
+                    files.append(ledgerFile.getName()).append("\t");
                 }
                 output.put("entrylog files", files.toString());
             }
@@ -110,9 +112,9 @@ public class ListDiskFilesService implements HttpEndpointService {
             if (all || index) {
                 File[] indexDirs = (conf.getIndexDirs() == null) ? conf.getLedgerDirs() : conf.getIndexDirs();
                 List<File> indexFiles = listFilesAndSort(indexDirs, "idx");
-                StringBuffer files = new StringBuffer();
+                StringBuilder files = new StringBuilder();
                 for (File indexFile : indexFiles) {
-                    files.append(indexFile.getName()+ "\t");
+                    files.append(indexFile.getName()).append("\t");
                 }
                 output.put("index files", files.toString());
             }

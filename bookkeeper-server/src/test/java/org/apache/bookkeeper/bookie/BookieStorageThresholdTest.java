@@ -21,9 +21,12 @@
 
 package org.apache.bookkeeper.bookie;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,19 +35,25 @@ import org.apache.bookkeeper.bookie.LedgerDirsManager.LedgerDirsListener;
 import org.apache.bookkeeper.bookie.LedgerDirsManager.NoWritableLedgerDirException;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerHandle;
+<<<<<<< HEAD
+=======
+import org.apache.bookkeeper.common.testing.annotations.FlakyTest;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.bookkeeper.util.DiskChecker;
 import org.apache.bookkeeper.util.TestUtils;
 import org.junit.Before;
-import org.junit.Test;
 
+/**
+ * Test BookieStorage with a threshold.
+ */
 public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
 
-    static int NUM_BOOKIES = 1;
-    static int NUM_ENTRIES = 100;
-    static int ENTRY_SIZE = 1024;
+    private static final int NUM_BOOKIES = 1;
+    private static final int NUM_ENTRIES = 100;
+    private static final int ENTRY_SIZE = 1024;
 
     final String msg;
     DigestType digestType = DigestType.CRC32;
@@ -109,6 +118,9 @@ public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
         return lhs;
     }
 
+    /**
+     * A Threshold-based disk checker test.
+     */
     public class ThresholdTestDiskChecker extends DiskChecker {
 
         final AtomicBoolean injectDiskOutOfSpaceException;
@@ -132,19 +144,25 @@ public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
         }
     }
 
-    @Test
+    @FlakyTest(value = "https://github.com/apache/bookkeeper/issues/1562")
     public void testStorageThresholdCompaction() throws Exception {
         stopAllBookies();
         ServerConfiguration conf = newServerConfiguration();
         File ledgerDir1 = createTempDir("ledger", "test1");
+<<<<<<< HEAD
         File ledgerDir2 = createTempDir("ledger","test2");
         File journalDir = createTempDir("journal","test");
+=======
+        File ledgerDir2 = createTempDir("ledger", "test2");
+        File journalDir = createTempDir("journal", "test");
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         String[] ledgerDirNames = new String[]{
             ledgerDir1.getPath(),
             ledgerDir2.getPath()
         };
         conf.setLedgerDirNames(ledgerDirNames);
         conf.setJournalDirName(journalDir.getPath());
+<<<<<<< HEAD
         BookieServer server = startBookie(conf);
         bs.add(server);
         bsConfs.add(conf);
@@ -154,14 +172,21 @@ public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
         bookie.ledgerMonitor.shutdown();
 
         LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
+=======
+
+        BookieServer server = startAndAddBookie(conf).getServer();
+        BookieImpl bookie = (BookieImpl) server.getBookie();
+        // since we are going to set dependency injected dirsMonitor, so we need to shutdown
+        // the dirsMonitor which was created as part of the initialization of Bookie
+        bookie.dirsMonitor.shutdown();
+
+        LedgerDirsManager ledgerDirsManager = ((BookieImpl) bookie).getLedgerDirsManager();
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
         // flag latches
         final CountDownLatch diskWritable = new CountDownLatch(1);
         final CountDownLatch diskFull = new CountDownLatch(1);
         ledgerDirsManager.addLedgerDirsListener(new LedgerDirsListener() {
-            @Override
-            public void fatalError() {
-            }
 
             @Override
             public void diskWritable(File disk) {
@@ -169,37 +194,20 @@ public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
             }
 
             @Override
-            public void diskJustWritable(File disk) {
-            }
-
-            @Override
             public void diskFull(File disk) {
                 diskFull.countDown();
             }
 
-            @Override
-            public void diskFailed(File disk) {
-            }
-
-            @Override
-            public void diskAlmostFull(File disk) {
-            }
-
-            @Override
-            public void allDisksFull() {
-            }
         });
 
         // Dependency Injected class
         ThresholdTestDiskChecker thresholdTestDiskChecker = new ThresholdTestDiskChecker(
                 baseConf.getDiskUsageThreshold(), baseConf.getDiskUsageWarnThreshold());
-        LedgerDirsMonitor ledgerDirsMonitor = new LedgerDirsMonitor(baseConf, thresholdTestDiskChecker,
-                ledgerDirsManager);
-        // set the ledgermonitor and idxmonitor and initiate/start it
-        bookie.ledgerMonitor = ledgerDirsMonitor;
-        bookie.idxMonitor = ledgerDirsMonitor;
-        bookie.ledgerMonitor.init();
-        bookie.ledgerMonitor.start();
+        bookie.dirsMonitor = new LedgerDirsMonitor(baseConf, thresholdTestDiskChecker,
+                Collections.singletonList(ledgerDirsManager));
+        // set the dirsMonitor and initiate/start it
+        bookie.dirsMonitor.init();
+        bookie.dirsMonitor.start();
 
         // create ledgers and add fragments
         LedgerHandle[] lhs = prepareData(3);
@@ -235,14 +243,19 @@ public class BookieStorageThresholdTest extends BookKeeperClusterTestCase {
         // force GC.
         // Because of getWritableLedgerDirsForNewLog, compaction would be able to create newlog and compact even though
         // there are no writableLedgerDirs
+<<<<<<< HEAD
         for(File ledgerDir : bookie.getLedgerDirsManager().getAllLedgerDirs()) {
+=======
+        for (File ledgerDir : bookie.getLedgerDirsManager().getAllLedgerDirs()) {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             assertFalse("Found entry log file ([0,1,2].log. They should have been compacted" + ledgerDir,
                 TestUtils.hasLogFiles(ledgerDir.getParentFile(), true, 0, 1, 2));
         }
 
         try {
             ledgerDirsManager.getWritableLedgerDirs();
-            fail("It is expected that there wont be any Writable LedgerDirs and getWritableLedgerDirs is supposed to throw NoWritableLedgerDirException");
+            fail("It is expected that there wont be any Writable LedgerDirs and getWritableLedgerDirs "
+                    + "is supposed to throw NoWritableLedgerDirException");
         } catch (NoWritableLedgerDirException nowritableDirsException) {
         }
 

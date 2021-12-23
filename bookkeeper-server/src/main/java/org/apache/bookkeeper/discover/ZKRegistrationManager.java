@@ -19,39 +19,58 @@
 package org.apache.bookkeeper.discover;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
+import static org.apache.bookkeeper.util.BookKeeperConstants.AVAILABLE_NODE;
 import static org.apache.bookkeeper.util.BookKeeperConstants.COOKIE_NODE;
+import static org.apache.bookkeeper.util.BookKeeperConstants.EMPTY_BYTE_ARRAY;
 import static org.apache.bookkeeper.util.BookKeeperConstants.INSTANCEID;
 import static org.apache.bookkeeper.util.BookKeeperConstants.READONLY;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.HashSet;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.BookieException.BookieIllegalOpException;
+import org.apache.bookkeeper.bookie.BookieException.CookieExistException;
 import org.apache.bookkeeper.bookie.BookieException.CookieNotFoundException;
 import org.apache.bookkeeper.bookie.BookieException.MetadataStoreException;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.BKException.BKInterruptedException;
+import org.apache.bookkeeper.client.BKException.MetaStoreException;
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.meta.AbstractZkLedgerManagerFactory;
+import org.apache.bookkeeper.meta.LayoutManager;
+import org.apache.bookkeeper.meta.LedgerManagerFactory;
+import org.apache.bookkeeper.meta.ZkLayoutManager;
+import org.apache.bookkeeper.meta.ZkLedgerUnderreplicationManager;
+import org.apache.bookkeeper.meta.zk.ZKMetadataDriverBase;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.proto.DataFormats.BookieServiceInfoFormat;
+import org.apache.bookkeeper.util.BookKeeperConstants;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.bookkeeper.versioning.LongVersion;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.bookkeeper.versioning.Versioned;
-import org.apache.bookkeeper.zookeeper.BoundExponentialBackoffRetryPolicy;
-import org.apache.bookkeeper.zookeeper.ZooKeeperClient;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.Op;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.ZKUtil;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
@@ -62,110 +81,84 @@ import org.apache.zookeeper.data.Stat;
 @Slf4j
 public class ZKRegistrationManager implements RegistrationManager {
 
-    private ServerConfiguration conf;
-    private ZooKeeper zk;
-    private List<ACL> zkAcls;
-    private volatile boolean running = false;
+    private static final Function<Throwable, BKException> EXCEPTION_FUNC = cause -> {
+        if (cause instanceof BKException) {
+            log.error("Failed to get bookie list : ", cause);
+            return (BKException) cause;
+        } else if (cause instanceof InterruptedException) {
+            log.error("Interrupted reading bookie list : ", cause);
+            return new BKInterruptedException();
+        } else {
+            return new MetaStoreException();
+        }
+    };
 
+    private final ServerConfiguration conf;
+    private final ZooKeeper zk;
+    private final List<ACL> zkAcls;
+    private final LayoutManager layoutManager;
+
+    private volatile boolean zkRegManagerInitialized = false;
+
+    // ledgers root path
+    private final String ledgersRootPath;
     // cookie path
-    private String cookiePath;
+    private final String cookiePath;
     // registration paths
-    protected String bookieRegistrationPath;
-    protected String bookieReadonlyRegistrationPath;
+    protected final String bookieRegistrationPath;
+    protected final String bookieReadonlyRegistrationPath;
+    // session timeout in milliseconds
+    private final int zkTimeoutMs;
 
-    private StatsLogger statsLogger;
+    public ZKRegistrationManager(ServerConfiguration conf,
+                                 ZooKeeper zk,
+                                 RegistrationListener listener) {
+        this(conf, zk, ZKMetadataDriverBase.resolveZkLedgersRootPath(conf), listener);
+    }
 
-    @Override
-    public RegistrationManager initialize(ServerConfiguration conf,
-                                          RegistrationListener listener,
-                                          StatsLogger statsLogger)
-            throws BookieException {
-        if (null == conf.getZkServers()) {
-            log.warn("No ZK servers passed to Bookie constructor so BookKeeper clients won't know about this server!");
-            return null;
-        }
-
+    public ZKRegistrationManager(ServerConfiguration conf,
+                                 ZooKeeper zk,
+                                 String ledgersRootPath,
+                                 RegistrationListener listener) {
         this.conf = conf;
-        this.zkAcls = ZkUtils.getACLs(conf);
-        this.statsLogger = statsLogger;
-
-        this.cookiePath = conf.getZkLedgersRootPath() + "/" + COOKIE_NODE;
-        this.bookieRegistrationPath = conf.getZkAvailableBookiesPath();
-        this.bookieReadonlyRegistrationPath = this.bookieRegistrationPath + "/" + READONLY;
-
-        try {
-            this.zk = newZookeeper(conf, listener);
-        } catch (InterruptedException | KeeperException | IOException e) {
-            throw new MetadataStoreException(e);
-        }
-        return this;
-    }
-
-    @VisibleForTesting
-    public void setZk(ZooKeeper zk) {
         this.zk = zk;
-    }
+        this.zkAcls = ZkUtils.getACLs(conf);
+        this.ledgersRootPath = ledgersRootPath;
+        this.cookiePath = ledgersRootPath + "/" + COOKIE_NODE;
+        this.bookieRegistrationPath = ledgersRootPath + "/" + AVAILABLE_NODE;
+        this.bookieReadonlyRegistrationPath = this.bookieRegistrationPath + "/" + READONLY;
+        this.zkTimeoutMs = conf.getZkTimeout();
 
-    @VisibleForTesting
-    public ZooKeeper getZk() {
-        return this.zk;
-    }
+        this.layoutManager = new ZkLayoutManager(
+            zk,
+            ledgersRootPath,
+            zkAcls);
 
-    /**
-     * Create a new zookeeper client to zk cluster.
-     *
-     * <p>
-     * Bookie Server just used zk client when syncing ledgers for garbage collection.
-     * So when zk client is expired, it means this bookie server is not available in
-     * bookie server list. The bookie client will be notified for its expiration. No
-     * more bookie request will be sent to this server. So it's better to exit when zk
-     * expired.
-     * </p>
-     * <p>
-     * Since there are lots of bk operations cached in queue, so we wait for all the operations
-     * are processed and quit. It is done by calling <b>shutdown</b>.
-     * </p>
-     *
-     * @param conf server configuration
-     *
-     * @return zk client instance
-     */
-    private ZooKeeper newZookeeper(final ServerConfiguration conf, RegistrationListener listener)
-        throws InterruptedException, KeeperException, IOException {
-        Set<Watcher> watchers = new HashSet<Watcher>();
-        watchers.add(event -> {
-            if (!running) {
+        this.zk.register(event -> {
+            if (!zkRegManagerInitialized) {
                 // do nothing until first registration
                 return;
             }
             // Check for expired connection.
-            if (event.getType().equals(EventType.None) && event.getState().equals(KeeperState.Expired)) {
+            if (event.getType().equals(EventType.None)
+                && event.getState().equals(KeeperState.Expired)) {
                 listener.onRegistrationExpired();
             }
         });
-        return ZooKeeperClient.newBuilder()
-                .connectString(conf.getZkServers())
-                .sessionTimeoutMs(conf.getZkTimeout())
-                .watchers(watchers)
-                .operationRetryPolicy(new BoundExponentialBackoffRetryPolicy(conf.getZkRetryBackoffStartMs(),
-                        conf.getZkRetryBackoffMaxMs(), Integer.MAX_VALUE))
-                .requestRateLimit(conf.getZkRequestRateLimit())
-                .statsLogger(this.statsLogger.scope(BOOKIE_SCOPE))
-                .build();
     }
 
     @Override
     public void close() {
-        if (null != zk) {
-            try {
-                zk.close();
-            } catch (InterruptedException e) {
-                log.warn("Interrupted on closing zookeeper client", e);
-            }
-        }
+        // no-op
     }
 
-    private String getCookiePath(String bookieId) {
+    /**
+     * Returns the CookiePath of the bookie in the ZooKeeper.
+     *
+     * @param bookieId bookie id
+     * @return
+     */
+    public String getCookiePath(BookieId bookieId) {
         return this.cookiePath + "/" + bookieId;
     }
 
@@ -199,9 +192,9 @@ public class ZKRegistrationManager implements RegistrationManager {
                 // wait for it to be expired.
                 if (stat.getEphemeralOwner() != zk.getSessionId()) {
                     log.info("Previous bookie registration znode: {} exists, so waiting zk sessiontimeout:"
-                            + " {} ms for znode deletion", regPath, conf.getZkTimeout());
+                            + " {} ms for znode deletion", regPath, zkTimeoutMs);
                     // waiting for the previous bookie reg znode deletion
-                    if (!prevNodeLatch.await(conf.getZkTimeout(), TimeUnit.MILLISECONDS)) {
+                    if (!prevNodeLatch.await(zkTimeoutMs, TimeUnit.MILLISECONDS)) {
                         throw new NodeExistsException(regPath);
                     } else {
                         return false;
@@ -216,6 +209,7 @@ public class ZKRegistrationManager implements RegistrationManager {
             throw new IOException("ZK exception checking and wait ephemeral znode "
                     + regPath + " expired", ke);
         } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             log.error("Interrupted checking and wait ephemeral znode {} expired : ", regPath, ie);
             throw new IOException("Interrupted checking and wait ephemeral znode "
                     + regPath + " expired", ie);
@@ -223,21 +217,54 @@ public class ZKRegistrationManager implements RegistrationManager {
     }
 
     @Override
-    public void registerBookie(String bookieId, boolean readOnly) throws BookieException {
+    public void registerBookie(BookieId bookieId, boolean readOnly,
+                               BookieServiceInfo bookieServiceInfo) throws BookieException {
         if (!readOnly) {
             String regPath = bookieRegistrationPath + "/" + bookieId;
-            doRegisterBookie(regPath);
+            doRegisterBookie(regPath, bookieServiceInfo);
         } else {
-            doRegisterReadOnlyBookie(bookieId);
+            doRegisterReadOnlyBookie(bookieId, bookieServiceInfo);
         }
     }
 
-    private void doRegisterBookie(String regPath) throws BookieException {
+    @VisibleForTesting
+    static byte[] serializeBookieServiceInfo(BookieServiceInfo bookieServiceInfo) {
+        if (log.isDebugEnabled()) {
+            log.debug("serialize BookieServiceInfo {}", bookieServiceInfo);
+        }
+        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            BookieServiceInfoFormat.Builder builder = BookieServiceInfoFormat.newBuilder();
+            List<BookieServiceInfoFormat.Endpoint> bsiEndpoints = bookieServiceInfo.getEndpoints().stream()
+                    .map(e -> {
+                        return BookieServiceInfoFormat.Endpoint.newBuilder()
+                               .setId(e.getId())
+                               .setPort(e.getPort())
+                               .setHost(e.getHost())
+                               .setProtocol(e.getProtocol())
+                               .addAllAuth(e.getAuth())
+                               .addAllExtensions(e.getExtensions())
+                               .build();
+                    })
+                    .collect(Collectors.toList());
+
+            builder.addAllEndpoints(bsiEndpoints);
+            builder.putAllProperties(bookieServiceInfo.getProperties());
+
+            builder.build().writeTo(os);
+            return os.toByteArray();
+        } catch (IOException err) {
+            log.error("Cannot serialize bookieServiceInfo from " + bookieServiceInfo);
+            throw new RuntimeException(err);
+        }
+    }
+
+    private void doRegisterBookie(String regPath, BookieServiceInfo bookieServiceInfo) throws BookieException {
         // ZK ephemeral node for this Bookie.
         try {
             if (!checkRegNodeAndWaitExpired(regPath)) {
                 // Create the ZK ephemeral node for this Bookie.
-                zk.create(regPath, new byte[0], zkAcls, CreateMode.EPHEMERAL);
+                zk.create(regPath, serializeBookieServiceInfo(bookieServiceInfo), zkAcls, CreateMode.EPHEMERAL);
+                zkRegManagerInitialized = true;
             }
         } catch (KeeperException ke) {
             log.error("ZK exception registering ephemeral Znode for Bookie!", ke);
@@ -246,6 +273,7 @@ public class ZKRegistrationManager implements RegistrationManager {
             // exit here as this is a fatal error.
             throw new MetadataStoreException(ke);
         } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             log.error("Interrupted exception registering ephemeral Znode for Bookie!", ie);
             // Throw an IOException back up. This will cause the Bookie
             // constructor to error out. Alternatively, we could do a System
@@ -256,11 +284,12 @@ public class ZKRegistrationManager implements RegistrationManager {
         }
     }
 
-    private void doRegisterReadOnlyBookie(String bookieId) throws BookieException {
+    private void doRegisterReadOnlyBookie(BookieId bookieId, BookieServiceInfo bookieServiceInfo)
+            throws BookieException {
         try {
             if (null == zk.exists(this.bookieReadonlyRegistrationPath, false)) {
                 try {
-                    zk.create(this.bookieReadonlyRegistrationPath, new byte[0],
+                    zk.create(this.bookieReadonlyRegistrationPath, serializeBookieServiceInfo(bookieServiceInfo),
                               zkAcls, CreateMode.PERSISTENT);
                 } catch (NodeExistsException e) {
                     // this node is just now created by someone.
@@ -268,7 +297,7 @@ public class ZKRegistrationManager implements RegistrationManager {
             }
 
             String regPath = bookieReadonlyRegistrationPath + "/" + bookieId;
-            doRegisterBookie(regPath);
+            doRegisterBookie(regPath, bookieServiceInfo);
             // clear the write state
             regPath = bookieRegistrationPath + "/" + bookieId;
             try {
@@ -284,7 +313,7 @@ public class ZKRegistrationManager implements RegistrationManager {
     }
 
     @Override
-    public void unregisterBookie(String bookieId, boolean readOnly) throws BookieException {
+    public void unregisterBookie(BookieId bookieId, boolean readOnly) throws BookieException {
         String regPath;
         if (!readOnly) {
             regPath = bookieRegistrationPath + "/" + bookieId;
@@ -297,7 +326,10 @@ public class ZKRegistrationManager implements RegistrationManager {
     private void doUnregisterBookie(String regPath) throws BookieException {
         try {
             zk.delete(regPath, -1);
-        } catch (InterruptedException | KeeperException e) {
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new MetadataStoreException(ie);
+        } catch (KeeperException e) {
             throw new MetadataStoreException(e);
         }
     }
@@ -307,7 +339,7 @@ public class ZKRegistrationManager implements RegistrationManager {
     //
 
     @Override
-    public void writeCookie(String bookieId,
+    public void writeCookie(BookieId bookieId,
                             Versioned<byte[]> cookieData) throws BookieException {
         String zkPath = getCookiePath(bookieId);
         try {
@@ -330,13 +362,20 @@ public class ZKRegistrationManager implements RegistrationManager {
                     cookieData.getValue(),
                     (int) ((LongVersion) cookieData.getVersion()).getLongVersion());
             }
-        } catch (InterruptedException | KeeperException e) {
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new MetadataStoreException("Interrupted writing cookie for bookie " + bookieId, ie);
+        } catch (NoNodeException nne) {
+            throw new CookieNotFoundException(bookieId.toString());
+        } catch (NodeExistsException nee) {
+            throw new CookieExistException(bookieId.toString());
+        } catch (KeeperException e) {
             throw new MetadataStoreException("Failed to write cookie for bookie " + bookieId);
         }
     }
 
     @Override
-    public Versioned<byte[]> readCookie(String bookieId) throws BookieException {
+    public Versioned<byte[]> readCookie(BookieId bookieId) throws BookieException {
         String zkPath = getCookiePath(bookieId);
         try {
             Stat stat = zk.exists(zkPath, false);
@@ -345,20 +384,23 @@ public class ZKRegistrationManager implements RegistrationManager {
             LongVersion version = new LongVersion(stat.getVersion());
             return new Versioned<>(data, version);
         } catch (NoNodeException nne) {
-            throw new CookieNotFoundException(bookieId);
+            throw new CookieNotFoundException(bookieId.toString());
         } catch (KeeperException | InterruptedException e) {
             throw new MetadataStoreException("Failed to read cookie for bookie " + bookieId);
         }
     }
 
     @Override
-    public void removeCookie(String bookieId, Version version) throws BookieException {
+    public void removeCookie(BookieId bookieId, Version version) throws BookieException {
         String zkPath = getCookiePath(bookieId);
         try {
             zk.delete(zkPath, (int) ((LongVersion) version).getLongVersion());
         } catch (NoNodeException e) {
-            throw new CookieNotFoundException(bookieId);
-        } catch (InterruptedException | KeeperException e) {
+            throw new CookieNotFoundException(bookieId.toString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new MetadataStoreException("Interrupted deleting cookie for bookie " + bookieId, e);
+        } catch (KeeperException e) {
             throw new MetadataStoreException("Failed to delete cookie for bookie " + bookieId);
         }
 
@@ -370,14 +412,14 @@ public class ZKRegistrationManager implements RegistrationManager {
     public String getClusterInstanceId() throws BookieException {
         String instanceId = null;
         try {
-            if (zk.exists(conf.getZkLedgersRootPath(), null) == null) {
+            if (zk.exists(ledgersRootPath, null) == null) {
                 log.error("BookKeeper metadata doesn't exist in zookeeper. "
                     + "Has the cluster been initialized? "
                     + "Try running bin/bookkeeper shell metaformat");
                 throw new KeeperException.NoNodeException("BookKeeper metadata");
             }
             try {
-                byte[] data = zk.getData(conf.getZkLedgersRootPath() + "/"
+                byte[] data = zk.getData(ledgersRootPath + "/"
                     + INSTANCEID, false, null);
                 instanceId = new String(data, UTF_8);
             } catch (KeeperException.NoNodeException e) {
@@ -387,5 +429,185 @@ public class ZKRegistrationManager implements RegistrationManager {
             throw new MetadataStoreException("Failed to get cluster instance id", e);
         }
         return instanceId;
+    }
+
+    @Override
+    public boolean prepareFormat() throws Exception {
+        boolean ledgerRootExists = null != zk.exists(ledgersRootPath, false);
+        boolean availableNodeExists = null != zk.exists(bookieRegistrationPath, false);
+        // Create ledgers root node if not exists
+        if (!ledgerRootExists) {
+            ZkUtils.createFullPathOptimistic(zk, ledgersRootPath, "".getBytes(StandardCharsets.UTF_8), zkAcls,
+                    CreateMode.PERSISTENT);
+        }
+        // create available bookies node if not exists
+        if (!availableNodeExists) {
+            zk.create(bookieRegistrationPath, "".getBytes(StandardCharsets.UTF_8), zkAcls, CreateMode.PERSISTENT);
+        }
+
+        // create readonly bookies node if not exists
+        if (null == zk.exists(bookieReadonlyRegistrationPath, false)) {
+            zk.create(bookieReadonlyRegistrationPath, new byte[0], zkAcls, CreateMode.PERSISTENT);
+        }
+
+        return ledgerRootExists;
+    }
+
+    @Override
+    public boolean initNewCluster() throws Exception {
+        String zkServers = ZKMetadataDriverBase.resolveZkServers(conf);
+        String instanceIdPath = ledgersRootPath + "/" + INSTANCEID;
+        log.info("Initializing ZooKeeper metadata for new cluster, ZKServers: {} ledger root path: {}", zkServers,
+                ledgersRootPath);
+
+        boolean ledgerRootExists = null != zk.exists(ledgersRootPath, false);
+
+        if (ledgerRootExists) {
+            log.error("Ledger root path: {} already exists", ledgersRootPath);
+            return false;
+        }
+
+        List<Op> multiOps = Lists.newArrayListWithExpectedSize(4);
+
+        // Create ledgers root node
+        multiOps.add(Op.create(ledgersRootPath, EMPTY_BYTE_ARRAY, zkAcls, CreateMode.PERSISTENT));
+
+        // create available bookies node
+        multiOps.add(Op.create(bookieRegistrationPath, EMPTY_BYTE_ARRAY, zkAcls, CreateMode.PERSISTENT));
+
+        // create readonly bookies node
+        multiOps.add(Op.create(
+            bookieReadonlyRegistrationPath,
+            EMPTY_BYTE_ARRAY,
+            zkAcls,
+            CreateMode.PERSISTENT));
+
+        // create INSTANCEID
+        String instanceId = UUID.randomUUID().toString();
+        multiOps.add(Op.create(instanceIdPath, instanceId.getBytes(UTF_8),
+                zkAcls, CreateMode.PERSISTENT));
+
+        // execute the multi ops
+        zk.multi(multiOps);
+
+        // creates the new layout and stores in zookeeper
+        AbstractZkLedgerManagerFactory.newLedgerManagerFactory(conf, layoutManager);
+
+        log.info("Successfully initiated cluster. ZKServers: {} ledger root path: {} instanceId: {}", zkServers,
+                ledgersRootPath, instanceId);
+        return true;
+    }
+
+    @Override
+    public boolean nukeExistingCluster() throws Exception {
+        String zkServers = ZKMetadataDriverBase.resolveZkServers(conf);
+        log.info("Nuking ZooKeeper metadata of existing cluster, ZKServers: {} ledger root path: {}",
+                zkServers, ledgersRootPath);
+
+        boolean ledgerRootExists = null != zk.exists(ledgersRootPath, false);
+        if (!ledgerRootExists) {
+            log.info("There is no existing cluster with ledgersRootPath: {} in ZKServers: {}, "
+                    + "so exiting nuke operation", ledgersRootPath, zkServers);
+            return true;
+        }
+
+        boolean availableNodeExists = null != zk.exists(bookieRegistrationPath, false);
+        try (RegistrationClient regClient = new ZKRegistrationClient(
+            zk,
+            ledgersRootPath,
+            null,
+            false
+        )) {
+            if (availableNodeExists) {
+                Collection<BookieId> rwBookies = FutureUtils
+                        .result(regClient.getWritableBookies(), EXCEPTION_FUNC).getValue();
+                if (rwBookies != null && !rwBookies.isEmpty()) {
+                    log.error("Bookies are still up and connected to this cluster, "
+                            + "stop all bookies before nuking the cluster");
+                    return false;
+                }
+
+                boolean readonlyNodeExists = null != zk.exists(bookieReadonlyRegistrationPath, false);
+                if (readonlyNodeExists) {
+                    Collection<BookieId> roBookies = FutureUtils
+                            .result(regClient.getReadOnlyBookies(), EXCEPTION_FUNC).getValue();
+                    if (roBookies != null && !roBookies.isEmpty()) {
+                        log.error("Readonly Bookies are still up and connected to this cluster, "
+                                + "stop all bookies before nuking the cluster");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        LedgerManagerFactory ledgerManagerFactory =
+            AbstractZkLedgerManagerFactory.newLedgerManagerFactory(conf, layoutManager);
+        return ledgerManagerFactory.validateAndNukeExistingCluster(conf, layoutManager);
+    }
+
+    @Override
+    public boolean format() throws Exception {
+        // Clear underreplicated ledgers
+        try {
+            ZKUtil.deleteRecursive(zk, ZkLedgerUnderreplicationManager.getBasePath(ledgersRootPath)
+                    + BookKeeperConstants.DEFAULT_ZK_LEDGERS_ROOT_PATH);
+        } catch (KeeperException.NoNodeException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("underreplicated ledgers root path node not exists in zookeeper to delete");
+            }
+        }
+
+        // Clear underreplicatedledger locks
+        try {
+            ZKUtil.deleteRecursive(zk, ZkLedgerUnderreplicationManager.getBasePath(ledgersRootPath) + '/'
+                    + BookKeeperConstants.UNDER_REPLICATION_LOCK);
+        } catch (KeeperException.NoNodeException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("underreplicatedledger locks node not exists in zookeeper to delete");
+            }
+        }
+
+        // Clear the cookies
+        try {
+            ZKUtil.deleteRecursive(zk, cookiePath);
+        } catch (KeeperException.NoNodeException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("cookies node not exists in zookeeper to delete");
+            }
+        }
+
+        // Clear the INSTANCEID
+        try {
+            zk.delete(ledgersRootPath + "/" + BookKeeperConstants.INSTANCEID, -1);
+        } catch (KeeperException.NoNodeException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("INSTANCEID not exists in zookeeper to delete");
+            }
+        }
+
+        // create INSTANCEID
+        String instanceId = UUID.randomUUID().toString();
+        zk.create(ledgersRootPath + "/" + BookKeeperConstants.INSTANCEID,
+                instanceId.getBytes(StandardCharsets.UTF_8), zkAcls, CreateMode.PERSISTENT);
+
+        log.info("Successfully formatted BookKeeper metadata");
+        return true;
+    }
+
+    @Override
+    public boolean isBookieRegistered(BookieId bookieId) throws BookieException {
+        String regPath = bookieRegistrationPath + "/" + bookieId;
+        String readonlyRegPath = bookieReadonlyRegistrationPath + "/" + bookieId;
+        try {
+            return ((null != zk.exists(regPath, false)) || (null != zk.exists(readonlyRegPath, false)));
+        } catch (KeeperException e) {
+            log.error("ZK exception while checking registration ephemeral znodes for BookieId: {}", bookieId, e);
+            throw new MetadataStoreException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("InterruptedException while checking registration ephemeral znodes for BookieId: {}", bookieId,
+                    e);
+            throw new MetadataStoreException(e);
+        }
     }
 }

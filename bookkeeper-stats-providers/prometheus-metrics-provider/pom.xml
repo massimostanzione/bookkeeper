@@ -20,55 +20,16 @@
   <parent>
     <artifactId>bookkeeper</artifactId>
     <groupId>org.apache.bookkeeper</groupId>
+<<<<<<< HEAD
     <version>4.6.0</version>
+=======
+    <version>4.15.0-SNAPSHOT</version>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     <relativePath>../..</relativePath>
   </parent>
   <groupId>org.apache.bookkeeper.stats</groupId>
   <artifactId>prometheus-metrics-provider</artifactId>
   <name>Apache BookKeeper :: Stats Providers :: Prometheus</name>
-
-  <properties>
-    <prometheus.version>0.0.21</prometheus.version>
-  </properties>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>${maven-checkstyle-plugin.version}</version>
-        <dependencies>
-          <dependency>
-            <groupId>com.puppycrawl.tools</groupId>
-            <artifactId>checkstyle</artifactId>
-            <version>${puppycrawl.checkstyle.version}</version>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.bookkeeper</groupId>
-            <artifactId>buildtools</artifactId>
-            <version>${project.parent.version}</version>
-          </dependency>
-        </dependencies>
-        <configuration>
-          <configLocation>bookkeeper/checkstyle.xml</configLocation>
-          <suppressionsLocation>bookkeeper/suppressions.xml</suppressionsLocation>
-          <encoding>UTF-8</encoding>
-          <consoleOutput>true</consoleOutput>
-          <failsOnError>true</failsOnError>
-        </configuration>
-        <executions>
-          <execution>
-            <id>checkstyle</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.bookkeeper.stats</groupId>
@@ -79,31 +40,36 @@
     <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient</artifactId>
-      <version>${prometheus.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_hotspot</artifactId>
-      <version>${prometheus.version}</version>
     </dependency>
 
     <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_servlet</artifactId>
-      <version>${prometheus.version}</version>
+    </dependency>
+    
+    <dependency>
+       <groupId>io.netty</groupId>
+       <artifactId>netty-common</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-servlet</artifactId>
-      <version>9.4.5.v20170502</version>
     </dependency>
 
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>${guava.version}</version>
+    </dependency>
+    
+    <dependency>
+      <groupId>com.yahoo.datasketches</groupId>
+      <artifactId>sketches-core</artifactId>
     </dependency>
 
   </dependencies>

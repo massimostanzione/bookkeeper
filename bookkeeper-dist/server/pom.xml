@@ -23,7 +23,11 @@
   <parent>
     <artifactId>bookkeeper-dist</artifactId>
     <groupId>org.apache.bookkeeper</groupId>
+<<<<<<< HEAD
     <version>4.6.0</version>
+=======
+    <version>4.15.0-SNAPSHOT</version>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     <relativePath>..</relativePath>
   </parent>
 
@@ -62,11 +66,49 @@
       <version>${project.version}</version>
     </dependency>
 
+<<<<<<< HEAD
+=======
+    <!-- stream.storage -->
+    <dependency>
+       <groupId>org.apache.bookkeeper</groupId>
+       <artifactId>stream-storage-server</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+
+    <!-- bookkeeper.tools (new CLI) -->
+    <dependency>
+      <groupId>org.apache.bookkeeper</groupId>
+      <artifactId>bookkeeper-tools</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- dlog -->
+    <dependency>
+      <groupId>org.apache.distributedlog</groupId>
+      <artifactId>distributedlog-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     <!-- slf4j binding -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
+<<<<<<< HEAD
       <version>${slf4j.version}</version>
+=======
+    </dependency>
+
+    <dependency>
+       <!-- needed by ZooKeeper server -->
+       <groupId>org.xerial.snappy</groupId>
+       <artifactId>snappy-java</artifactId>
+    </dependency>
+    <dependency>
+        <!-- needed by ZooKeeper server -->
+       <groupId>io.dropwizard.metrics</groupId>
+       <artifactId>metrics-core</artifactId>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     </dependency>
   </dependencies>
 
@@ -77,10 +119,18 @@
         <version>${maven-assembly-plugin.version}</version>
         <configuration>
           <finalName>bookkeeper-server-${project.version}</finalName>
+<<<<<<< HEAD
           <attach>false</attach>
           <descriptors>
             <descriptor>../src/assemble/bin-server.xml</descriptor>
           </descriptors>
+=======
+          <attach>true</attach>
+          <descriptors>
+            <descriptor>../src/assemble/bin-server.xml</descriptor>
+          </descriptors>
+          <tarLongFileMode>posix</tarLongFileMode>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         </configuration>
         <executions>
           <execution>

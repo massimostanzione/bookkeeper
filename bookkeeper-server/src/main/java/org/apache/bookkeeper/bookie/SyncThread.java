@@ -22,18 +22,27 @@
 package org.apache.bookkeeper.bookie;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+<<<<<<< HEAD
+=======
+
+import lombok.AccessLevel;
+import lombok.Getter;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.bookie.LedgerDirsManager.LedgerDirsListener;
 import org.apache.bookkeeper.bookie.LedgerDirsManager.NoWritableLedgerDirException;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+<<<<<<< HEAD
 import org.apache.bookkeeper.util.MathUtils;
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
 /**
  * SyncThread is a background thread which help checkpointing ledger storage
@@ -55,8 +64,8 @@ import org.apache.bookkeeper.util.MathUtils;
 @Slf4j
 class SyncThread implements Checkpointer {
 
+    @Getter(AccessLevel.PACKAGE)
     final ScheduledExecutorService executor;
-    final int flushInterval;
     final LedgerStorage ledgerStorage;
     final LedgerDirsListener dirsListener;
     final CheckpointSource checkpointSource;
@@ -72,6 +81,7 @@ class SyncThread implements Checkpointer {
         this.dirsListener = dirsListener;
         this.ledgerStorage = ledgerStorage;
         this.checkpointSource = checkpointSource;
+<<<<<<< HEAD
         ThreadFactoryBuilder tfb = new ThreadFactoryBuilder()
             .setNameFormat("SyncThread-" + conf.getBookiePort() + "-%d");
         this.executor = Executors.newSingleThreadScheduledExecutor(tfb.build());
@@ -83,6 +93,17 @@ class SyncThread implements Checkpointer {
 
     @Override
     public void startCheckpoint(Checkpoint checkpoint) {
+=======
+        this.executor = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("SyncThread"));
+    }
+
+    @Override
+    public void startCheckpoint(Checkpoint checkpoint) {
+        doCheckpoint(checkpoint);
+    }
+
+    protected void doCheckpoint(Checkpoint checkpoint) {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         executor.submit(() -> {
             try {
                 synchronized (suspensionLock) {
@@ -105,7 +126,11 @@ class SyncThread implements Checkpointer {
         });
     }
 
+<<<<<<< HEAD
     public Future<Void> requestFlush() {
+=======
+    public Future requestFlush() {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return executor.submit(() -> {
             try {
                 flush();
@@ -122,7 +147,11 @@ class SyncThread implements Checkpointer {
             ledgerStorage.flush();
         } catch (NoWritableLedgerDirException e) {
             log.error("No writeable ledger directories", e);
+<<<<<<< HEAD
             dirsListener.allDisksFull();
+=======
+            dirsListener.allDisksFull(true);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             return;
         } catch (IOException e) {
             log.error("Exception flushing ledgers", e);
@@ -138,7 +167,11 @@ class SyncThread implements Checkpointer {
             checkpointSource.checkpointComplete(checkpoint, false);
         } catch (IOException e) {
             log.error("Exception marking checkpoint as complete", e);
+<<<<<<< HEAD
             dirsListener.allDisksFull();
+=======
+            dirsListener.allDisksFull(true);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
     }
 
@@ -153,7 +186,11 @@ class SyncThread implements Checkpointer {
             ledgerStorage.checkpoint(checkpoint);
         } catch (NoWritableLedgerDirException e) {
             log.error("No writeable ledger directories", e);
+<<<<<<< HEAD
             dirsListener.allDisksFull();
+=======
+            dirsListener.allDisksFull(true);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             return;
         } catch (IOException e) {
             log.error("Exception flushing ledgers", e);
@@ -164,8 +201,17 @@ class SyncThread implements Checkpointer {
             checkpointSource.checkpointComplete(checkpoint, true);
         } catch (IOException e) {
             log.error("Exception marking checkpoint as complete", e);
+<<<<<<< HEAD
             dirsListener.allDisksFull();
+=======
+            dirsListener.allDisksFull(true);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
+    }
+
+    @Override
+    public void start() {
+        // no-op
     }
 
     /**
@@ -198,12 +244,19 @@ class SyncThread implements Checkpointer {
     void shutdown() throws InterruptedException {
         log.info("Shutting down SyncThread");
         requestFlush();
+
         executor.shutdown();
-        long start = MathUtils.now();
+        long start = System.currentTimeMillis();
         while (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+<<<<<<< HEAD
             long now = MathUtils.now();
             log.info("SyncThread taking a long time to shutdown. Has taken {}"
                     + " seconds so far", now - start);
+=======
+            long now = System.currentTimeMillis();
+            log.info("SyncThread taking a long time to shutdown. Has taken {}"
+                    + " milliseconds so far", now - start);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
     }
 }

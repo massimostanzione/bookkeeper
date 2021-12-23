@@ -23,7 +23,9 @@ package org.apache.bookkeeper.bookie;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -39,17 +41,20 @@ import org.apache.bookkeeper.client.ClientUtil;
 import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.conf.TestBKConfiguration;
-import org.apache.bookkeeper.test.PortManager;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.bookkeeper.util.IOUtils;
+import org.apache.bookkeeper.util.PortManager;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Test the protocol upgrade procedure.
+ */
 public class UpgradeTest extends BookKeeperClusterTestCase {
-    private final static Logger LOG = LoggerFactory.getLogger(FileInfo.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FileInfo.class);
 
-    final static int bookiePort = PortManager.nextFreePort();
+    private static final int bookiePort = PortManager.nextFreePort();
 
     public UpgradeTest() {
         super(0);
@@ -62,17 +67,17 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
 
         File fn = new File(dir, IndexPersistenceMgr.getLedgerName(ledgerId));
         fn.getParentFile().mkdirs();
-        FileInfo fi = new FileInfo(fn, masterKey);
+        FileInfo fi = new FileInfo(fn, masterKey, FileInfo.CURRENT_HEADER_VERSION);
         // force creation of index file
         fi.write(new ByteBuffer[]{ ByteBuffer.allocate(0) }, 0);
         fi.close(true);
 
         long logId = 0;
-        ByteBuffer LOGFILE_HEADER = ByteBuffer.allocate(1024);
-        LOGFILE_HEADER.put("BKLO".getBytes());
+        ByteBuffer logfileHeader = ByteBuffer.allocate(1024);
+        logfileHeader.put("BKLO".getBytes());
         FileChannel logfile = new RandomAccessFile(
-                new File(dir, Long.toHexString(logId)+".log"), "rw").getChannel();
-        logfile.write((ByteBuffer) LOGFILE_HEADER.clear());
+                new File(dir, Long.toHexString(logId) + ".log"), "rw").getChannel();
+        logfile.write((ByteBuffer) logfileHeader.clear());
         logfile.close();
     }
 
@@ -85,34 +90,32 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
 
         long ledgerId = 1;
         byte[] data = new byte[1024];
-        Arrays.fill(data, (byte)'X');
+        Arrays.fill(data, (byte) 'X');
         long lastConfirmed = LedgerHandle.INVALID_ENTRY_ID;
 
         for (int i = 1; i <= numEntries; i++) {
             ByteBuf packet = ClientUtil.generatePacket(ledgerId, i, lastConfirmed,
-                                                          i*data.length, data);
+                                                          i * data.length, data);
             lastConfirmed = i;
             ByteBuffer lenBuff = ByteBuffer.allocate(4);
             lenBuff.putInt(packet.readableBytes());
             lenBuff.flip();
 
-            bc.write(lenBuff);
-            bc.write(packet.nioBuffer());
+            bc.write(Unpooled.wrappedBuffer(lenBuff));
+            bc.write(packet);
             packet.release();
         }
-        bc.flush(true);
+        bc.flushAndForceWrite(false);
 
         return jc;
     }
 
-    static File newV1JournalDirectory() throws Exception {
-        File d = IOUtils.createTempDir("bookie", "tmpdir");
+    static File initV1JournalDirectory(File d) throws Exception {
         writeJournal(d, 100, "foobar".getBytes()).close();
         return d;
     }
-              
-    static File newV1LedgerDirectory() throws Exception {
-        File d = IOUtils.createTempDir("bookie", "tmpdir");
+
+    static File initV1LedgerDirectory(File d) throws Exception {
         writeLedgerDir(d, "foobar".getBytes());
         return d;
     }
@@ -133,27 +136,25 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
         }
     }
 
-    static File newV2JournalDirectory() throws Exception {
-        File d = newV1JournalDirectory();
-        createVersion2File(d);
+    static File initV2JournalDirectory(File d) throws Exception {
+        createVersion2File(initV1JournalDirectory(d));
         return d;
     }
 
-    static File newV2LedgerDirectory() throws Exception {
-        File d = newV1LedgerDirectory();
-        createVersion2File(d);
+    static File initV2LedgerDirectory(File d) throws Exception {
+        createVersion2File(initV1LedgerDirectory(d));
         return d;
     }
 
     private static void testUpgradeProceedure(String zkServers, String journalDir, String ledgerDir) throws Exception {
-        ServerConfiguration conf = TestBKConfiguration.newServerConfiguration()
-            .setZkServers(zkServers)
-            .setJournalDirName(journalDir)
+        ServerConfiguration conf = TestBKConfiguration.newServerConfiguration();
+        conf.setMetadataServiceUri("zk://" + zkServers + "/ledgers");
+        conf.setJournalDirName(journalDir)
             .setLedgerDirNames(new String[] { ledgerDir })
             .setBookiePort(bookiePort);
         Bookie b = null;
         try {
-            b = new Bookie(conf);
+            b = new BookieImpl(conf);
             fail("Shouldn't have been able to start");
         } catch (BookieException.InvalidCookieException e) {
             // correct behaviour
@@ -161,14 +162,14 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
         }
 
         FileSystemUpgrade.upgrade(conf); // should work fine
-        b = new Bookie(conf);
+        b = new BookieImpl(conf);
         b.start();
         b.shutdown();
         b = null;
 
         FileSystemUpgrade.rollback(conf);
         try {
-            b = new Bookie(conf);
+            b = new BookieImpl(conf);
             fail("Shouldn't have been able to start");
         } catch (BookieException.InvalidCookieException e) {
             // correct behaviour
@@ -177,7 +178,7 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
 
         FileSystemUpgrade.upgrade(conf);
         FileSystemUpgrade.finalizeUpgrade(conf);
-        b = new Bookie(conf);
+        b = new BookieImpl(conf);
         b.start();
         b.shutdown();
         b = null;
@@ -185,38 +186,32 @@ public class UpgradeTest extends BookKeeperClusterTestCase {
 
     @Test
     public void testUpgradeV1toCurrent() throws Exception {
-        File journalDir = newV1JournalDirectory();
-        tmpDirs.add(journalDir);
-        File ledgerDir = newV1LedgerDirectory();
-        tmpDirs.add(ledgerDir);
+        File journalDir = initV1JournalDirectory(createTempDir("bookie", "journal"));
+        File ledgerDir = initV1LedgerDirectory(createTempDir("bookie", "ledger"));
         testUpgradeProceedure(zkUtil.getZooKeeperConnectString(), journalDir.getPath(), ledgerDir.getPath());
     }
 
     @Test
     public void testUpgradeV2toCurrent() throws Exception {
-        File journalDir = newV2JournalDirectory();
-        tmpDirs.add(journalDir);
-        File ledgerDir = newV2LedgerDirectory();
-        tmpDirs.add(ledgerDir);
+        File journalDir = initV2JournalDirectory(createTempDir("bookie", "journal"));
+        File ledgerDir = initV2LedgerDirectory(createTempDir("bookie", "ledger"));
         testUpgradeProceedure(zkUtil.getZooKeeperConnectString(), journalDir.getPath(), ledgerDir.getPath());
     }
 
     @Test
     public void testUpgradeCurrent() throws Exception {
-        File journalDir = newV2JournalDirectory();
-        tmpDirs.add(journalDir);
-        File ledgerDir = newV2LedgerDirectory();
-        tmpDirs.add(ledgerDir);
+        File journalDir = initV2JournalDirectory(createTempDir("bookie", "journal"));
+        File ledgerDir = initV2LedgerDirectory(createTempDir("bookie", "ledger"));
         testUpgradeProceedure(zkUtil.getZooKeeperConnectString(), journalDir.getPath(), ledgerDir.getPath());
 
         // Upgrade again
-        ServerConfiguration conf = TestBKConfiguration.newServerConfiguration()
-            .setZkServers(zkUtil.getZooKeeperConnectString())
-            .setJournalDirName(journalDir.getPath())
+        ServerConfiguration conf = TestBKConfiguration.newServerConfiguration();
+        conf.setJournalDirName(journalDir.getPath())
             .setLedgerDirNames(new String[] { ledgerDir.getPath() })
-            .setBookiePort(bookiePort);
+            .setBookiePort(bookiePort)
+            .setMetadataServiceUri(zkUtil.getMetadataServiceUri());
         FileSystemUpgrade.upgrade(conf); // should work fine with current directory
-        Bookie b = new Bookie(conf);
+        Bookie b = new BookieImpl(conf);
         b.start();
         b.shutdown();
     }

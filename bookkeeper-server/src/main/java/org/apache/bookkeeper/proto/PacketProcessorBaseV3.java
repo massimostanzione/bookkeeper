@@ -32,7 +32,11 @@ import org.apache.bookkeeper.proto.BookkeeperProtocol.StatusCode;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.util.MathUtils;
 import org.apache.bookkeeper.util.SafeRunnable;
+import org.apache.bookkeeper.util.StringUtils;
 
+/**
+ * A base class for bookkeeper protocol v3 packet processors.
+ */
 public abstract class PacketProcessorBaseV3 extends SafeRunnable {
 
     final Request request;
@@ -50,14 +54,50 @@ public abstract class PacketProcessorBaseV3 extends SafeRunnable {
 
     protected void sendResponse(StatusCode code, Object response, OpStatsLogger statsLogger) {
         final long writeNanos = MathUtils.nowInNano();
+
+        final long timeOut = requestProcessor.getWaitTimeoutOnBackpressureMillis();
+        if (timeOut >= 0 && !channel.isWritable()) {
+            if (!requestProcessor.isBlacklisted(channel)) {
+                synchronized (channel) {
+                    if (!channel.isWritable() && !requestProcessor.isBlacklisted(channel)) {
+                        final long waitUntilNanos = writeNanos + TimeUnit.MILLISECONDS.toNanos(timeOut);
+                        while (!channel.isWritable() && MathUtils.nowInNano() < waitUntilNanos) {
+                            try {
+                                TimeUnit.MILLISECONDS.sleep(1);
+                            } catch (InterruptedException e) {
+                                break;
+                            }
+                        }
+                        if (!channel.isWritable()) {
+                            requestProcessor.blacklistChannel(channel);
+                            requestProcessor.handleNonWritableChannel(channel);
+                        }
+                    }
+                }
+            }
+
+            if (!channel.isWritable()) {
+                LOGGER.warn("cannot write response to non-writable channel {} for request {}", channel,
+                        StringUtils.requestToString(request));
+                requestProcessor.getRequestStats().getChannelWriteStats()
+                        .registerFailedEvent(MathUtils.elapsedNanos(writeNanos), TimeUnit.NANOSECONDS);
+                statsLogger.registerFailedEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
+                return;
+            } else {
+                requestProcessor.invalidateBlacklist(channel);
+            }
+        }
+
         channel.writeAndFlush(response).addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
                 long writeElapsedNanos = MathUtils.elapsedNanos(writeNanos);
                 if (!future.isSuccess()) {
-                    requestProcessor.channelWriteStats.registerFailedEvent(writeElapsedNanos, TimeUnit.NANOSECONDS);
+                    requestProcessor.getRequestStats().getChannelWriteStats()
+                        .registerFailedEvent(writeElapsedNanos, TimeUnit.NANOSECONDS);
                 } else {
-                    requestProcessor.channelWriteStats.registerSuccessfulEvent(writeElapsedNanos, TimeUnit.NANOSECONDS);
+                    requestProcessor.getRequestStats().getChannelWriteStats()
+                        .registerSuccessfulEvent(writeElapsedNanos, TimeUnit.NANOSECONDS);
                 }
                 if (StatusCode.EOK == code) {
                     statsLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
@@ -66,7 +106,6 @@ public abstract class PacketProcessorBaseV3 extends SafeRunnable {
                 }
             }
         });
-
     }
 
     protected boolean isVersionCompatible() {

@@ -24,12 +24,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.util.Enumeration;
 import java.util.concurrent.TimeUnit;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.bookie.Bookie;
+import org.apache.bookkeeper.bookie.BookieImpl;
 import org.apache.bookkeeper.bookie.InterleavedLedgerStorage;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
 import org.apache.bookkeeper.client.BKException;
@@ -37,11 +40,11 @@ import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.util.BookKeeperConstants;
+import org.apache.bookkeeper.util.PortManager;
 import org.junit.Test;
 
 /**
- * Test to verify the readonly feature of bookies
+ * Test to verify the readonly feature of bookies.
  */
 public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
 
@@ -49,10 +52,11 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
         super(2);
         baseConf.setLedgerStorageClass(InterleavedLedgerStorage.class.getName());
         baseConf.setEntryLogFilePreAllocationEnabled(false);
+        baseConf.setMinUsableSizeForEntryLogCreation(Long.MAX_VALUE);
     }
 
     /**
-     * Check readonly bookie
+     * Check readonly bookie.
      */
     @Test
     public void testBookieShouldServeAsReadOnly() throws Exception {
@@ -63,11 +67,11 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
                 "".getBytes());
 
         // Check new bookie with readonly mode enabled.
-        File[] ledgerDirs = bsConfs.get(1).getLedgerDirs();
+        File[] ledgerDirs = confByIndex(1).getLedgerDirs();
         assertEquals("Only one ledger dir should be present", 1,
                 ledgerDirs.length);
-        Bookie bookie = bs.get(1).getBookie();
-        LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
+        Bookie bookie = serverByIndex(1).getBookie();
+        LedgerDirsManager ledgerDirsManager = ((BookieImpl) bookie).getLedgerDirsManager();
 
         for (int i = 0; i < 10; i++) {
             ledger.addEntry("data".getBytes());
@@ -106,10 +110,10 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
                 "".getBytes());
 
         // Check new bookie with readonly mode enabled.
-        File[] ledgerDirs = bsConfs.get(1).getLedgerDirs();
+        File[] ledgerDirs = confByIndex(1).getLedgerDirs();
         assertEquals("Only one ledger dir should be present", 1,
                 ledgerDirs.length);
-        Bookie bookie = bs.get(1).getBookie();
+        BookieImpl bookie = (BookieImpl) serverByIndex(1).getBookie();
         LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
 
         for (int i = 0; i < 10; i++) {
@@ -128,7 +132,11 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
             // Expected
         }
 
+<<<<<<< HEAD
         bkc.waitForReadOnlyBookie(Bookie.getBookieAddress(bsConfs.get(1)))
+=======
+        bkc.waitForReadOnlyBookie(BookieImpl.getBookieId(confByIndex(1)))
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             .get(30, TimeUnit.SECONDS);
 
         LOG.info("bookie is running {}, readonly {}.", bookie.isRunning(), bookie.isReadOnly());
@@ -146,7 +154,11 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
         // Now add the current ledger dir back to writable dirs list
         ledgerDirsManager.addToWritableDirs(testDir, true);
 
+<<<<<<< HEAD
         bkc.waitForWritableBookie(Bookie.getBookieAddress(bsConfs.get(1)))
+=======
+        bkc.waitForWritableBookie(BookieImpl.getBookieId(confByIndex(1)))
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             .get(30, TimeUnit.SECONDS);
 
         LOG.info("bookie is running {}, readonly {}.", bookie.isRunning(), bookie.isReadOnly());
@@ -165,7 +177,7 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
     }
 
     /**
-     * check readOnlyModeEnabled=false
+     * check readOnlyModeEnabled=false.
      */
     @Test
     public void testBookieShutdownIfReadOnlyModeNotEnabled() throws Exception {
@@ -173,10 +185,10 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
         baseConf.setReadOnlyModeEnabled(false);
         startNewBookie();
 
-        File[] ledgerDirs = bsConfs.get(1).getLedgerDirs();
+        File[] ledgerDirs = confByIndex(1).getLedgerDirs();
         assertEquals("Only one ledger dir should be present", 1,
                 ledgerDirs.length);
-        Bookie bookie = bs.get(1).getBookie();
+        BookieImpl bookie = (BookieImpl) serverByIndex(1).getBookie();
         LedgerHandle ledger = bkc.createLedger(2, 2, DigestType.MAC,
                 "".getBytes());
         LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
@@ -204,17 +216,17 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
     }
 
     /**
-     * Check multiple ledger dirs
+     * Check multiple ledger dirs.
      */
     @Test
     public void testBookieContinueWritingIfMultipleLedgersPresent()
             throws Exception {
         startNewBookieWithMultipleLedgerDirs(2);
 
-        File[] ledgerDirs = bsConfs.get(1).getLedgerDirs();
+        File[] ledgerDirs = confByIndex(1).getLedgerDirs();
         assertEquals("Only one ledger dir should be present", 2,
                 ledgerDirs.length);
-        Bookie bookie = bs.get(1).getBookie();
+        BookieImpl bookie = (BookieImpl) serverByIndex(1).getBookie();
         LedgerHandle ledger = bkc.createLedger(2, 2, DigestType.MAC,
                 "".getBytes());
         LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
@@ -236,34 +248,37 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
 
     private void startNewBookieWithMultipleLedgerDirs(int numOfLedgerDirs)
             throws Exception {
-        ServerConfiguration conf = bsConfs.get(1);
+        ServerConfiguration conf = confByIndex(1);
         killBookie(1);
 
         File[] ledgerDirs = new File[numOfLedgerDirs];
         for (int i = 0; i < numOfLedgerDirs; i++) {
             File dir = createTempDir("bookie", "test");
-            tmpDirs.add(dir);
             ledgerDirs[i] = dir;
         }
 
         ServerConfiguration newConf = newServerConfiguration(
-                conf.getBookiePort() + 1, zkUtil.getZooKeeperConnectString(),
+                PortManager.nextFreePort(),
                 ledgerDirs[0], ledgerDirs);
-        bsConfs.add(newConf);
-        bs.add(startBookie(newConf));
+        startAndAddBookie(newConf);
     }
 
     /**
-     * Test ledger creation with readonly bookies
+     * Test ledger creation with readonly bookies.
      */
     @Test
     public void testLedgerCreationShouldFailWithReadonlyBookie() throws Exception {
         killBookie(1);
         baseConf.setReadOnlyModeEnabled(true);
         startNewBookie();
-        bs.get(1).getBookie().doTransitionToReadOnlyMode();
+
+        serverByIndex(1).getBookie().getStateManager().transitionToReadOnlyMode().get();
         try {
+<<<<<<< HEAD
             bkc.waitForReadOnlyBookie(Bookie.getBookieAddress(bsConfs.get(1)))
+=======
+            bkc.waitForReadOnlyBookie(BookieImpl.getBookieId(confByIndex(1)))
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
                 .get(30, TimeUnit.SECONDS);
 
             bkc.createLedger(2, 2, DigestType.CRC32, "".getBytes());
@@ -282,14 +297,14 @@ public class ReadOnlyBookieTest extends BookKeeperClusterTestCase {
             ledger.addEntry("data".getBytes());
         }
         ledger.close();
-        bsConfs.get(1).setReadOnlyModeEnabled(true);
-        bsConfs.get(1).setDiskCheckInterval(500);
+        confByIndex(1).setReadOnlyModeEnabled(true);
+        confByIndex(1).setDiskCheckInterval(500);
         restartBookies();
 
         // Check new bookie with readonly mode enabled.
-        File[] ledgerDirs = bsConfs.get(1).getLedgerDirs();
+        File[] ledgerDirs = confByIndex(1).getLedgerDirs();
         assertEquals("Only one ledger dir should be present", 1, ledgerDirs.length);
-        Bookie bookie = bs.get(1).getBookie();
+        BookieImpl bookie = (BookieImpl) serverByIndex(1).getBookie();
         LedgerDirsManager ledgerDirsManager = bookie.getLedgerDirsManager();
 
         // Now add the current ledger dir to filled dirs list

@@ -21,13 +21,15 @@
 
 package org.apache.bookkeeper.bookie;
 
-import com.google.common.util.concurrent.SettableFuture;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Observable;
-import java.util.Observer;
+import java.util.PrimitiveIterator.OfLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.bookkeeper.client.api.BKException;
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
+import org.apache.bookkeeper.common.util.Watcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,13 +38,13 @@ import org.slf4j.LoggerFactory;
  * to write entries to a ledger and read entries from a ledger.
  */
 public class LedgerDescriptorImpl extends LedgerDescriptor {
-    private static final Logger LOG = LoggerFactory.getLogger(LedgerDescriptor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LedgerDescriptorImpl.class);
     final LedgerStorage ledgerStorage;
     private long ledgerId;
     final byte[] masterKey;
 
     private AtomicBoolean fenceEntryPersisted = new AtomicBoolean();
-    private SettableFuture<Boolean> logFenceResult = null;
+    private CompletableFuture<Boolean> logFenceResult = null;
 
     LedgerDescriptorImpl(byte[] masterKey,
                          long ledgerId,
@@ -53,10 +55,10 @@ public class LedgerDescriptorImpl extends LedgerDescriptor {
     }
 
     @Override
-    void checkAccess(byte masterKey[]) throws BookieException, IOException {
+    void checkAccess(byte[] masterKey) throws BookieException, IOException {
         if (!Arrays.equals(this.masterKey, masterKey)) {
-            LOG.error("[{}] Requested master key {} does not match the cached master key {}", new Object[] {
-                    this.ledgerId, Arrays.toString(masterKey), Arrays.toString(this.masterKey) });
+            LOG.error("[{}] Requested master key {} does not match the cached master key {}",
+                    this.ledgerId, Arrays.toString(masterKey), Arrays.toString(this.masterKey));
             throw BookieException.create(BookieException.Code.UnauthorizedAccessException);
         }
     }
@@ -78,15 +80,16 @@ public class LedgerDescriptorImpl extends LedgerDescriptor {
 
     @Override
     void setExplicitLac(ByteBuf lac) throws IOException {
-        ledgerStorage.setExplicitlac(ledgerId, lac);
+        ledgerStorage.setExplicitLac(ledgerId, lac);
     }
 
     @Override
-    ByteBuf getExplicitLac() {
+    ByteBuf getExplicitLac() throws IOException {
         return ledgerStorage.getExplicitLac(ledgerId);
     }
 
-    synchronized SettableFuture<Boolean> fenceAndLogInJournal(Journal journal) throws IOException {
+    @Override
+    synchronized CompletableFuture<Boolean> fenceAndLogInJournal(Journal journal) throws IOException {
         boolean success = this.setFenced();
         if (success) {
             // fenced for first time, we should add the key to journal ensure we can rebuild.
@@ -99,8 +102,8 @@ public class LedgerDescriptorImpl extends LedgerDescriptor {
             if (logFenceResult == null || fenceEntryPersisted.get()){
                 // Either ledger's fenced state is recovered from Journal
                 // Or Log fence entry in Journal succeed
-                SettableFuture<Boolean> result = SettableFuture.create();
-                result.set(true);
+                CompletableFuture<Boolean> result = FutureUtils.createFuture();
+                result.complete(true);
                 return result;
             } else if (logFenceResult.isDone()) {
                 // We failed to log fence entry in Journal, try again.
@@ -116,26 +119,34 @@ public class LedgerDescriptorImpl extends LedgerDescriptor {
      * @param journal log the fence entry in the Journal
      * @return A future which will be satisfied when add entry to journal complete
      */
-    private SettableFuture<Boolean> logFenceEntryInJournal(Journal journal) {
-        SettableFuture<Boolean> result;
+    private CompletableFuture<Boolean> logFenceEntryInJournal(Journal journal) {
+        CompletableFuture<Boolean> result;
         synchronized (this) {
-            result = logFenceResult = SettableFuture.create();
+            result = logFenceResult = FutureUtils.createFuture();
         }
         ByteBuf entry = createLedgerFenceEntry(ledgerId);
-        journal.logAddEntry(entry, (rc, ledgerId, entryId, addr, ctx) -> {
-            LOG.debug("Record fenced state for ledger {} in journal with rc {}", ledgerId, rc);
-            if (rc == 0) {
-                fenceEntryPersisted.compareAndSet(false, true);
-                result.set(true);
-            } else {
-                result.set(false);
-            }
-        }, null);
+        try {
+            journal.logAddEntry(entry, false /* ackBeforeSync */, (rc, ledgerId, entryId, addr, ctx) -> {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Record fenced state for ledger {} in journal with rc {}",
+                            ledgerId, BKException.codeLogger(rc));
+                }
+                if (rc == 0) {
+                    fenceEntryPersisted.compareAndSet(false, true);
+                    result.complete(true);
+                } else {
+                    result.complete(false);
+                }
+            }, null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            result.completeExceptionally(e);
+        }
         return result;
     }
 
     @Override
-    long addEntry(ByteBuf entry) throws IOException {
+    long addEntry(ByteBuf entry) throws IOException, BookieException {
         long ledgerId = entry.getLong(entry.readerIndex());
 
         if (ledgerId != this.ledgerId) {
@@ -156,7 +167,18 @@ public class LedgerDescriptorImpl extends LedgerDescriptor {
     }
 
     @Override
-    Observable waitForLastAddConfirmedUpdate(long previousLAC, Observer observer) throws IOException {
-        return ledgerStorage.waitForLastAddConfirmedUpdate(ledgerId, previousLAC, observer);
+    boolean waitForLastAddConfirmedUpdate(long previousLAC,
+                                          Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException {
+        return ledgerStorage.waitForLastAddConfirmedUpdate(ledgerId, previousLAC, watcher);
+    }
+
+    @Override
+    void cancelWaitForLastAddConfirmedUpdate(Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException {
+        ledgerStorage.cancelWaitForLastAddConfirmedUpdate(ledgerId, watcher);
+    }
+
+    @Override
+    OfLong getListOfEntriesOfLedger(long ledgerId) throws IOException {
+        return ledgerStorage.getListOfEntriesOfLedger(ledgerId);
     }
 }

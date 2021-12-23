@@ -22,16 +22,37 @@
 package org.apache.bookkeeper.util;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
-import org.apache.bookkeeper.bookie.Bookie;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.bookie.BookieImpl;
+import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.api.ReadHandle;
 
-public class TestUtils {
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.commons.io.FileUtils;
+import org.junit.Assert;
+
+/**
+ * Test utilities.
+ */
+@Slf4j
+public final class TestUtils {
+
+    private TestUtils() {}
+
+    public static String buildStatsCounterPathFromBookieID(BookieId bookieId) {
+        return bookieId.toString().replace('.', '_').replace('-', '_').replace(":", "_");
+    }
+
     public static boolean hasLogFiles(File ledgerDirectory, boolean partial, Integer... logsId) {
         boolean result = partial ? false : true;
         Set<Integer> logs = new HashSet<Integer>();
-        for (File file : Bookie.getCurrentDirectory(ledgerDirectory).listFiles()) {
+        for (File file : BookieImpl.getCurrentDirectory(ledgerDirectory).listFiles()) {
             if (file.isFile()) {
                 String name = file.getName();
                 if (!name.endsWith(".log")) {
@@ -49,4 +70,43 @@ public class TestUtils {
         }
         return result;
     }
+
+    public static void waitUntilLacUpdated(ReadHandle rh, long newLac) throws Exception {
+        long lac = rh.getLastAddConfirmed();
+        while (lac < newLac) {
+            TimeUnit.MILLISECONDS.sleep(20);
+            lac = rh.readLastAddConfirmed();
+        }
+    }
+
+    public static long waitUntilExplicitLacUpdated(LedgerHandle rh, long newLac) throws Exception {
+        long lac;
+        while ((lac = rh.readExplicitLastConfirmed()) < newLac) {
+            TimeUnit.MILLISECONDS.sleep(20);
+        }
+        return lac;
+    }
+
+    public static void assertEventuallyTrue(String description, BooleanSupplier predicate) throws Exception {
+        assertEventuallyTrue(description, predicate, 10, TimeUnit.SECONDS);
+    }
+
+    public static void assertEventuallyTrue(String description, BooleanSupplier predicate,
+                                            long duration, TimeUnit unit) throws Exception {
+        long iterations = unit.toMillis(duration) / 100;
+        for (int i = 0; i < iterations && !predicate.getAsBoolean(); i++) {
+            Thread.sleep(100);
+        }
+        Assert.assertTrue(description, predicate.getAsBoolean());
+    }
+
+    public static int countNumOfFiles(File[] folderNames, String... extensions) {
+        int count = 0;
+        for (int i = 0; i < folderNames.length; i++) {
+            Collection<File> filesCollection = FileUtils.listFiles(folderNames[i], extensions, true);
+            count += filesCollection.size();
+        }
+        return count;
+    }
+
 }

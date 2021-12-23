@@ -42,9 +42,15 @@ import java.util.concurrent.TimeoutException;
  */
 public class BoundedScheduledExecutorService extends ForwardingListeningExecutorService
         implements ListeningScheduledExecutorService {
+<<<<<<< HEAD
     BlockingQueue<Runnable> queue;
     ListeningScheduledExecutorService thread;
     int maxTasksInQueue;
+=======
+    private final BlockingQueue<Runnable> queue;
+    private final ListeningScheduledExecutorService thread;
+    private final int maxTasksInQueue;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     public BoundedScheduledExecutorService(ScheduledThreadPoolExecutor thread, int maxTasksInQueue) {
         this.queue = thread.getQueue();
@@ -59,76 +65,121 @@ public class BoundedScheduledExecutorService extends ForwardingListeningExecutor
 
     @Override
     public ListenableScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return this.thread.schedule(command, delay, unit);
     }
 
     @Override
     public <V> ListenableScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return this.thread.schedule(callable, delay, unit);
     }
 
     @Override
     public ListenableScheduledFuture<?> scheduleAtFixedRate(Runnable command,
                                                             long initialDelay, long period, TimeUnit unit) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return this.thread.scheduleAtFixedRate(command, initialDelay, period, unit);
     }
 
     @Override
     public ListenableScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
                                                                long initialDelay, long delay, TimeUnit unit) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return this.thread.scheduleAtFixedRate(command, initialDelay, delay, unit);
     }
 
     @Override
     public <T> ListenableFuture<T> submit(Callable<T> task) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.submit(task);
     }
 
     @Override
     public ListenableFuture<?> submit(Runnable task) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.submit(task);
     }
 
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(tasks.size());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.invokeAll(tasks);
     }
 
     @Override
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
                                          long timeout, TimeUnit unit) throws InterruptedException {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(tasks.size());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.invokeAll(tasks, timeout, unit);
     }
 
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(tasks.size());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.invokeAny(tasks);
     }
 
     @Override
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout,
                            TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(tasks.size());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.invokeAny(tasks, timeout, unit);
     }
 
     @Override
     public <T> ListenableFuture<T> submit(Runnable task, T result) {
+<<<<<<< HEAD
         this.checkQueue();
+=======
+        this.checkQueue(1);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return super.submit(task, result);
     }
 
     @Override
     public void execute(Runnable command) {
+<<<<<<< HEAD
         this.checkQueue();
         super.execute(command);
     }
@@ -136,6 +187,15 @@ public class BoundedScheduledExecutorService extends ForwardingListeningExecutor
     private void checkQueue() {
         if (this.maxTasksInQueue > 0 && this.queue.size() >= this.maxTasksInQueue) {
             throw new RejectedExecutionException("Queue at limit of " + this.maxTasksInQueue + " items");
+=======
+        this.checkQueue(1);
+        super.execute(command);
+    }
+
+    private void checkQueue(int numberOfTasks) {
+        if (maxTasksInQueue > 0 && (queue.size() + numberOfTasks) > maxTasksInQueue) {
+            throw new RejectedExecutionException("Queue at limit of " + maxTasksInQueue + " items");
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
     }
 

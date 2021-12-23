@@ -39,5 +39,13 @@ public enum DigestType {
     /**
      * Entries are verified by applied MAC algorithm.
      */
-    MAC
+    MAC,
+    /**
+     * Entries are verified by applied CRC32C algorithm.
+     */
+    CRC32C,
+    /**
+     * Entries are not verified.
+     */
+    DUMMY,
 }

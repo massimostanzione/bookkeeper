@@ -22,17 +22,28 @@ package org.apache.bookkeeper.proto;
 
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SERVER_SCOPE;
-
+import static org.apache.bookkeeper.conf.AbstractConfiguration.PERMITTED_STARTUP_USERS;
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.buffer.ByteBufAllocator;
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.UnknownHostException;
+import java.security.AccessControlException;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieCriticalThread;
 import org.apache.bookkeeper.bookie.BookieException;
+import org.apache.bookkeeper.bookie.BookieImpl;
 import org.apache.bookkeeper.bookie.ExitCode;
 import org.apache.bookkeeper.bookie.ReadOnlyBookie;
-import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.common.allocator.ByteBufAllocatorBuilder;
+import org.apache.bookkeeper.common.util.JsonUtil.ParseJsonException;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.discover.BookieServiceInfo;
+import org.apache.bookkeeper.discover.BookieServiceInfoUtils;
+import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.processor.RequestProcessor;
 import org.apache.bookkeeper.replication.ReplicationException.CompatibilityException;
@@ -55,9 +66,9 @@ public class BookieServer {
     final ServerConfiguration conf;
     BookieNettyServer nettyServer;
     private volatile boolean running = false;
-    Bookie bookie;
+    private final Bookie bookie;
     DeathWatcher deathWatcher;
-    private final static Logger LOG = LoggerFactory.getLogger(BookieServer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BookieServer.class);
 
     int exitCode = ExitCode.OK;
 
@@ -67,20 +78,44 @@ public class BookieServer {
     // Expose Stats
     private final StatsLogger statsLogger;
 
+    // Exception handler
+    private volatile UncaughtExceptionHandler uncaughtExceptionHandler = null;
+
     public BookieServer(ServerConfiguration conf) throws IOException,
             KeeperException, InterruptedException, BookieException,
             UnavailableException, CompatibilityException, SecurityException {
-        this(conf, NullStatsLogger.INSTANCE);
+        this(conf, NullStatsLogger.INSTANCE, null);
     }
 
-    public BookieServer(ServerConfiguration conf, StatsLogger statsLogger)
+    public BookieServer(ServerConfiguration conf, StatsLogger statsLogger,
+            Supplier<BookieServiceInfo> bookieServiceInfoProvider)
             throws IOException, KeeperException, InterruptedException,
             BookieException, UnavailableException, CompatibilityException, SecurityException {
+        if (bookieServiceInfoProvider == null) {
+            bookieServiceInfoProvider = () -> {
+                try {
+                    return BookieServiceInfoUtils
+                            .buildLegacyBookieServiceInfo(this.getLocalAddress().toBookieId().toString());
+                } catch (IOException err) {
+                    throw new RuntimeException(err);
+                }
+            };
+        }
         this.conf = conf;
-        this.statsLogger = statsLogger;
-        this.nettyServer = new BookieNettyServer(this.conf, null);
+        validateUser(conf);
+        String configAsString;
         try {
-            this.bookie = newBookie(conf);
+            configAsString = conf.asJson();
+            LOG.info(configAsString);
+        } catch (ParseJsonException pe) {
+            LOG.error("Got ParseJsonException while converting Config to JSONString", pe);
+        }
+
+        ByteBufAllocator allocator = getAllocator(conf);
+        this.statsLogger = statsLogger;
+        this.nettyServer = new BookieNettyServer(this.conf, null, allocator);
+        try {
+            this.bookie = newBookie(conf, allocator, bookieServiceInfoProvider);
         } catch (IOException | KeeperException | InterruptedException | BookieException e) {
             // interrupted on constructing a bookie
             this.nettyServer.shutdown();
@@ -91,34 +126,60 @@ public class BookieServer {
         shFactory = SecurityProviderFactoryFactory
                 .getSecurityProviderFactory(conf.getTLSProviderFactoryClass());
         this.requestProcessor = new BookieRequestProcessor(conf, bookie,
-                statsLogger.scope(SERVER_SCOPE), shFactory);
+                statsLogger.scope(SERVER_SCOPE), shFactory, allocator);
         this.nettyServer.setRequestProcessor(this.requestProcessor);
     }
 
-    protected Bookie newBookie(ServerConfiguration conf)
-        throws IOException, KeeperException, InterruptedException, BookieException {
-        return conf.isForceReadOnlyBookie() ?
-                new ReadOnlyBookie(conf, statsLogger.scope(BOOKIE_SCOPE)) :
-                new Bookie(conf, statsLogger.scope(BOOKIE_SCOPE));
+    /**
+     * Currently the uncaught exception handler is used for DeathWatcher to notify
+     * lifecycle management that a bookie is dead for some reasons.
+     *
+     * <p>in future, we can register this <tt>exceptionHandler</tt> to critical threads
+     * so when those threads are dead, it will automatically trigger lifecycle management
+     * to shutdown the process.
+     */
+    public void setExceptionHandler(UncaughtExceptionHandler exceptionHandler) {
+        this.uncaughtExceptionHandler = exceptionHandler;
     }
 
-    public void start() throws IOException, UnavailableException, InterruptedException, BKException {
+    protected Bookie newBookie(ServerConfiguration conf, ByteBufAllocator allocator,
+            Supplier<BookieServiceInfo> bookieServiceInfoProvider)
+        throws IOException, KeeperException, InterruptedException, BookieException {
+        return conf.isForceReadOnlyBookie()
+            ? new ReadOnlyBookie(conf, statsLogger.scope(BOOKIE_SCOPE), allocator, bookieServiceInfoProvider)
+            : new BookieImpl(conf, statsLogger.scope(BOOKIE_SCOPE), allocator, bookieServiceInfoProvider);
+    }
+
+    public void start() throws InterruptedException {
         this.bookie.start();
         // fail fast, when bookie startup is not successful
         if (!this.bookie.isRunning()) {
             exitCode = bookie.getExitCode();
+            this.requestProcessor.close();
             return;
         }
         this.nettyServer.start();
 
         running = true;
         deathWatcher = new DeathWatcher(conf);
+        if (null != uncaughtExceptionHandler) {
+            deathWatcher.setUncaughtExceptionHandler(uncaughtExceptionHandler);
+        }
         deathWatcher.start();
+
+        // fixes test flappers at random places until ISSUE#1400 is resolved
+        // https://github.com/apache/bookkeeper/issues/1400
+        TimeUnit.MILLISECONDS.sleep(250);
     }
 
     @VisibleForTesting
     public BookieSocketAddress getLocalAddress() throws UnknownHostException {
-        return Bookie.getBookieAddress(conf);
+        return BookieImpl.getBookieAddress(conf);
+    }
+
+    @VisibleForTesting
+    public BookieId getBookieId() throws UnknownHostException {
+        return BookieImpl.getBookieId(conf);
     }
 
     @VisibleForTesting
@@ -126,8 +187,13 @@ public class BookieServer {
         return bookie;
     }
 
+    @VisibleForTesting
+    public BookieRequestProcessor getBookieRequestProcessor() {
+        return (BookieRequestProcessor) requestProcessor;
+    }
+
     /**
-     * Suspend processing of requests in the bookie (for testing)
+     * Suspend processing of requests in the bookie (for testing).
      */
     @VisibleForTesting
     public void suspendProcessing() {
@@ -138,7 +204,7 @@ public class BookieServer {
     }
 
     /**
-     * Resume processing requests in the bookie (for testing)
+     * Resume processing requests in the bookie (for testing).
      */
     @VisibleForTesting
     public void resumeProcessing() {
@@ -158,6 +224,28 @@ public class BookieServer {
         this.requestProcessor.close();
         running = false;
     }
+
+    /**
+     * Ensure the current user can start-up the process if it's restricted.
+     */
+    private void validateUser(ServerConfiguration conf) throws AccessControlException {
+        if (conf.containsKey(PERMITTED_STARTUP_USERS)) {
+            String currentUser = System.getProperty("user.name");
+            String[] propertyValue = conf.getPermittedStartupUsers();
+            for (String s : propertyValue) {
+                if (s.equals(currentUser)) {
+                    return;
+                }
+            }
+            String errorMsg =
+                    "System cannot start because current user isn't in permittedStartupUsers."
+                            + " Current user: " + currentUser + " permittedStartupUsers: "
+                            + Arrays.toString(propertyValue);
+            LOG.error(errorMsg);
+            throw new AccessControlException(errorMsg);
+        }
+    }
+
 
     public boolean isRunning() {
         return bookie.isRunning() && nettyServer.isRunning() && running;
@@ -181,7 +269,7 @@ public class BookieServer {
     }
 
     /**
-     * A thread to watch whether bookie & nioserver is still alive
+     * A thread to watch whether bookie and nioserver are still alive.
      */
     private class DeathWatcher extends BookieCriticalThread {
 
@@ -190,23 +278,51 @@ public class BookieServer {
         DeathWatcher(ServerConfiguration conf) {
             super("BookieDeathWatcher-" + conf.getBookiePort());
             watchInterval = conf.getDeathWatchInterval();
+            // set a default uncaught exception handler to shutdown the bookie server
+            // when it notices the bookie is not running any more.
+            setUncaughtExceptionHandler((thread, cause) -> {
+                LOG.info("BookieDeathWatcher exited loop due to uncaught exception from thread {}",
+                    thread.getName(), cause);
+                shutdown();
+            });
         }
 
         @Override
         public void run() {
-            while(true) {
+            while (true) {
                 try {
                     Thread.sleep(watchInterval);
                 } catch (InterruptedException ie) {
                     // do nothing
+                    Thread.currentThread().interrupt();
                 }
                 if (!isBookieRunning()) {
-                    shutdown();
-                    break;
+                    LOG.info("BookieDeathWatcher noticed the bookie is not running any more, exiting the watch loop!");
+                    // death watcher has noticed that bookie is not running any more
+                    // throw an exception to fail the death watcher thread and it will
+                    // trigger the uncaught exception handler to handle this "bookie not running" situation.
+                    throw new RuntimeException("Bookie is not running any more");
                 }
             }
-            LOG.info("BookieDeathWatcher exited loop!");
         }
+    }
+
+    private ByteBufAllocator getAllocator(ServerConfiguration conf) {
+        return ByteBufAllocatorBuilder.create()
+                .poolingPolicy(conf.getAllocatorPoolingPolicy())
+                .poolingConcurrency(conf.getAllocatorPoolingConcurrency())
+                .outOfMemoryPolicy(conf.getAllocatorOutOfMemoryPolicy())
+                .outOfMemoryListener((ex) -> {
+                    try {
+                        LOG.error("Unable to allocate memory, exiting bookie", ex);
+                    } finally {
+                        if (uncaughtExceptionHandler != null) {
+                            uncaughtExceptionHandler.uncaughtException(Thread.currentThread(), ex);
+                        }
+                    }
+                })
+                .leakDetectionPolicy(conf.getAllocatorLeakDetectionPolicy())
+                .build();
     }
 
     /**
@@ -218,13 +334,14 @@ public class BookieServer {
 
     @Override
     public  String toString() {
-        String id = "UNKNOWN";
-
+        String addr = "UNKNOWN";
+        String id = "?";
         try {
-            id = Bookie.getBookieAddress(conf).toString();
+            addr = BookieImpl.getBookieAddress(conf).toString();
+            id = getBookieId().toString();
         } catch (UnknownHostException e) {
             //Ignored...
         }
-        return "Bookie Server listening on " + id;
+        return "Bookie Server listening on " + addr + " with id " + id;
     }
 }

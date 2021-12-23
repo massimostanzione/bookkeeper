@@ -32,12 +32,26 @@ public abstract class AbstractLogCompactor {
 
     protected final ServerConfiguration conf;
     protected final Throttler throttler;
+<<<<<<< HEAD
     protected final GarbageCollectorThread gcThread;
 
     public AbstractLogCompactor(GarbageCollectorThread gcThread) {
         this.gcThread = gcThread;
         this.conf = gcThread.conf;
         this.throttler = new Throttler(conf);
+=======
+
+    interface LogRemovalListener {
+        void removeEntryLog(long logToRemove);
+    }
+
+    protected final LogRemovalListener logRemovalListener;
+
+    public AbstractLogCompactor(ServerConfiguration conf, LogRemovalListener logRemovalListener) {
+        this.conf = conf;
+        this.throttler = new Throttler(conf);
+        this.logRemovalListener = logRemovalListener;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     /**

@@ -23,27 +23,23 @@ package org.apache.bookkeeper.test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.bookkeeper.proto.LocalBookiesRegistry;
 import org.junit.Test;
 
 /**
- * Test the correctness and the availability outside of its package of LocalBookiesRegistryTest
+ * Test the correctness and the availability outside of its package of LocalBookiesRegistryTest.
  */
 public class LocalBookiesRegistryTest extends BookKeeperClusterTestCase {
-    
+
     public LocalBookiesRegistryTest() {
-        super(3);
+        super(1);
         baseConf.setDisableServerSocketBind(true);
         baseConf.setEnableLocalTransport(true);
     }
 
     @Test
     public void testAccessibleLocalBookiesRegistry() throws Exception {
-        assertEquals(3,bs.size());
-        for (BookieServer bk : bs) {
-            assertTrue(LocalBookiesRegistry.isLocalBookie(bk.getLocalAddress()));
-        }
+        assertEquals(1, bookieCount());
+        bookieAddresses().forEach(a -> assertTrue(LocalBookiesRegistry.isLocalBookie(a)));
     }
 }

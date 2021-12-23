@@ -1,5 +1,4 @@
-/**
- *
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,11 +15,10 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
-
 package org.apache.bookkeeper.bookie;
 
+<<<<<<< HEAD
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_ADD_ENTRY;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_ADD_ENTRY_BYTES;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_READ_ENTRY;
@@ -37,12 +35,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
 import java.io.IOException;
+<<<<<<< HEAD
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -77,10 +74,14 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.discover.RegistrationManager;
 import org.apache.bookkeeper.discover.ZKRegistrationManager;
 import org.apache.bookkeeper.meta.LedgerManager;
+=======
+import java.util.PrimitiveIterator;
+import java.util.concurrent.CompletableFuture;
+import org.apache.bookkeeper.common.util.Watcher;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
-import org.apache.bookkeeper.net.BookieSocketAddress;
-import org.apache.bookkeeper.net.DNS;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
+<<<<<<< HEAD
 import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.Gauge;
 import org.apache.bookkeeper.stats.NullStatsLogger;
@@ -102,72 +103,78 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
 /**
- * Implements a bookie.
+ * Interface for the bookie.
  */
-public class Bookie extends BookieCriticalThread {
+public interface Bookie {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Bookie.class);
+    void start();
+    void join() throws InterruptedException;
+    boolean isRunning();
+    int getExitCode();
+    int shutdown();
 
-    final List<File> journalDirectories;
-    final ServerConfiguration conf;
+    boolean isAvailableForHighPriorityWrites();
+    boolean isReadOnly();
 
-    final SyncThread syncThread;
-    final LedgerManagerFactory ledgerManagerFactory;
-    final LedgerManager ledgerManager;
-    final LedgerStorage ledgerStorage;
-    final List<Journal> journals;
+    // TODO: replace callback with futures
+    // TODO: replace ackBeforeSync with flags
+    void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb, Object ctx, byte[] masterKey)
+            throws IOException, BookieException, InterruptedException;
+    void recoveryAddEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey)
+            throws IOException, BookieException, InterruptedException;
+    void forceLedger(long ledgerId, WriteCallback cb, Object ctx);
+    void setExplicitLac(ByteBuf entry, WriteCallback writeCallback, Object ctx, byte[] masterKey)
+            throws IOException, InterruptedException, BookieException;
+    ByteBuf getExplicitLac(long ledgerId) throws IOException, NoLedgerException;
 
-    final HandleFactory handles;
+    // these can probably be moved out and called directly on ledgerdirmanager
+    long getTotalDiskSpace() throws IOException;
+    long getTotalFreeSpace() throws IOException;
 
-    static final long METAENTRY_ID_LEDGER_KEY = -0x1000;
-    static final long METAENTRY_ID_FENCE_KEY  = -0x2000;
+    // TODO: Shouldn't this be async?
+    ByteBuf readEntry(long ledgerId, long entryId)
+            throws IOException, NoLedgerException;
+    long readLastAddConfirmed(long ledgerId) throws IOException;
+    PrimitiveIterator.OfLong getListOfEntriesOfLedger(long ledgerId) throws IOException, NoLedgerException;
 
-    private final LedgerDirsManager ledgerDirsManager;
-    private LedgerDirsManager indexDirsManager;
+    /**
+     * Fences a ledger. From this point on, clients will be unable to
+     * write to this ledger. Only recoveryAddEntry will be
+     * able to add entries to the ledger.
+     * This method is idempotent. Once a ledger is fenced, it can
+     * never be unfenced. Fencing a fenced ledger has no effect.
+     * @return
+     */
+    CompletableFuture<Boolean> fenceLedger(long ledgerId, byte[] masterKey)
+            throws IOException, BookieException;
 
-    LedgerDirsMonitor ledgerMonitor;
-    LedgerDirsMonitor idxMonitor;
+    // TODO: Replace Watcher with a completableFuture (cancellable)
+    boolean waitForLastAddConfirmedUpdate(long ledgerId,
+                                          long previousLAC,
+                                          Watcher<LastAddConfirmedUpdateNotification> watcher)
+            throws IOException;
+    void cancelWaitForLastAddConfirmedUpdate(long ledgerId,
+                                             Watcher<LastAddConfirmedUpdateNotification> watcher)
+            throws IOException;
 
-    // Registration Manager for managing registration
-    RegistrationManager registrationManager;
+    // TODO: StateManager should be passed as a parameter to Bookie
+    StateManager getStateManager();
 
-    // Running flag
-    private volatile boolean running = false;
-    // Flag identify whether it is in shutting down progress
-    private volatile boolean shuttingdown = false;
-    // Bookie status
-    private final BookieStatus bookieStatus = new BookieStatus();
+    // TODO: Should be constructed and passed in as a parameter
+    LedgerStorage getLedgerStorage();
 
-    private int exitCode = ExitCode.OK;
+    // TODO: LedgerManagerFactory, should be constructed elsewhere, passed in as parameter
+    LedgerManagerFactory getLedgerManagerFactory();
 
-    private final ConcurrentLongHashMap<byte[]> masterKeyCache = new ConcurrentLongHashMap<>();
-
-    protected final String bookieId;
-
-    private final AtomicBoolean rmRegistered = new AtomicBoolean(false);
-    protected final AtomicBoolean forceReadOnly = new AtomicBoolean(false);
-    // executor to manage the state changes for a bookie.
-    final ExecutorService stateService = Executors.newSingleThreadExecutor(
-            new ThreadFactoryBuilder().setNameFormat("BookieStateService-%d").build());
-
-    // Expose Stats
-    private final StatsLogger statsLogger;
-    private final Counter writeBytes;
-    private final Counter readBytes;
-    // Bookie Operation Latency Stats
-    private final OpStatsLogger addEntryStats;
-    private final OpStatsLogger recoveryAddEntryStats;
-    private final OpStatsLogger readEntryStats;
-    // Bookie Operation Bytes Stats
-    private final OpStatsLogger addBytesStats;
-    private final OpStatsLogger readBytesStats;
-
+    // TODO: Move this exceptions somewhere else
     /**
      * Exception is thrown when no such a ledger is found in this bookie.
      */
-    public static class NoLedgerException extends IOException {
+    class NoLedgerException extends IOException {
         private static final long serialVersionUID = 1L;
         private final long ledgerId;
         public NoLedgerException(long ledgerId) {
@@ -182,7 +189,7 @@ public class Bookie extends BookieCriticalThread {
     /**
      * Exception is thrown when no such an entry is found in this bookie.
      */
-    public static class NoEntryException extends IOException {
+    class NoEntryException extends IOException {
         private static final long serialVersionUID = 1L;
         private final long ledgerId;
         private final long entryId;
@@ -204,6 +211,7 @@ public class Bookie extends BookieCriticalThread {
         }
     }
 
+<<<<<<< HEAD
     // Write Callback do nothing
     static class NopWriteCallback implements WriteCallback {
         @Override
@@ -1580,4 +1588,6 @@ public class Bookie extends BookieCriticalThread {
         return exitCode;
     }
 
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

@@ -17,18 +17,21 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
+<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/ConfigurationService.java
+=======
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/ConfigurationService.java
+
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.util.JsonUtil;
 
 /**
  * HttpEndpointService that handle Bookkeeper Configuration related http request.
@@ -38,7 +41,7 @@ public class ConfigurationService implements HttpEndpointService {
     protected ServerConfiguration conf;
 
     public ConfigurationService(ServerConfiguration conf) {
-        Preconditions.checkNotNull(conf);
+        checkNotNull(conf);
         this.conf = conf;
     }
 
@@ -47,20 +50,19 @@ public class ConfigurationService implements HttpEndpointService {
         HttpServiceResponse response = new HttpServiceResponse();
         // GET
         if (HttpServer.Method.GET == request.getMethod()) {
-            Map<String, Object> configMap = toMap(conf);
-            String jsonResponse = JsonUtil.toJson(configMap);
+            String jsonResponse = conf.asJson();
             response.setBody(jsonResponse);
             return response;
         } else if (HttpServer.Method.PUT == request.getMethod()) {
             String requestBody = request.getBody();
-            if(null == requestBody) {
+            if (null == requestBody) {
                 response.setCode(HttpServer.StatusCode.NOT_FOUND);
                 response.setBody("Request body not found. should contains k-v pairs");
                 return response;
             }
             @SuppressWarnings("unchecked")
             HashMap<String, Object> configMap = JsonUtil.fromJson(requestBody, HashMap.class);
-            for(Map.Entry<String, Object> entry: configMap.entrySet()) {
+            for (Map.Entry<String, Object> entry: configMap.entrySet()) {
                 conf.setProperty(entry.getKey(), entry.getValue());
             }
 
@@ -73,18 +75,5 @@ public class ConfigurationService implements HttpEndpointService {
             return response;
         }
 
-    }
-
-    private Map<String, Object> toMap(ServerConfiguration conf) {
-        Map<String, Object> configMap = new HashMap<>();
-        Iterator iterator = conf.getKeys();
-        while (iterator.hasNext()) {
-            String key = iterator.next().toString();
-            Object property = conf.getProperty(key);
-            if (property != null) {
-                configMap.put(key, property.toString());
-            }
-        }
-        return configMap;
     }
 }

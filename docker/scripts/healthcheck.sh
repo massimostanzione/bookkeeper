@@ -25,4 +25,12 @@
 set -x -e -u
 
 # Sanity check that creates a ledger, writes a few entries, reads them and deletes the ledger.
+<<<<<<< HEAD
 /opt/bookkeeper/bin/bookkeeper shell bookiesanity
+=======
+DEFAULT_HEALTH_CHECK_CMD="/opt/bookkeeper/bin/bookkeeper shell bookiesanity"
+
+HEALTH_CHECK_CMD=${HEALTH_CHECK_CMD:-"${DEFAULT_HEALTH_CHECK_CMD}"}
+
+eval "${HEALTH_CHECK_CMD}"
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367

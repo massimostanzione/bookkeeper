@@ -26,8 +26,21 @@ import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
  */
 public interface Checkpointer {
 
+<<<<<<< HEAD
     Checkpointer NULL = checkpoint -> {
         // do nothing;
+=======
+    Checkpointer NULL = new Checkpointer(){
+        @Override
+        public void startCheckpoint(Checkpoint checkpoint) {
+            // no-op
+        }
+
+        @Override
+        public void start() {
+            // no-op
+        }
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     };
 
     /**
@@ -37,4 +50,8 @@ public interface Checkpointer {
      */
     void startCheckpoint(Checkpoint checkpoint);
 
+<<<<<<< HEAD
+=======
+    void start();
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

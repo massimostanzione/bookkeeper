@@ -25,19 +25,30 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.bookie.ExitCode;
+import org.apache.bookkeeper.bookie.ScrubberStats;
+import org.apache.bookkeeper.common.component.ComponentInfoPublisher;
 import org.apache.bookkeeper.common.component.ComponentStarter;
 import org.apache.bookkeeper.common.component.LifecycleComponent;
 import org.apache.bookkeeper.common.component.LifecycleComponentStack;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+<<<<<<< HEAD
+=======
+import org.apache.bookkeeper.conf.UncheckedConfigurationException;
+import org.apache.bookkeeper.discover.BookieServiceInfo;
+import org.apache.bookkeeper.discover.BookieServiceInfo.Endpoint;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.server.component.ServerLifecycleComponent;
 import org.apache.bookkeeper.server.conf.BookieConfiguration;
 import org.apache.bookkeeper.server.http.BKHttpServiceProvider;
 import org.apache.bookkeeper.server.service.AutoRecoveryService;
 import org.apache.bookkeeper.server.service.BookieService;
 import org.apache.bookkeeper.server.service.HttpService;
+import org.apache.bookkeeper.server.service.ScrubberService;
 import org.apache.bookkeeper.server.service.StatsProviderService;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.commons.cli.BasicParser;
@@ -47,6 +58,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * A bookie server is a server that run bookie and serving rpc requests.
@@ -108,6 +120,7 @@ public class Main {
         log.info("Using configuration file {}", confFile);
     }
 
+    @SuppressWarnings("deprecation")
     private static ServerConfiguration parseArgs(String[] args)
         throws IllegalArgumentException {
         try {
@@ -133,18 +146,27 @@ public class Main {
                 conf.setForceReadOnlyBookie(true);
             }
 
-
-            // command line arguments overwrite settings in configuration file
-            if (cmdLine.hasOption('z')) {
-                String sZK = cmdLine.getOptionValue('z');
-                log.info("Get cmdline zookeeper instance: {}", sZK);
-                conf.setZkServers(sZK);
+            boolean overwriteMetadataServiceUri = false;
+            String sZkLedgersRootPath = "/ledgers";
+            if (cmdLine.hasOption('m')) {
+                sZkLedgersRootPath = cmdLine.getOptionValue('m');
+                log.info("Get cmdline zookeeper ledger path: {}", sZkLedgersRootPath);
+                overwriteMetadataServiceUri = true;
             }
 
-            if (cmdLine.hasOption('m')) {
-                String sZkLedgersRootPath = cmdLine.getOptionValue('m');
-                log.info("Get cmdline zookeeper ledger path: {}", sZkLedgersRootPath);
-                conf.setZkLedgersRootPath(sZkLedgersRootPath);
+
+            String sZK = conf.getZkServers();
+            if (cmdLine.hasOption('z')) {
+                sZK = cmdLine.getOptionValue('z');
+                log.info("Get cmdline zookeeper instance: {}", sZK);
+                overwriteMetadataServiceUri = true;
+            }
+
+            // command line arguments overwrite settings in configuration file
+            if (overwriteMetadataServiceUri) {
+                String metadataServiceUri = "zk://" + sZK + sZkLedgersRootPath;
+                conf.setMetadataServiceUri(metadataServiceUri);
+                log.info("Overwritten service uri to {}", metadataServiceUri);
             }
 
             if (cmdLine.hasOption('p')) {
@@ -211,20 +233,21 @@ public class Main {
         }
 
         // 2. start the server
-        CountDownLatch aliveLatch = new CountDownLatch(1);
-        ComponentStarter.startComponent(server, aliveLatch);
         try {
-            aliveLatch.await();
+            ComponentStarter.startComponent(server).get();
         } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             // the server is interrupted
             log.info("Bookie server is interrupted. Exiting ...");
+        } catch (ExecutionException ee) {
+            log.error("Error in bookie shutdown", ee.getCause());
+            return ExitCode.SERVER_EXCEPTION;
         }
-        server.close();
         return ExitCode.OK;
     }
 
     private static ServerConfiguration parseCommandLine(String[] args)
-            throws IllegalArgumentException {
+            throws IllegalArgumentException, UncheckedConfigurationException {
         ServerConfiguration conf;
         try {
             conf = parseArgs(args);
@@ -234,23 +257,14 @@ public class Main {
             printUsage();
             throw iae;
         }
-
-        StringBuilder sb = new StringBuilder();
-        String[] ledgerDirNames = conf.getLedgerDirNames();
-        for (int i = 0; i < ledgerDirNames.length; i++) {
-            if (i != 0) {
-                sb.append(',');
-            }
-            sb.append(ledgerDirNames[i]);
-        }
-
         String hello = String.format(
-            "Hello, I'm your bookie, listening on port %1$s. ZKServers are on %2$s."
-                + " Journals are in %3$s. Ledgers are stored in %4$s.",
+            "Hello, I'm your bookie, bookieId is %1$s, listening on port %2$s. Metadata service uri is %3$s."
+                + " Journals are in %4$s. Ledgers are stored in %5$s.",
+            conf.getBookieId() != null ? conf.getBookieId() : "<not-set>",
             conf.getBookiePort(),
-            conf.getZkServers(),
+            conf.getMetadataServiceUriUnchecked(),
             Arrays.asList(conf.getJournalDirNames()),
-            sb);
+            Arrays.asList(conf.getLedgerDirNames()));
         log.info(hello);
 
         return conf;
@@ -271,23 +285,37 @@ public class Main {
      * @param conf bookie server configuration
      * @return lifecycle stack
      */
-    static LifecycleComponentStack buildBookieServer(BookieConfiguration conf) throws Exception {
-        LifecycleComponentStack.Builder serverBuilder = LifecycleComponentStack.newBuilder().withName("bookie-server");
+    public static LifecycleComponentStack buildBookieServer(BookieConfiguration conf) throws Exception {
+
+        final ComponentInfoPublisher componentInfoPublisher = new ComponentInfoPublisher();
+
+        final Supplier<BookieServiceInfo> bookieServiceInfoProvider =
+                () -> buildBookieServiceInfo(componentInfoPublisher);
+        LifecycleComponentStack.Builder serverBuilder = LifecycleComponentStack
+                .newBuilder()
+                .withComponentInfoPublisher(componentInfoPublisher)
+                .withName("bookie-server");
 
         // 1. build stats provider
         StatsProviderService statsProviderService =
             new StatsProviderService(conf);
         StatsLogger rootStatsLogger = statsProviderService.getStatsProvider().getStatsLogger("");
-
         serverBuilder.addComponent(statsProviderService);
         log.info("Load lifecycle component : {}", StatsProviderService.class.getName());
 
         // 2. build bookie server
         BookieService bookieService =
-            new BookieService(conf, rootStatsLogger);
+            new BookieService(conf, rootStatsLogger, bookieServiceInfoProvider);
 
         serverBuilder.addComponent(bookieService);
         log.info("Load lifecycle component : {}", BookieService.class.getName());
+
+        if (conf.getServerConf().isLocalScrubEnabled()) {
+            serverBuilder.addComponent(
+                    new ScrubberService(
+                            rootStatsLogger.scope(ScrubberStats.SCOPE),
+                    conf, bookieService.getServer().getBookie().getLedgerStorage()));
+        }
 
         // 3. build auto recovery
         if (conf.getServerConf().isAutoRecoveryDaemonEnabled()) {
@@ -303,10 +331,10 @@ public class Main {
             BKHttpServiceProvider provider = new BKHttpServiceProvider.Builder()
                 .setBookieServer(bookieService.getServer())
                 .setServerConfiguration(conf.getServerConf())
+                .setStatsProvider(statsProviderService.getStatsProvider())
                 .build();
             HttpService httpService =
                 new HttpService(provider, conf, rootStatsLogger);
-
             serverBuilder.addComponent(httpService);
             log.info("Load lifecycle component : {}", HttpService.class.getName());
         }
@@ -314,17 +342,48 @@ public class Main {
         // 5. build extra services
         String[] extraComponents = conf.getServerConf().getExtraServerComponents();
         if (null != extraComponents) {
-            List<ServerLifecycleComponent> components = loadServerComponents(
-                extraComponents,
-                conf,
-                rootStatsLogger);
-            for (ServerLifecycleComponent component : components) {
-                serverBuilder.addComponent(component);
-                log.info("Load lifecycle component : {}", component.getClass().getName());
+            try {
+                List<ServerLifecycleComponent> components = loadServerComponents(
+                    extraComponents,
+                    conf,
+                    rootStatsLogger);
+                for (ServerLifecycleComponent component : components) {
+                    serverBuilder.addComponent(component);
+                    log.info("Load lifecycle component : {}", component.getClass().getName());
+                }
+            } catch (Exception e) {
+                if (conf.getServerConf().getIgnoreExtraServerComponentsStartupFailures()) {
+                    log.info("Failed to load extra components '{}' - {}. Continuing without those components.",
+                        StringUtils.join(extraComponents), e.getMessage());
+                } else {
+                    throw e;
+                }
             }
         }
 
         return serverBuilder.build();
+    }
+
+    /**
+     * Create the {@link BookieServiceInfo} starting from the published endpoints.
+     *
+     * @see ComponentInfoPublisher
+     * @param componentInfoPublisher the endpoint publisher
+     * @return the created bookie service info
+     */
+    private static BookieServiceInfo buildBookieServiceInfo(ComponentInfoPublisher componentInfoPublisher) {
+        List<Endpoint> endpoints = componentInfoPublisher.getEndpoints().values()
+                .stream().map(e -> {
+                    return new Endpoint(
+                            e.getId(),
+                            e.getPort(),
+                            e.getHost(),
+                            e.getProtocol(),
+                            e.getAuth(),
+                            e.getExtensions()
+                    );
+                }).collect(Collectors.toList());
+        return new BookieServiceInfo(componentInfoPublisher.getProperties(), endpoints);
     }
 
 }

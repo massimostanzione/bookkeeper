@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.bookkeeper.net;
 
 import java.util.HashSet;
@@ -23,16 +22,18 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.bookkeeper.conf.Configurable;
+import org.apache.bookkeeper.proto.BookieAddressResolver;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 
 /**
- * This is a base class for DNS to Switch mappings. <p/> It is not mandatory to
- * derive {@link DNSToSwitchMapping} implementations from it, but it is strongly
+ * This is a base class for DNS to Switch mappings.
+ *
+ * <p>It is not mandatory to derive {@link DNSToSwitchMapping} implementations from it, but it is strongly
  * recommended, as it makes it easy for the Hadoop developers to add new methods
  * to this base class that are automatically picked up by all implementations.
- * <p/>
  *
- * This class does not extend the <code>Configured</code>
+ * <p>This class does not extend the <code>Configured</code>
  * base class, and should not be changed to do so, as it causes problems
  * for subclasses. The constructor of the <code>Configured</code> calls
  * the  {@link #setConf(Configuration)} method, which will call into the
@@ -42,9 +43,10 @@ import org.apache.commons.configuration.Configuration;
 public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, Configurable {
 
     private Configuration conf;
+    private BookieAddressResolver bookieAddressResolver;
 
     /**
-     * Create an unconfigured instance
+     * Create an unconfigured instance.
      */
     protected AbstractDNSToSwitchMapping() {
     }
@@ -59,12 +61,24 @@ public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, 
         this.conf = conf;
     }
 
+    public BookieAddressResolver getBookieAddressResolver() {
+        return bookieAddressResolver;
+    }
+
+    @Override
+    public void setBookieAddressResolver(BookieAddressResolver bookieAddressResolver) {
+        this.bookieAddressResolver = bookieAddressResolver;
+    }
+
+    @Override
     public Configuration getConf() {
         return conf;
     }
 
+    @Override
     public void setConf(Configuration conf) {
         this.conf = conf;
+        validateConf();
     }
 
     /**
@@ -73,12 +87,9 @@ public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, 
      * multi-rack. Subclasses may override this with methods that are more aware
      * of their topologies.
      *
-     * <p/>
-     *
-     * This method is used when parts of Hadoop need know whether to apply
+     * <p>This method is used when parts of Hadoop need know whether to apply
      * single rack vs multi-rack policies, such as during block placement.
      * Such algorithms behave differently if they are on multi-switch systems.
-     * </p>
      *
      * @return true if the mapping thinks that it is on a single switch
      */
@@ -87,7 +98,7 @@ public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, 
     }
 
     /**
-     * Get a copy of the map (for diagnostics)
+     * Get a copy of the map (for diagnostics).
      * @return a clone of the map or null for none known
      */
     public Map<String, String> getSwitchMap() {
@@ -121,15 +132,17 @@ public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, 
     }
 
     protected boolean isSingleSwitchByScriptPolicy() {
-        return conf != null && conf.getString(CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY) == null;
+        return conf != null
+                && (!StringUtils.isNotBlank(conf.getString(CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY)));
     }
 
     /**
      * Query for a {@link DNSToSwitchMapping} instance being on a single
      * switch.
-     * <p/>
-     * This predicate simply assumes that all mappings not derived from
+     *
+     * <p>This predicate simply assumes that all mappings not derived from
      * this class are multi-switch.
+     *
      * @param mapping the mapping to query
      * @return true if the base class says it is single switch, or the mapping
      * is not derived from this class.
@@ -139,4 +152,10 @@ public abstract class AbstractDNSToSwitchMapping implements DNSToSwitchMapping, 
                 && ((AbstractDNSToSwitchMapping) mapping).isSingleSwitch();
     }
 
+    /**
+     * when setConf is called it should do sanity checking of the conf/env. and
+     * throw RuntimeException if things are not valid.
+     */
+    protected void validateConf() {
+    }
 }

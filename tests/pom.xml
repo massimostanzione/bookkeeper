@@ -21,16 +21,30 @@
   <parent>
     <groupId>org.apache.bookkeeper</groupId>
     <artifactId>bookkeeper</artifactId>
+<<<<<<< HEAD
     <version>4.6.0</version>
+=======
+    <version>4.15.0-SNAPSHOT</version>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
   </parent>
   <groupId>org.apache.bookkeeper.tests</groupId>
   <artifactId>tests-parent</artifactId>
   <name>Apache BookKeeper :: Tests</name>
+
+  <properties>
+    <groovy.version>2.5.8</groovy.version>
+  </properties>
+
   <modules>
-    <module>bookkeeper-server-compat-4.0.0</module>
-    <module>bookkeeper-server-compat-4.1.0</module>
-    <module>bookkeeper-server-compat-4.2.0</module>
-    <module>backward</module>
+    <module>shaded</module>
+    <module>docker-images</module>
+    <module>integration-tests-base</module>
+    <module>integration-tests-base-groovy</module>
+    <module>integration-tests-utils</module>
+    <module>integration-tests-topologies</module>
+    <module>backward-compat</module>
+    <module>integration</module>
+    <module>scripts</module>
   </modules>
   <build>
     <plugins>

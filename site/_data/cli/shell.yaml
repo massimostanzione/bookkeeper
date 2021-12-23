@@ -6,7 +6,7 @@ commands:
     description: Enable autorecovery of underreplicated ledgers
   - flag: -disable
     description: Disable autorecovery of underreplicated ledgers
-- name: bookieFormat
+- name: bookieformat
   description: Format the current server contents.
   options:
   - flag: -nonInteractive
@@ -15,6 +15,13 @@ commands:
     description: If [nonInteractive] is specified, then whether to force delete the old data without prompt..?
   - flag: -deleteCookie
     description: Delete its cookie on zookeeper
+- name: initbookie
+  description: |
+    Initialize new bookie, by making sure that the journalDir, ledgerDirs and
+    indexDirs are empty and there is no registered Bookie with this BookieId.
+
+    If there is data present in current bookie server, the init operation will fail. If you want to format
+    the bookie server, use `bookieformat`.
 - name: bookieinfo
   description: Retrieve bookie info such as free and total disk space.
 - name: bookiesanity
@@ -33,6 +40,8 @@ commands:
     description: Ledger ID
   - flag: -force
     description: Whether to force delete the Ledger without prompt..?
+- name: endpointinfo
+  description: Get endpoints of a Bookie.
 - name: expandstorage
   description: Add new empty ledger/index directories. Update the directories info in the conf file before running the command.
 - name: help
@@ -79,13 +88,30 @@ commands:
     description: Bookie Id of missing replica
   - flag: -excludingmissingreplica N
     description: Bookie Id of missing replica to ignore
+  - flag: -printmissingreplica
+    description: Whether to print missingreplicas list?
 - name: metaformat
-  description: Format Bookkeeper metadata in Zookeeper.
+  description: |
+    Format Bookkeeper metadata in Zookeeper. This command is deprecated since 4.7.0,
+    in favor of using `initnewcluster` for initializing a new cluster and `nukeexistingcluster` for nuking an existing cluster.
   options:
   - flag: -nonInteractive
     description: Whether to confirm if old data exists..?
   - flag: -force
     description: If [nonInteractive] is specified, then whether to force delete the old data without prompt.
+- name: initnewcluster
+  description: |
+    Initializes a new bookkeeper cluster. If initnewcluster fails then try nuking
+    existing cluster by running nukeexistingcluster before running initnewcluster again
+- name: nukeexistingcluster
+  description: Nuke bookkeeper cluster by deleting metadata
+  options:
+  - flag: -zkledgersrootpath
+    description: zookeeper ledgers rootpath
+  - flag: -instanceid
+    description: instance id
+  - flag: -force
+    description: If instanceid is not specified, then whether to force nuke the metadata without validating instanceid
 - name: lostbookierecoverydelay
   description: Setter and Getter for LostBookieRecoveryDelay value (in seconds) in Zookeeper.
   options:
@@ -119,7 +145,7 @@ commands:
     description: End Position
 - name: recover
   description: Recover the ledger data for failed bookie.
-  argument: <bookieSrc> [<bookieDest>]
+  argument: <bookieSrc[,bookieSrc,...]>
   options:
   - flag: -deleteCookie
     description: Delete cookie node for the bookie.
@@ -154,3 +180,32 @@ commands:
     description: Print status of the ledger updation (default false)
   - flag: -printprogress N
     description: Print messages on every configured seconds if verbose turned on (default 10 secs)
+- name: updateBookieInLedger
+  description:  |
+    Replace srcBookie with destBookie in ledger metadata. (this may take a long time).
+    Useful when Host-reip or data-migration. In that case, shutdown bookie process in src-bookie,
+    use this command to update ledger metadata by replacing src-bookie to dest-bookie where data has been copied/moved.
+    Start the bookie process on dest-bookie and dest-bookie will serve copied ledger data from src-bookie.
+  options:
+  - flag: -srcBookie BOOKIE_ID
+    description: Source Bookie Id
+  - flag: -destBookie BOOKIE_ID
+    description: Destination Bookie Id
+  - flag: -updatespersec N
+    description: Number of ledgers updating per second (default 5 per sec)
+  - flag: -limit N
+    description: Maximum number of ledgers to update (default no limit)
+  - flag: -verbose
+    description: Print status of the ledger updation (default false)
+  - flag: -printprogress N
+    description: Print messages on every configured seconds if verbose turned on (default 10 secs)
+- name: whoisauditor
+  description: Print the node which holds the auditor lock
+- name: whatisinstanceid
+  description: Print the instanceid of the cluster
+- name: convert-to-db-storage
+  description: Convert bookie indexes from InterleavedStorage to DbLedgerStorage format
+- name: convert-to-interleaved-storage
+  description: Convert bookie indexes from DbLedgerStorage to InterleavedStorage format
+- name: rebuild-db-ledger-locations-index
+  description: Rebuild DbLedgerStorage locations index

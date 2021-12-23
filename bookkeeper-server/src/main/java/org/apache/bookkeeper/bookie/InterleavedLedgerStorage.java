@@ -22,31 +22,60 @@
 package org.apache.bookkeeper.bookie;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+<<<<<<< HEAD
+=======
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_READ_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.CATEGORY_SERVER;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.ENTRYLOGGER_SCOPE;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.STORAGE_GET_ENTRY;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.STORAGE_GET_OFFSET;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.STORAGE_SCRUB_PAGES_SCANNED;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.STORAGE_SCRUB_PAGE_RETRIES;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.RateLimiter;
+
 import io.netty.buffer.ByteBuf;
+<<<<<<< HEAD
+=======
+import io.netty.buffer.ByteBufAllocator;
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.Observable;
-import java.util.Observer;
+import java.util.Optional;
+import java.util.PrimitiveIterator.OfLong;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import lombok.Cleanup;
+import lombok.Getter;
+
 import org.apache.bookkeeper.bookie.Bookie.NoLedgerException;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.bookie.EntryLogger.EntryLogListener;
 import org.apache.bookkeeper.bookie.LedgerDirsManager.LedgerDirsListener;
+import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.proto.BookieProtocol;
+import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.stats.annotations.StatsDoc;
 import org.apache.bookkeeper.util.MathUtils;
 import org.apache.bookkeeper.util.SnapshotMap;
+import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +85,20 @@ import org.slf4j.LoggerFactory;
  * <p>This ledger storage implementation stores all entries in a single
  * file and maintains an index file for each ledger.
  */
+@StatsDoc(
+    name = BOOKIE_SCOPE,
+    category = CATEGORY_SERVER,
+    help = "Bookie related stats"
+)
 public class InterleavedLedgerStorage implements CompactableLedgerStorage, EntryLogListener {
     private static final Logger LOG = LoggerFactory.getLogger(InterleavedLedgerStorage.class);
+<<<<<<< HEAD
+=======
+    public static final long INVALID_ENTRYID = -1;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     EntryLogger entryLogger;
+    @Getter
     LedgerCache ledgerCache;
     protected CheckpointSource checkpointSource;
     protected Checkpointer checkpointer;
@@ -75,13 +114,29 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
     GarbageCollectorThread gcThread;
 
     // this indicates that a write has happened since the last flush
-    private volatile boolean somethingWritten = false;
+    private final AtomicBoolean somethingWritten = new AtomicBoolean(false);
+
+    private int pageSize;
 
     // Expose Stats
+    @StatsDoc(
+        name = STORAGE_GET_OFFSET,
+        help = "Operation stats of getting offset from ledger cache",
+        parent = BOOKIE_READ_ENTRY
+    )
     private OpStatsLogger getOffsetStats;
+    @StatsDoc(
+        name = STORAGE_GET_ENTRY,
+        help = "Operation stats of getting entry from entry logger",
+        parent = BOOKIE_READ_ENTRY,
+        happensAfter = STORAGE_GET_OFFSET
+    )
     private OpStatsLogger getEntryStats;
+    private OpStatsLogger pageScanStats;
+    private Counter retryCounter;
 
-    InterleavedLedgerStorage() {
+    @VisibleForTesting
+    public InterleavedLedgerStorage() {
         activeLedgers = new SnapshotMap<Long, Boolean>();
     }
 
@@ -90,31 +145,91 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
                            LedgerManager ledgerManager,
                            LedgerDirsManager ledgerDirsManager,
                            LedgerDirsManager indexDirsManager,
+<<<<<<< HEAD
                            CheckpointSource checkpointSource,
                            Checkpointer checkpointer,
                            StatsLogger statsLogger)
             throws IOException {
         checkNotNull(checkpointSource, "invalid null checkpoint source");
         checkNotNull(checkpointer, "invalid null checkpointer");
+=======
+                           StateManager stateManager,
+                           CheckpointSource checkpointSource,
+                           Checkpointer checkpointer,
+                           StatsLogger statsLogger,
+                           ByteBufAllocator allocator)
+            throws IOException {
+        initializeWithEntryLogListener(
+            conf,
+            ledgerManager,
+            ledgerDirsManager,
+            indexDirsManager,
+            stateManager,
+            checkpointSource,
+            checkpointer,
+            this,
+            statsLogger,
+            allocator);
+    }
 
+    void initializeWithEntryLogListener(ServerConfiguration conf,
+                                        LedgerManager ledgerManager,
+                                        LedgerDirsManager ledgerDirsManager,
+                                        LedgerDirsManager indexDirsManager,
+                                        StateManager stateManager,
+                                        CheckpointSource checkpointSource,
+                                        Checkpointer checkpointer,
+                                        EntryLogListener entryLogListener,
+                                        StatsLogger statsLogger,
+                                        ByteBufAllocator allocator) throws IOException {
+        initializeWithEntryLogger(
+                conf,
+                ledgerManager,
+                ledgerDirsManager,
+                indexDirsManager,
+                stateManager,
+                checkpointSource,
+                checkpointer,
+                new EntryLogger(conf, ledgerDirsManager, entryLogListener, statsLogger.scope(ENTRYLOGGER_SCOPE),
+                        allocator),
+                statsLogger);
+    }
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
+
+    @VisibleForTesting
+    public void initializeWithEntryLogger(ServerConfiguration conf,
+                LedgerManager ledgerManager,
+                LedgerDirsManager ledgerDirsManager,
+                LedgerDirsManager indexDirsManager,
+                StateManager stateManager,
+                CheckpointSource checkpointSource,
+                Checkpointer checkpointer,
+                EntryLogger entryLogger,
+                StatsLogger statsLogger) throws IOException {
+        checkNotNull(checkpointSource, "invalid null checkpoint source");
+        checkNotNull(checkpointer, "invalid null checkpointer");
+        this.entryLogger = entryLogger;
+        this.entryLogger.addListener(this);
         this.checkpointSource = checkpointSource;
         this.checkpointer = checkpointer;
+<<<<<<< HEAD
         entryLogger = new EntryLogger(conf, ledgerDirsManager, this);
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         ledgerCache = new LedgerCacheImpl(conf, activeLedgers,
                 null == indexDirsManager ? ledgerDirsManager : indexDirsManager, statsLogger);
-        gcThread = new GarbageCollectorThread(conf, ledgerManager, this);
+        gcThread = new GarbageCollectorThread(conf, ledgerManager, this, statsLogger.scope("gc"));
+        pageSize = conf.getPageSize();
         ledgerDirsManager.addLedgerDirsListener(getLedgerDirsListener());
         // Expose Stats
         getOffsetStats = statsLogger.getOpStatsLogger(STORAGE_GET_OFFSET);
         getEntryStats = statsLogger.getOpStatsLogger(STORAGE_GET_ENTRY);
+        pageScanStats = statsLogger.getOpStatsLogger(STORAGE_SCRUB_PAGES_SCANNED);
+        retryCounter = statsLogger.getCounter(STORAGE_SCRUB_PAGE_RETRIES);
     }
 
     private LedgerDirsListener getLedgerDirsListener() {
         return new LedgerDirsListener() {
-            @Override
-            public void diskFailed(File disk) {
-                // do nothing.
-            }
 
             @Override
             public void diskAlmostFull(File disk) {
@@ -136,18 +251,13 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
             }
 
             @Override
-            public void allDisksFull() {
+            public void allDisksFull(boolean highPriorityWritesAllowed) {
                 if (gcThread.isForceGCAllowWhenNoSpace) {
                     gcThread.enableForceGC();
                 } else {
                     gcThread.suspendMajorGC();
                     gcThread.suspendMinorGC();
                 }
-            }
-
-            @Override
-            public void fatalError() {
-                // do nothing.
             }
 
             @Override
@@ -174,6 +284,16 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
                 }
             }
         };
+    }
+
+    @Override
+    public void forceGC() {
+        gcThread.enableForceGC();
+    }
+
+    @Override
+    public boolean isInForceGC() {
+        return gcThread.isInForceGC();
     }
 
     @Override
@@ -209,7 +329,7 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
     }
 
     @Override
-    public void setExplicitlac(long ledgerId, ByteBuf lac) throws IOException {
+    public void setExplicitLac(long ledgerId, ByteBuf lac) throws IOException {
         ledgerCache.setExplicitLac(ledgerId, lac);
     }
 
@@ -241,29 +361,40 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
             if (null == bb) {
                 return BookieProtocol.INVALID_ENTRY_ID;
             } else {
-                bb.readLong(); // ledger id
-                bb.readLong(); // entry id
-                lac = bb.readLong();
-                lac = ledgerCache.updateLastAddConfirmed(ledgerId, lac);
+                try {
+                    bb.skipBytes(2 * Long.BYTES); // skip ledger & entry id
+                    lac = bb.readLong();
+                    lac = ledgerCache.updateLastAddConfirmed(ledgerId, lac);
+                } finally {
+                    bb.release();
+                }
             }
         }
         return lac;
     }
 
     @Override
-    public Observable waitForLastAddConfirmedUpdate(long ledgerId, long previoisLAC, Observer observer)
+    public boolean waitForLastAddConfirmedUpdate(long ledgerId,
+                                                 long previousLAC,
+                                                 Watcher<LastAddConfirmedUpdateNotification> watcher)
             throws IOException {
-        return ledgerCache.waitForLastAddConfirmedUpdate(ledgerId, previoisLAC, observer);
+        return ledgerCache.waitForLastAddConfirmedUpdate(ledgerId, previousLAC, watcher);
     }
 
+    @Override
+    public void cancelWaitForLastAddConfirmedUpdate(long ledgerId,
+                                                    Watcher<LastAddConfirmedUpdateNotification> watcher)
+            throws IOException {
+        ledgerCache.cancelWaitForLastAddConfirmedUpdate(ledgerId, watcher);
+    }
 
     @Override
-    public synchronized long addEntry(ByteBuf entry) throws IOException {
+    public long addEntry(ByteBuf entry) throws IOException {
         long ledgerId = entry.getLong(entry.readerIndex() + 0);
         long entryId = entry.getLong(entry.readerIndex() + 8);
         long lac = entry.getLong(entry.readerIndex() + 16);
 
-        processEntry(ledgerId, entryId, entry.nioBuffer());
+        processEntry(ledgerId, entryId, entry);
 
         ledgerCache.updateLastAddConfirmed(ledgerId, lac);
         return entryId;
@@ -354,10 +485,9 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
 
     @Override
     public synchronized void flush() throws IOException {
-        if (!somethingWritten) {
+        if (!somethingWritten.compareAndSet(true, false)) {
             return;
         }
-        somethingWritten = false;
         flushOrCheckpoint(false);
     }
 
@@ -409,16 +539,16 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
         ledgerDeletionListeners.add(listener);
     }
 
-    protected void processEntry(long ledgerId, long entryId, ByteBuffer entry) throws IOException {
+    protected void processEntry(long ledgerId, long entryId, ByteBuf entry) throws IOException {
         processEntry(ledgerId, entryId, entry, true);
     }
 
-    protected synchronized void processEntry(long ledgerId, long entryId, ByteBuffer entry, boolean rollLog)
+    protected void processEntry(long ledgerId, long entryId, ByteBuf entry, boolean rollLog)
             throws IOException {
         /*
          * Touch dirty flag
          */
-        somethingWritten = true;
+        somethingWritten.set(true);
 
         /*
          * Log the entry
@@ -441,5 +571,119 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
         // mechanism when adding entry. {@link https://github.com/apache/bookkeeper/issues/279}
         Checkpoint checkpoint = checkpointSource.newCheckpoint();
         checkpointer.startCheckpoint(checkpoint);
+<<<<<<< HEAD
+=======
+    }
+
+    /**
+     * Return iterable for index entries for ledgerId.
+     * @param ledgerId ledger to scan
+     * @return Iterator
+     */
+    public LedgerCache.PageEntriesIterable getIndexEntries(long ledgerId) throws IOException {
+        return ledgerCache.listEntries(ledgerId);
+    }
+
+    /**
+     * Read implementation metadata for index file.
+     * @param ledgerId
+     * @return Implementation metadata
+     * @throws IOException
+     */
+    public LedgerCache.LedgerIndexMetadata readLedgerIndexMetadata(long ledgerId) throws IOException {
+        return ledgerCache.readLedgerIndexMetadata(ledgerId);
+    }
+
+    @Override
+    public List<DetectedInconsistency> localConsistencyCheck(Optional<RateLimiter> rateLimiter) throws IOException {
+        long checkStart = MathUtils.nowInNano();
+        LOG.info("Starting localConsistencyCheck");
+        long checkedLedgers = 0;
+        long checkedPages = 0;
+        final MutableLong checkedEntries = new MutableLong(0);
+        final MutableLong pageRetries = new MutableLong(0);
+        NavigableMap<Long, Boolean> bkActiveLedgersSnapshot = activeLedgers.snapshot();
+        final List<DetectedInconsistency> errors = new ArrayList<>();
+        for (Long ledger : bkActiveLedgersSnapshot.keySet()) {
+            try (LedgerCache.PageEntriesIterable pages = ledgerCache.listEntries(ledger)) {
+                for (LedgerCache.PageEntries page : pages) {
+                    @Cleanup LedgerEntryPage lep = page.getLEP();
+                    MutableBoolean retry = new MutableBoolean(false);
+                    do {
+                        retry.setValue(false);
+                        int version = lep.getVersion();
+
+                        MutableBoolean success = new MutableBoolean(true);
+                        long start = MathUtils.nowInNano();
+                        lep.getEntries((entry, offset) -> {
+                            rateLimiter.ifPresent(RateLimiter::acquire);
+
+                            try {
+                                entryLogger.checkEntry(ledger, entry, offset);
+                                checkedEntries.increment();
+                            } catch (EntryLogger.EntryLookupException e) {
+                                if (version != lep.getVersion()) {
+                                    pageRetries.increment();
+                                    if (lep.isDeleted()) {
+                                        LOG.debug("localConsistencyCheck: ledger {} deleted", ledger);
+                                    } else {
+                                        LOG.debug("localConsistencyCheck: concurrent modification, retrying");
+                                        retry.setValue(true);
+                                        retryCounter.inc();
+                                    }
+                                    return false;
+                                } else {
+                                    errors.add(new DetectedInconsistency(ledger, entry, e));
+                                    LOG.error("Got error: ", e);
+                                }
+                                success.setValue(false);
+                            }
+                            return true;
+                        });
+
+                        if (success.booleanValue()) {
+                            pageScanStats.registerSuccessfulEvent(
+                                MathUtils.elapsedNanos(start), TimeUnit.NANOSECONDS);
+                        } else {
+                            pageScanStats.registerFailedEvent(
+                                MathUtils.elapsedNanos(start), TimeUnit.NANOSECONDS);
+                        }
+                    } while (retry.booleanValue());
+                    checkedPages++;
+                }
+            } catch (NoLedgerException | FileInfo.FileInfoDeletedException e) {
+                if (activeLedgers.containsKey(ledger)) {
+                    LOG.error("Cannot find ledger {}, should exist, exception is ", ledger, e);
+                    errors.add(new DetectedInconsistency(ledger, -1, e));
+                } else {
+                    LOG.debug("ledger {} deleted since snapshot taken", ledger);
+                }
+            } catch (Exception e) {
+                throw new IOException("Got other exception in localConsistencyCheck", e);
+            }
+            checkedLedgers++;
+        }
+        LOG.info(
+            "Finished localConsistencyCheck, took {}s to scan {} ledgers, {} pages, "
+                + "{} entries with {} retries, {} errors",
+            TimeUnit.NANOSECONDS.toSeconds(MathUtils.elapsedNanos(checkStart)),
+            checkedLedgers,
+            checkedPages,
+            checkedEntries.longValue(),
+            pageRetries.longValue(),
+            errors.size());
+
+        return errors;
+    }
+
+    @Override
+    public List<GarbageCollectionStatus> getGarbageCollectionStatus() {
+        return Collections.singletonList(gcThread.getGarbageCollectionStatus());
+    }
+
+    @Override
+    public OfLong getListOfEntriesOfLedger(long ledgerId) throws IOException {
+        return ledgerCache.getEntriesIterator(ledgerId);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 }

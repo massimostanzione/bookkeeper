@@ -25,12 +25,17 @@
   <fileSets>
     <fileSet>
       <directory>target</directory>
+<<<<<<< HEAD
       <outputDirectory>/</outputDirectory>
+=======
+      <outputDirectory></outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <includes>
         <include>${project.artifactId}-${project.version}.jar</include>
       </includes>
     </fileSet>
     <fileSet>
+<<<<<<< HEAD
       <directory>../../bookkeeper-server/conf</directory>
       <outputDirectory>/conf</outputDirectory>
     </fileSet>
@@ -38,11 +43,24 @@
       <directory>../../bookkeeper-server/bin</directory>
       <fileMode>755</fileMode>
       <outputDirectory>/bin</outputDirectory>
+=======
+      <directory>../../conf</directory>
+      <outputDirectory>conf</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <directory>../../bin</directory>
+      <fileMode>755</fileMode>
+      <outputDirectory>bin</outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     </fileSet>
     <fileSet>
       <directory>../../bookkeeper-benchmark/bin</directory>
       <fileMode>755</fileMode>
+<<<<<<< HEAD
       <outputDirectory>/bin</outputDirectory>
+=======
+      <outputDirectory>bin</outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     </fileSet>
     <fileSet>
       <fileMode>644</fileMode>
@@ -50,35 +68,75 @@
         <include>${basedir}/*.txt</include>
       </includes>
     </fileSet>
+<<<<<<< HEAD
+=======
+    <fileSet>
+      <directory>../src/main/resources/deps</directory>
+      <outputDirectory>deps</outputDirectory>
+      <includes>
+        <include>checker-qual-3.5.0/LICENSE</include>
+        <include>google-auth-library-credentials-0.20.0/LICENSE</include>
+        <include>javax.servlet-api-4.0.0/CDDL+GPL-1.1</include>
+        <include>bouncycastle-1.0.2/LICENSE.html</include>
+        <include>jsr-305/LICENSE</include>
+        <include>netty-4.1.63.Final/*</include>
+        <include>paranamer-2.8/LICENSE.txt</include>
+        <include>protobuf-3.14.0/LICENSE</include>
+        <include>protobuf-3.12.0/LICENSE</include>
+        <include>scala-library-2.11.7/LICENSE.md</include>
+        <include>scala-parser-combinators_2.11-1.0.4/LICENSE.md</include>
+        <include>scala-reflect-2.11.8/LICENSE.md</include>
+        <include>slf4j-1.7.25/LICENSE.txt</include>
+      </includes>
+      <fileMode>644</fileMode>
+    </fileSet>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
   </fileSets>
   <files>
     <file>
       <source>../../README.md</source>
+<<<<<<< HEAD
       <outputDirectory>/</outputDirectory>
+=======
+      <outputDirectory></outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <fileMode>644</fileMode>
     </file>
     <file>
       <source>../src/main/resources/LICENSE-all.bin.txt</source>
+<<<<<<< HEAD
       <outputDirectory>/</outputDirectory>
+=======
+      <outputDirectory></outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <destName>LICENSE</destName>
       <fileMode>644</fileMode>
     </file>
     <file>
       <source>../src/main/resources/NOTICE-all.bin.txt</source>
+<<<<<<< HEAD
       <outputDirectory>/</outputDirectory>
+=======
+      <outputDirectory></outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <destName>NOTICE</destName>
       <fileMode>644</fileMode>
     </file>
   </files>
   <dependencySets>
     <dependencySet>
+<<<<<<< HEAD
       <outputDirectory>/lib</outputDirectory>
+=======
+      <outputDirectory>lib</outputDirectory>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <unpack>false</unpack>
       <scope>runtime</scope>
       <useProjectArtifact>false</useProjectArtifact>
       <!-- Include 'groupId' in the dependencies Jar names to better identify the provenance of the jar -->
       <outputFileNameMapping>${artifact.groupId}-${artifact.artifactId}-${artifact.version}${dashClassifier?}.${artifact.extension}</outputFileNameMapping>
       <excludes>
+<<<<<<< HEAD
         <!-- All these dependencies are already included in netty-all -->
         <exclude>io.netty:netty-buffer</exclude>
         <exclude>io.netty:netty-codec</exclude>
@@ -94,6 +152,15 @@
         <exclude>io.netty:netty-tcnative-boringssl-static</exclude>
         <exclude>io.netty:netty-transport-native-epoll</exclude>
         <exclude>io.netty:netty-transport</exclude>
+=======
+        <!-- All these dependencies are already included in stream-storage-java-client -->
+        <exclude>org.apache.bookkeeper:stream-storage-common</exclude>
+        <exclude>org.apache.bookkeeper:stream-storage-proto</exclude>
+        <exclude>org.apache.bookkeeper:stream-storage-api</exclude>
+        <exclude>org.apache.bookkeeper:stream-storage-java-client-base</exclude>
+        <exclude>org.apache.bookkeeper:stream-storage-java-kv-client</exclude>
+        <exclude>org.codehaus.mojo:animal-sniffer-annotations</exclude>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       </excludes>
     </dependencySet>
   </dependencySets>

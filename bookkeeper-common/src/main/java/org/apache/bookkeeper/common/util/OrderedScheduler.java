@@ -17,25 +17,41 @@
  */
 package org.apache.bookkeeper.common.util;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
+import com.google.common.util.concurrent.ForwardingListeningExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableScheduledFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+<<<<<<< HEAD
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Random;
+=======
+
+import io.netty.util.concurrent.DefaultThreadFactory;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+<<<<<<< HEAD
 
 import org.apache.bookkeeper.stats.Gauge;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.stats.OpStatsLogger;
+=======
+import java.util.concurrent.TimeoutException;
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.stats.StatsLogger;
-import org.apache.commons.lang.StringUtils;
 
 /**
  * This class provides 2 things over the java {@link ScheduledExecutorService}.
@@ -51,6 +67,7 @@ import org.apache.commons.lang.StringUtils;
  * achieved by hashing the key objects to threads by their {@link #hashCode()}
  * method.
  */
+<<<<<<< HEAD
 public class OrderedScheduler {
     public static final int NO_TASK_LIMIT = -1;
     protected static final long WARN_TIME_MICRO_SEC_DEFAULT = TimeUnit.SECONDS.toMicros(1);
@@ -64,6 +81,9 @@ public class OrderedScheduler {
     final boolean traceTaskExecution;
     final long warnTimeMicroSec;
     final int maxTasksInQueue;
+=======
+public class OrderedScheduler extends OrderedExecutor implements ScheduledExecutorService {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     /**
      * Create a builder to build ordered scheduler.
@@ -77,6 +97,7 @@ public class OrderedScheduler {
     /**
      * Builder to build ordered scheduler.
      */
+<<<<<<< HEAD
     public static class SchedulerBuilder extends AbstractBuilder<OrderedScheduler> {}
 
     /**
@@ -128,15 +149,21 @@ public class OrderedScheduler {
 
         @SuppressWarnings("unchecked")
         public T build() {
+=======
+    public static class SchedulerBuilder extends OrderedExecutor.AbstractBuilder<OrderedScheduler> {
+        @Override
+        public OrderedScheduler build() {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             if (null == threadFactory) {
-                threadFactory = Executors.defaultThreadFactory();
+                threadFactory = new DefaultThreadFactory(name);
             }
-            return (T) new OrderedScheduler(
+            return new OrderedScheduler(
                 name,
                 numThreads,
                 threadFactory,
                 statsLogger,
                 traceTaskExecution,
+<<<<<<< HEAD
                 warnTimeMicroSec,
                 maxTasksInQueue);
         }
@@ -163,6 +190,11 @@ public class OrderedScheduler {
                 LOGGER.warn("Runnable {}:{} took too long {} micros to execute.",
                             new Object[] { runnable, runnable.getClass(), elapsedMicroSec });
             }
+=======
+                preserveMdcForTaskExecution,
+                warnTimeMicroSec,
+                maxTasksInQueue);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
     }
 
@@ -179,14 +211,17 @@ public class OrderedScheduler {
      *            - for reporting executor stats
      * @param traceTaskExecution
      *            - should we stat task execution
+     * @param preserveMdcForTaskExecution
+     *            - should we preserve MDC for task execution
      * @param warnTimeMicroSec
      *            - log long task exec warning after this interval
      */
-    protected OrderedScheduler(String baseName,
+    private OrderedScheduler(String baseName,
                                int numThreads,
                                ThreadFactory threadFactory,
                                StatsLogger statsLogger,
                                boolean traceTaskExecution,
+<<<<<<< HEAD
                                long warnTimeMicroSec,
                                int maxTasksInQueue) {
         checkArgument(numThreads > 0);
@@ -277,65 +312,43 @@ public class OrderedScheduler {
         }
 
         return threads[MathUtils.signSafeMod(orderingKey.hashCode(), threads.length)];
+=======
+                               boolean preserveMdcForTaskExecution,
+                               long warnTimeMicroSec,
+                               int maxTasksInQueue) {
+        super(baseName, numThreads, threadFactory, statsLogger, traceTaskExecution,
+                preserveMdcForTaskExecution, warnTimeMicroSec, maxTasksInQueue, false /* enableBusyWait */);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
-    /**
-     * skip hashcode generation in this special case.
-     *
-     * @param orderingKey long ordering key
-     * @return the thread for executing this order key
-     */
+    @Override
+    protected ScheduledThreadPoolExecutor createSingleThreadExecutor(ThreadFactory factory) {
+        return new ScheduledThreadPoolExecutor(1, factory);
+    }
+
+    @Override
+    protected ListeningScheduledExecutorService getBoundedExecutor(ThreadPoolExecutor executor) {
+        return new BoundedScheduledExecutorService((ScheduledThreadPoolExecutor) executor, this.maxTasksInQueue);
+    }
+
+    @Override
+    protected ListeningScheduledExecutorService addExecutorDecorators(ExecutorService executor) {
+        return new OrderedSchedulerDecoratedThread((ListeningScheduledExecutorService) executor);
+    }
+
+    @Override
+    public ListeningScheduledExecutorService chooseThread() {
+        return (ListeningScheduledExecutorService) super.chooseThread();
+    }
+
+    @Override
+    public ListeningScheduledExecutorService chooseThread(Object orderingKey) {
+        return (ListeningScheduledExecutorService) super.chooseThread(orderingKey);
+    }
+
+    @Override
     public ListeningScheduledExecutorService chooseThread(long orderingKey) {
-        if (threads.length == 1) {
-            return threads[0];
-        }
-
-        return threads[MathUtils.signSafeMod(orderingKey, threads.length)];
-    }
-
-    private SafeRunnable timedRunnable(SafeRunnable r) {
-        if (traceTaskExecution) {
-            return new TimedRunnable(r);
-        } else {
-            return r;
-        }
-    }
-
-    /**
-     * schedules a one time action to execute.
-     */
-    public void submit(SafeRunnable r) {
-        chooseThread().submit(timedRunnable(r));
-    }
-
-    /**
-     * schedules a one time action to execute with an ordering guarantee on the key.
-     *
-     * @param orderingKey
-     * @param r
-     */
-    public ListenableFuture<?> submitOrdered(Object orderingKey, SafeRunnable r) {
-        return chooseThread(orderingKey).submit(timedRunnable(r));
-    }
-
-    /**
-     * schedules a one time action to execute with an ordering guarantee on the key.
-     *
-     * @param orderingKey
-     * @param r
-     */
-    public void submitOrdered(long orderingKey, SafeRunnable r) {
-        chooseThread(orderingKey).execute(r);
-    }
-
-    /**
-     * schedules a one time action to execute with an ordering guarantee on the key.
-     *
-     * @param orderingKey
-     * @param r
-     */
-    public void submitOrdered(int orderingKey, SafeRunnable r) {
-        chooseThread(orderingKey).execute(r);
+        return (ListeningScheduledExecutorService) super.chooseThread(orderingKey);
     }
 
     /**
@@ -345,7 +358,7 @@ public class OrderedScheduler {
      * @param callable
      */
     public <T> ListenableFuture<T> submitOrdered(Object orderingKey,
-                                                 java.util.concurrent.Callable<T> callable) {
+                                                 Callable<T> callable) {
         return chooseThread(orderingKey).submit(callable);
     }
 
@@ -359,7 +372,7 @@ public class OrderedScheduler {
      *         will return null upon completion
      */
     public ScheduledFuture<?> schedule(SafeRunnable command, long delay, TimeUnit unit) {
-        return chooseThread().schedule(command, delay, unit);
+        return chooseThread().schedule(timedRunnable(command), delay, unit);
     }
 
     /**
@@ -390,7 +403,7 @@ public class OrderedScheduler {
      * method will throw an exception upon cancellation
      */
     public ScheduledFuture<?> scheduleAtFixedRate(SafeRunnable command, long initialDelay, long period, TimeUnit unit) {
-        return chooseThread().scheduleAtFixedRate(command, initialDelay, period, unit);
+        return chooseThread().scheduleAtFixedRate(timedRunnable(command), initialDelay, period, unit);
     }
 
     /**
@@ -428,7 +441,7 @@ public class OrderedScheduler {
      */
     public ScheduledFuture<?> scheduleWithFixedDelay(SafeRunnable command, long initialDelay, long delay,
             TimeUnit unit) {
-        return chooseThread().scheduleWithFixedDelay(command, initialDelay, delay, unit);
+        return chooseThread().scheduleWithFixedDelay(timedRunnable(command), initialDelay, delay, unit);
     }
 
     /**
@@ -451,44 +464,123 @@ public class OrderedScheduler {
         return chooseThread(orderingKey).scheduleWithFixedDelay(command, initialDelay, delay, unit);
     }
 
-    protected long getThreadID(long orderingKey) {
-        // skip hashcode generation in this special case
-        if (threadIds.length == 1) {
-            return threadIds[0];
-        }
 
-        return threadIds[MathUtils.signSafeMod(orderingKey, threadIds.length)];
-    }
+    //
+    // Methods for implementing {@link ScheduledExecutorService}
+    //
 
-    public void shutdown() {
-        for (int i = 0; i < threads.length; i++) {
-            threads[i].shutdown();
-        }
-    }
-
-    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-        boolean ret = true;
-        for (int i = 0; i < threads.length; i++) {
-            ret = ret && threads[i].awaitTermination(timeout, unit);
-        }
-        return ret;
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+        return chooseThread().schedule(timedRunnable(command), delay, unit);
     }
 
     /**
-     * Force threads shutdown (cancel active requests) after specified delay,
-     * to be used after shutdown() rejects new requests.
+     * {@inheritDoc}
      */
-    public void forceShutdown(long timeout, TimeUnit unit) {
-        for (int i = 0; i < threads.length; i++) {
-            try {
-                if (!threads[i].awaitTermination(timeout, unit)) {
-                    threads[i].shutdownNow();
-                }
-            } catch (InterruptedException exception) {
-                threads[i].shutdownNow();
-                Thread.currentThread().interrupt();
+    @Override
+    public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+        return chooseThread().schedule(timedCallable(callable), delay, unit);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                                  long initialDelay, long period, TimeUnit unit) {
+        return chooseThread().scheduleAtFixedRate(timedRunnable(command), initialDelay, period, unit);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                     long initialDelay, long delay, TimeUnit unit) {
+        return chooseThread().scheduleWithFixedDelay(timedRunnable(command), initialDelay, delay, unit);
+    }
+
+    class OrderedSchedulerDecoratedThread extends ForwardingListeningExecutorService
+        implements ListeningScheduledExecutorService {
+        private final ListeningScheduledExecutorService delegate;
+
+        private OrderedSchedulerDecoratedThread(ListeningScheduledExecutorService delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+            protected ListeningExecutorService delegate() {
+                return delegate;
+            }
+
+            @Override
+            public ListenableScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+                return delegate.schedule(timedRunnable(command), delay, unit);
+            }
+
+            @Override
+            public <V> ListenableScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
+                return delegate.schedule(timedCallable(callable), delay, unit);
+            }
+
+            @Override
+            public ListenableScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                                                    long initialDelay, long period, TimeUnit unit) {
+                return delegate.scheduleAtFixedRate(timedRunnable(command), initialDelay, period, unit);
+            }
+
+            @Override
+            public ListenableScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                                       long initialDelay, long delay, TimeUnit unit) {
+                return delegate.scheduleAtFixedRate(timedRunnable(command), initialDelay, delay, unit);
+            }
+
+            @Override
+            public <T> ListenableFuture<T> submit(Callable<T> task) {
+                return super.submit(timedCallable(task));
+            }
+
+            @Override
+            public ListenableFuture<?> submit(Runnable task) {
+                return super.submit(timedRunnable(task));
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
+                return super.invokeAll(timedCallables(tasks));
+            }
+
+            @Override
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                                 long timeout, TimeUnit unit) throws InterruptedException {
+                return super.invokeAll(timedCallables(tasks), timeout, unit);
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+                    throws InterruptedException, ExecutionException {
+                return super.invokeAny(timedCallables(tasks));
+            }
+
+            @Override
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout,
+                                   TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+
+                return super.invokeAny(timedCallables(tasks), timeout, unit);
+            }
+
+            @Override
+            public <T> ListenableFuture<T> submit(Runnable task, T result) {
+                return super.submit(timedRunnable(task), result);
+            }
+
+            @Override
+            public void execute(Runnable command) {
+                super.execute(timedRunnable(command));
             }
         }
-    }
 
 }

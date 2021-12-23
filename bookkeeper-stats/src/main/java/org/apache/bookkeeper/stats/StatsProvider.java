@@ -16,7 +16,10 @@
  */
 package org.apache.bookkeeper.stats;
 
+import java.io.IOException;
+import java.io.Writer;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Provider to provide stats logger for different scopes.
@@ -36,10 +39,29 @@ public interface StatsProvider {
     void stop();
 
     /**
+     *
+     * @param writer
+     * @throws IOException
+     */
+    default void writeAllMetrics(Writer writer) throws IOException {
+        throw new UnsupportedOperationException("writeAllMetrics is not implemented yet");
+    }
+
+    /**
      * Return the stats logger to a given <i>scope</i>.
      * @param scope
      *          Scope for the given stats
      * @return stats logger for the given <i>scope</i>
      */
     StatsLogger getStatsLogger(String scope);
+
+    /**
+     * Return the fully qualified stats name comprised of given <tt>statsComponents</tt>.
+     *
+     * @param statsComponents stats components to comprise the fully qualified stats name
+     * @return the fully qualified stats name
+     */
+    default String getStatsName(String...statsComponents) {
+        return StringUtils.join(statsComponents, '/');
+    }
 }

@@ -27,21 +27,26 @@ package org.apache.bookkeeper.bookie;
 @SuppressWarnings("serial")
 public abstract class BookieException extends Exception {
 
-    private int code;
+    private final int code;
+
     public BookieException(int code) {
+        super();
         this.code = code;
     }
 
     public BookieException(int code, Throwable t) {
         super(t);
+        this.code = code;
     }
 
     public BookieException(int code, String reason) {
         super(reason);
+        this.code = code;
     }
 
     public BookieException(int code, String reason, Throwable t) {
         super(reason, t);
+        this.code = code;
     }
 
     public static BookieException create(int code) {
@@ -58,6 +63,8 @@ public abstract class BookieException extends Exception {
             return new DiskPartitionDuplicationException();
         case Code.CookieNotFoundException:
             return new CookieNotFoundException();
+        case Code.CookieExistsException:
+            return new CookieExistException();
         case Code.MetadataStoreException:
             return new MetadataStoreException();
         case Code.UnknownBookieIdException:
@@ -82,10 +89,8 @@ public abstract class BookieException extends Exception {
         int CookieNotFoundException = -105;
         int MetadataStoreException = -106;
         int UnknownBookieIdException = -107;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
+        int OperationRejectedException = -108;
+        int CookieExistsException = -109;
     }
 
     public int getCode() {
@@ -116,11 +121,17 @@ public abstract class BookieException extends Exception {
         case Code.CookieNotFoundException:
             err = "Cookie not found";
             break;
+        case Code.CookieExistsException:
+            err = "Cookie already exists";
+            break;
         case Code.MetadataStoreException:
             err = "Error performing metadata operations";
             break;
         case Code.UnknownBookieIdException:
             err = "Unknown bookie id";
+            break;
+        case Code.OperationRejectedException:
+            err = "Operation rejected";
             break;
         default:
             err = "Invalid operation";
@@ -175,6 +186,22 @@ public abstract class BookieException extends Exception {
     }
 
     /**
+     * Signals that a ledger has been fenced in a bookie. No more entries can be appended to that ledger.
+     */
+    public static class OperationRejectedException extends BookieException {
+        public OperationRejectedException() {
+            super(Code.OperationRejectedException);
+        }
+
+        @Override
+        public Throwable fillInStackTrace() {
+            // Since this exception is a way to signal a specific condition and it's triggered and very specific points,
+            // we can disable stack traces.
+            return null;
+        }
+    }
+
+    /**
      * Signal that an invalid cookie is found when starting a bookie.
      *
      * <p>This exception is mainly used for detecting if there is any malformed configuration in a bookie.
@@ -207,6 +234,23 @@ public abstract class BookieException extends Exception {
 
         public CookieNotFoundException(Throwable cause) {
             super(Code.CookieNotFoundException, cause);
+        }
+    }
+
+    /**
+     * Signal that cookie already exists when creating a new cookie.
+     */
+    public static class CookieExistException extends BookieException {
+        public CookieExistException() {
+            this("");
+        }
+
+        public CookieExistException(String reason) {
+            super(Code.CookieExistsException, reason);
+        }
+
+        public CookieExistException(Throwable cause) {
+            super(Code.CookieExistsException, cause);
         }
     }
 
@@ -279,4 +323,5 @@ public abstract class BookieException extends Exception {
             super(Code.UnknownBookieIdException, cause);
         }
     }
+
 }

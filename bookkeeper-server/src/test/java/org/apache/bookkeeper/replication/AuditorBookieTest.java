@@ -20,32 +20,34 @@
  */
 package org.apache.bookkeeper.replication;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-
-import org.junit.Assert;
-
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.zk.ZKMetadataDriverBase;
+import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.apache.bookkeeper.zookeeper.ZooKeeperClient;
 import org.apache.zookeeper.ZooKeeper;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.junit.Assert.*;
-
 /**
  * This test verifies the auditor bookie scenarios which will be monitoring the
- * bookie failures
+ * bookie failures.
  */
 public class AuditorBookieTest extends BookKeeperClusterTestCase {
     // Depending on the taste, select the amount of logging
     // by decommenting one of the two lines below
-    // private final static Logger LOG = Logger.getRootLogger();
-    private final static Logger LOG = LoggerFactory
+    // private static final Logger LOG = Logger.getRootLogger();
+    private static final Logger LOG = LoggerFactory
             .getLogger(AuditorBookieTest.class);
     private String electionPath;
     private HashMap<String, AuditorElector> auditorElectors = new HashMap<String, AuditorElector>();
@@ -53,14 +55,15 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
 
     public AuditorBookieTest() {
         super(6);
-        electionPath = baseConf.getZkLedgersRootPath()
-                + "/underreplication/auditorelection";
     }
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
         startAuditorElectors();
+
+        electionPath = ZKMetadataDriverBase.resolveZkLedgersRootPath(baseConf)
+            + "/underreplication/auditorelection";
     }
 
     @Override
@@ -83,27 +86,27 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
         BookieServer auditor = verifyAuditor();
 
         // shutdown bookie which is not an auditor
-        int indexOf = bs.indexOf(auditor);
+        int indexOf = indexOfServer(auditor);
         int bkIndexDownBookie;
-        if (indexOf < bs.size() - 1) {
+        if (indexOf < lastBookieIndex()) {
             bkIndexDownBookie = indexOf + 1;
         } else {
             bkIndexDownBookie = indexOf - 1;
         }
-        shutdownBookie(bs.get(bkIndexDownBookie));
+        shutdownBookie(serverByIndex(bkIndexDownBookie));
 
         startNewBookie();
         startNewBookie();
         // grace period for the auditor re-election if any
         BookieServer newAuditor = waitForNewAuditor(auditor);
-        Assert.assertSame(
+        assertSame(
                 "Auditor re-election is not happened for auditor failure!",
                 auditor, newAuditor);
     }
 
     /**
      * Test Auditor crashes should trigger re-election and another bookie should
-     * take over the auditor ship
+     * take over the auditor ship.
      */
     @Test
     public void testSuccessiveAuditorCrashes() throws Exception {
@@ -111,19 +114,16 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
         shutdownBookie(auditor);
 
         BookieServer newAuditor1 = waitForNewAuditor(auditor);
-        bs.remove(auditor);
-
         shutdownBookie(newAuditor1);
         BookieServer newAuditor2 = waitForNewAuditor(newAuditor1);
-        Assert.assertNotSame(
+        assertNotSame(
                 "Auditor re-election is not happened for auditor failure!",
                 auditor, newAuditor2);
-        bs.remove(newAuditor1);
     }
 
     /**
      * Test restarting the entire bookie cluster. It shouldn't create multiple
-     * bookie auditors
+     * bookie auditors.
      */
     @Test
     public void testBookieClusterRestart() throws Exception {
@@ -135,10 +135,10 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
         stopBKCluster();
         stopAuditorElectors();
 
-        startBKCluster();
+        startBKCluster(zkUtil.getMetadataServiceUri());
         startAuditorElectors();
         BookieServer newAuditor = waitForNewAuditor(auditor);
-        Assert.assertNotSame(
+        assertNotSame(
                 "Auditor re-election is not happened for auditor failure!",
                 auditor, newAuditor);
     }
@@ -153,18 +153,16 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
 
         // waiting for new auditor
         BookieServer newAuditor = waitForNewAuditor(auditor);
-        Assert.assertNotSame(
+        assertNotSame(
                 "Auditor re-election is not happened for auditor failure!",
                 auditor, newAuditor);
-        int indexOfDownBookie = bs.indexOf(auditor);
-        bs.remove(indexOfDownBookie);
-        bsConfs.remove(indexOfDownBookie);
+
         List<String> children = zkc.getChildren(electionPath, false);
         for (String child : children) {
             byte[] data = zkc.getData(electionPath + '/' + child, false, null);
             String bookieIP = new String(data);
-            String addr = auditor.getLocalAddress().toString();
-            Assert.assertFalse("AuditorElection cleanup fails", bookieIP
+            String addr = auditor.getBookieId().toString();
+            assertFalse("AuditorElection cleanup fails", bookieIP
                     .contains(addr));
         }
     }
@@ -177,15 +175,11 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
     public void testRestartAuditorBookieAfterCrashing() throws Exception {
         BookieServer auditor = verifyAuditor();
 
-        shutdownBookie(auditor);
-        String addr = auditor.getLocalAddress().toString();
+        String addr = auditor.getBookieId().toString();
 
         // restarting Bookie with same configurations.
-        int indexOfDownBookie = bs.indexOf(auditor);
-        ServerConfiguration serverConfiguration = bsConfs
-                .get(indexOfDownBookie);
-        bs.remove(indexOfDownBookie);
-        bsConfs.remove(indexOfDownBookie);
+        ServerConfiguration serverConfiguration = shutdownBookie(auditor);
+
         auditorElectors.remove(addr);
         startBookie(serverConfiguration);
         // starting corresponding auditor elector
@@ -195,32 +189,24 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
 
         // waiting for new auditor to come
         BookieServer newAuditor = waitForNewAuditor(auditor);
-        Assert.assertNotSame(
+        assertNotSame(
                 "Auditor re-election is not happened for auditor failure!",
                 auditor, newAuditor);
-        Assert.assertFalse("No relection after old auditor rejoins", auditor
-                .getLocalAddress().getPort() == newAuditor.getLocalAddress()
-                .getPort());
+        assertFalse("No relection after old auditor rejoins", auditor
+                .getBookieId().equals(newAuditor.getBookieId()));
     }
 
     private void startAuditorElector(String addr) throws Exception {
-        ZooKeeper zk = ZooKeeperClient.newBuilder()
-                .connectString(zkUtil.getZooKeeperConnectString())
-                .sessionTimeoutMs(10000)
-                .build();
-        zkClients.add(zk);
-
         AuditorElector auditorElector = new AuditorElector(addr,
-                                                           baseConf, zk);
+                                                           baseConf);
         auditorElectors.put(addr, auditorElector);
         auditorElector.start();
         LOG.debug("Starting Auditor Elector");
     }
 
     private void startAuditorElectors() throws Exception {
-        for (BookieServer bserver : bs) {
-            String addr = bserver.getLocalAddress().toString();
-            startAuditorElector(addr);
+        for (BookieId addr : bookieAddresses()) {
+            startAuditorElector(addr.toString());
         }
     }
 
@@ -233,7 +219,7 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
 
     private BookieServer verifyAuditor() throws Exception {
         List<BookieServer> auditors = getAuditorBookie();
-        Assert.assertEquals("Multiple Bookies acting as Auditor!", 1, auditors
+        assertEquals("Multiple Bookies acting as Auditor!", 1, auditors
                 .size());
         LOG.debug("Bookie running as Auditor:" + auditors.get(0));
         return auditors.get(0);
@@ -242,23 +228,27 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
     private List<BookieServer> getAuditorBookie() throws Exception {
         List<BookieServer> auditors = new LinkedList<BookieServer>();
         byte[] data = zkc.getData(electionPath, false, null);
-        Assert.assertNotNull("Auditor election failed", data);
-        for (BookieServer bks : bs) {
-            if (new String(data).contains(bks.getLocalAddress().getPort() + "")) {
+        assertNotNull("Auditor election failed", data);
+        for (int i = 0; i < bookieCount(); i++) {
+            BookieServer bks = serverByIndex(i);
+            if (new String(data).contains(bks.getBookieId() + "")) {
                 auditors.add(bks);
             }
         }
         return auditors;
     }
 
-    private void shutdownBookie(BookieServer bkServer) throws Exception {
-        String addr = bkServer.getLocalAddress().toString();
+    private ServerConfiguration shutdownBookie(BookieServer bkServer) throws Exception {
+        int index = indexOfServer(bkServer);
+        String addr = addressByIndex(index).toString();
         LOG.debug("Shutting down bookie:" + addr);
 
         // shutdown bookie which is an auditor
-        bkServer.shutdown();
+        ServerConfiguration conf = killBookie(index);
+
         // stopping corresponding auditor elector
         auditorElectors.get(addr).shutdown();
+        return conf;
     }
 
     private BookieServer waitForNewAuditor(BookieServer auditor)
@@ -276,7 +266,7 @@ public class AuditorBookieTest extends BookKeeperClusterTestCase {
             Thread.sleep(500);
             retryCount--;
         }
-        Assert.assertNotNull(
+        assertNotNull(
                 "New Auditor is not reelected after auditor crashes",
                 newAuditor);
         verifyAuditor();

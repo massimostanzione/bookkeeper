@@ -7,12 +7,21 @@ To use this feature, set `httpServerEnabled` to `true` in file `conf/bk_server.c
 
 ## All the endpoints
 
+<<<<<<< HEAD
 Currently all the HTTP endpoints could be divided into these 4 components:
 1. Heartbeat: heartbeat for a specific bookie.
 1. Config: doing the server configuration for a specific bookie.
 1. Ledger: HTTP endpoints related to ledgers.
 1. Bookie: HTTP endpoints related to bookies.
 1. AutoRecovery: HTTP endpoints related to auto recovery.
+=======
+Currently all the HTTP endpoints could be divided into these 5 components:
+1. Heartbeat: heartbeat for a specific bookie.
+2. Config: doing the server configuration for a specific bookie.
+3. Ledger: HTTP endpoints related to ledgers.
+4. Bookie: HTTP endpoints related to bookies.
+5. AutoRecovery: HTTP endpoints related to auto recovery.
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
 ## Heartbeat
 
@@ -60,9 +69,28 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         |403 | Permission denied |
         |404 | Not found |
 
+<<<<<<< HEAD
 ## Ledger
 
 ### Endpoint: /api/v1/ledger/delete/?ledger_id=<ledger_id>
+=======
+## Config
+
+### Endpoint: /metrics
+1. Method: GET
+    * Description: Get all metrics by calling `writeAllMetrics()` of `statsProvider` internally
+    * Response:  
+    
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+
+## Ledger
+
+### Endpoint: /api/v1/ledger/delete/?ledger_id=&lt;ledger_id&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: DELETE
     * Description: Delete a ledger.
     * Parameters: 
@@ -78,7 +106,11 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         |403 | Permission denied |
         |404 | Not found |
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/ledger/list/?print_metadata=<metadata>
+=======
+### Endpoint: /api/v1/ledger/list/?print_metadata=&lt;metadata&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description: List all the ledgers.
     * Parameters: 
@@ -103,7 +135,11 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         }
         ```
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/ledger/metadata/?ledger_id=<ledger_id>
+=======
+### Endpoint: /api/v1/ledger/metadata/?ledger_id=&lt;ledger_id&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description: Get the metadata of a ledger.
     * Parameters: 
@@ -126,7 +162,11 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         }
         ```    
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/ledger/read/?ledger_id=<ledger_id>&start_entry_id=<start_entry_id>&end_entry_id=<end_entry_id>
+=======
+### Endpoint: /api/v1/ledger/read/?ledger_id=&lt;ledger_id&gt;&start_entry_id=&lt;start_entry_id&gt;&end_entry_id=&lt;end_entry_id&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description: Read a range of entries from ledger.
     * Parameters: 
@@ -155,7 +195,29 @@ Currently all the HTTP endpoints could be divided into these 4 components:
 
 ## Bookie
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/bookie/list_bookies/?type=<type>&print_hostnames=<hostnames>
+=======
+### Endpoint: /api/v1/bookie/info
+1. Method: GET
+   * Description:  Get bookie info
+   * Response:
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |501 | Not implemented |
+   * Body:
+      ```json
+      {
+         "freeSpace" : 0,
+         "totalSpace" : 0
+       }
+      ```
+
+### Endpoint: /api/v1/bookie/list_bookies/?type=&lt;type&gt;&print_hostnames=&lt;hostnames&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description:  Get all the available bookies.
     * Parameters: 
@@ -222,7 +284,11 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         }
         ```   
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/bookie/list_disk_file/?file_type=<type>
+=======
+### Endpoint: /api/v1/bookie/list_disk_file/?file_type=&lt;type&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description:  Get all the files on disk of current bookie.
     * Parameters: 
@@ -258,6 +324,93 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         |403 | Permission denied |
         |404 | Not found |
 
+<<<<<<< HEAD
+=======
+### Endpoint: /api/v1/bookie/gc
+1. Method: PUT
+    * Description:  trigger gc for this bookie.
+    * Response:  
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+
+1. Method: GET
+    * Description:  whether force triggered Garbage Collection is running or not for this bookie. true for is running.
+    * Response:
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+    * Body:
+       ```json
+       {
+          "is_in_force_gc" : "false"
+       }
+       ```
+
+### Endpoint: /api/v1/bookie/gc_details
+1. Method: GET
+    * Description:  get details of Garbage Collection Thread, like whether it is in compacting, last compaction time, compaction counter, etc.
+    * Response:
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+    * Body:
+       ```json
+       [ {
+          "forceCompacting" : false,
+          "majorCompacting" : false,
+          "minorCompacting" : false,
+          "lastMajorCompactionTime" : 1544578144944,
+          "lastMinorCompactionTime" : 1544578144944,
+          "majorCompactionCounter" : 1,
+          "minorCompactionCounter" : 0
+        } ]
+       ```
+
+### Endpoint: /api/v1/bookie/state
+1. Method: GET
+   * Description:  Exposes the current state of bookie
+   * Response:
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+   * Body:
+      ```json
+      {
+         "running" : true,
+         "readOnly" : false,
+         "shuttingDown" : false,
+         "availableForHighPriorityWrites" : true
+       }
+      ```
+
+### Endpoint: /api/v1/bookie/is_ready
+1. Method: GET
+   * Description:  Return true if the bookie is ready
+   * Response:
+
+        | Code   | Description |
+        |:-------|:------------|
+        |200 | Successful operation |
+        |403 | Permission denied |
+        |404 | Not found |
+        |503 | Bookie is not ready |
+   * Body: <empty>
+
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 ## Auto recovery
 
 ### Endpoint: /api/v1/autorecovery/bookie/
@@ -286,7 +439,11 @@ Currently all the HTTP endpoints could be divided into these 4 components:
         |403 | Permission denied |
         |404 | Not found |
 
+<<<<<<< HEAD
 ### Endpoint: /api/v1/autorecovery/list_under_replicated_ledger/?missingreplica=<bookie_address>&excludingmissingreplica=<bookie_address>
+=======
+### Endpoint: /api/v1/autorecovery/list_under_replicated_ledger/?missingreplica=&lt;bookie_address&gt;&excludingmissingreplica=&lt;bookie_address&gt;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 1. Method: GET
     * Description:  Get all under replicated ledgers.
     * Parameters: 

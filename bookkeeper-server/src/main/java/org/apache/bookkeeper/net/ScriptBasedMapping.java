@@ -25,8 +25,9 @@ import java.util.StringTokenizer;
 
 import org.apache.bookkeeper.util.Shell.ShellCommandExecutor;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class implements the {@link DNSToSwitchMapping} interface using a
@@ -45,34 +46,34 @@ import org.apache.commons.logging.LogFactory;
 public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
 
     /**
-     * Minimum number of arguments: {@value}
+     * Minimum number of arguments: {@value}.
      */
     static final int MIN_ALLOWABLE_ARGS = 1;
 
     /**
-     * Default number of arguments: {@value}
+     * Default number of arguments: {@value}.
      */
     static final int DEFAULT_ARG_COUNT = CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_DEFAULT;
 
     /**
-     * key to the script filename {@value}
+     * Key to the script filename {@value}.
      */
     static final String SCRIPT_FILENAME_KEY = CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY;
     /**
-     * key to the argument count that the script supports
-     * {@value}
+     * Key to the argument count that the script supports
+     * {@value}.
      */
     static final String SCRIPT_ARG_COUNT_KEY = CommonConfigurationKeys.NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_KEY;
     /**
      * Text used in the {@link #toString()} method if there is no string
-     * {@value}
+     * {@value}.
      */
     public static final String NO_SCRIPT = "no script";
 
     /**
      * Create an instance with the default configuration.
-     * </p>
-     * Calling {@link #setConf(Configuration)} will trigger a
+     *
+     * <p>Calling {@link #setConf(Configuration)} will trigger a
      * re-evaluation of the configuration settings and so be used to
      * set up the mapping script.
      *
@@ -82,7 +83,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
     }
 
     /**
-     * Create an instance from the given configuration
+     * Create an instance from the given configuration.
      * @param conf configuration
      */
     public ScriptBasedMapping(Configuration conf) {
@@ -91,7 +92,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
     }
 
     /**
-     * Get the cached mapping and convert it to its real type
+     * Get the cached mapping and convert it to its real type.
      * @return the inner raw script mapping.
      */
     private RawScriptBasedMapping getRawMapping() {
@@ -110,8 +111,8 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
 
     /**
      * {@inheritDoc}
-     * <p/>
-     * This will get called in the superclass constructor, so a check is needed
+     *
+     * <p>This will get called in the superclass constructor, so a check is needed
      * to ensure that the raw mapping is defined before trying to relaying a null
      * configuration.
      * @param conf
@@ -124,26 +125,59 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
 
     /**
      * This is the uncached script mapping that is fed into the cache managed
-     * by the superclass {@link CachedDNSToSwitchMapping}
+     * by the superclass {@link CachedDNSToSwitchMapping}.
      */
     private static final class RawScriptBasedMapping extends AbstractDNSToSwitchMapping {
         private String scriptName;
         private int maxArgs; //max hostnames per call of the script
-        private static final Log LOG = LogFactory.getLog(ScriptBasedMapping.class);
+        private static final Logger LOG = LoggerFactory.getLogger(RawScriptBasedMapping.class);
 
-        /**
-         * Set the configuration and extract the configuration parameters of interest
-         * @param conf the new configuration
+        /*
+         * extract 'scriptName' and 'maxArgs' parameters from the conf and throw
+         * RuntimeException if 'scriptName' is null. Also for sanity check
+         * purpose try executing the script with no arguments. Here it is
+         * expected that running script with no arguments would do sanity check
+         * of the script and the env, and return successfully if script and env.
+         * are valid. If sanity check of the script with no argument fails then
+         * throw RuntimeException.
+         *
          */
         @Override
-        public void setConf(Configuration conf) {
-            super.setConf(conf);
+        protected void validateConf() {
+            Configuration conf = getConf();
             if (conf != null) {
-                scriptName = conf.getString(SCRIPT_FILENAME_KEY);
-                maxArgs = conf.getInt(SCRIPT_ARG_COUNT_KEY, DEFAULT_ARG_COUNT);
+                String scriptNameConfValue = conf.getString(SCRIPT_FILENAME_KEY);
+                if (StringUtils.isNotBlank(scriptNameConfValue)) {
+                    scriptName = scriptNameConfValue;
+                    maxArgs = conf.getInt(SCRIPT_ARG_COUNT_KEY, DEFAULT_ARG_COUNT);
+                } else {
+                    scriptName = null;
+                    maxArgs = 0;
+                }
             } else {
                 scriptName = null;
                 maxArgs = 0;
+            }
+
+            if (null == scriptName) {
+                throw new RuntimeException("No network topology script is found when using script"
+                        + " based DNS resolver.");
+            } else {
+                File dir = null;
+                String userDir;
+                if ((userDir = System.getProperty("user.dir")) != null) {
+                    dir = new File(userDir);
+                }
+                String[] execString = { this.scriptName };
+                ShellCommandExecutor s = new ShellCommandExecutor(execString, dir);
+                try {
+                    s.execute();
+                } catch (Exception e) {
+                    LOG.error("Conf validation failed. Got exception for sanity check of script: " + this.scriptName,
+                            e);
+                    throw new RuntimeException(
+                            "Conf validation failed. Got exception for sanity check of script: " + this.scriptName, e);
+                }
             }
         }
 
@@ -229,7 +263,7 @@ public final class ScriptBasedMapping extends CachedDNSToSwitchMapping {
                     s.execute();
                     allOutput.append(s.getOutput()).append(" ");
                 } catch (Exception e) {
-                    LOG.warn("Exception running " + s, e);
+                    LOG.warn("Exception running: {} Exception message: {}", s, e.getMessage());
                     return null;
                 }
                 loopCount++;

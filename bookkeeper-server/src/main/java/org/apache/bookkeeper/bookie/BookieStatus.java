@@ -19,7 +19,7 @@
 
 package org.apache.bookkeeper.bookie;
 
-import static com.google.common.base.Charsets.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.bookkeeper.util.BookKeeperConstants.BOOKIE_STATUS_FILENAME;
 
 import java.io.BufferedReader;
@@ -45,15 +45,14 @@ public class BookieStatus {
 
     enum BookieMode {
         READ_ONLY,
-        READ_WRITE;
+        READ_WRITE
     }
 
-    private final static long INVALID_UPDATE_TIME = -1;
+    private static final long INVALID_UPDATE_TIME = -1;
 
     private int layoutVersion;
     private long lastUpdateTime;
-    private BookieMode bookieMode;
-
+    private volatile BookieMode bookieMode;
 
     BookieStatus() {
         this.bookieMode = BookieMode.READ_WRITE;
@@ -61,11 +60,11 @@ public class BookieStatus {
         this.lastUpdateTime = INVALID_UPDATE_TIME;
     }
 
-    private synchronized BookieMode getBookieMode() {
+    private BookieMode getBookieMode() {
         return bookieMode;
     }
 
-    public synchronized boolean isInWritable() {
+    public boolean isInWritable() {
         return bookieMode.equals(BookieMode.READ_WRITE);
     }
 
@@ -78,7 +77,7 @@ public class BookieStatus {
         return false;
     }
 
-    synchronized boolean isInReadOnlyMode() {
+    boolean isInReadOnlyMode() {
         return bookieMode.equals(BookieMode.READ_ONLY);
     }
 
@@ -92,7 +91,7 @@ public class BookieStatus {
     }
 
     /**
-     * Write bookie status to multiple directories in best effort
+     * Write bookie status to multiple directories in best effort.
      *
      * @param directories list of directories to write to
      *
@@ -105,11 +104,11 @@ public class BookieStatus {
                 writeToFile(statusFile, toString());
                 success = true;
             } catch (IOException e) {
-                LOG.warn("IOException while trying to write bookie status to directory {}." +
-                    " This is fine if not all directories are failed.", dir);
+                LOG.warn("IOException while trying to write bookie status to directory {}."
+                    + " This is fine if not all directories are failed.", dir);
             }
         }
-        if(success){
+        if (success) {
             LOG.info("Successfully persist bookie status {}", this.bookieMode);
         } else {
             LOG.warn("Failed to persist bookie status {}", this.bookieMode);
@@ -124,16 +123,9 @@ public class BookieStatus {
      * @throws IOException
      */
     private static void writeToFile(File file, String body) throws IOException {
-        FileOutputStream fos = new FileOutputStream(file);
-        BufferedWriter bw = null;
-        try {
-            bw = new BufferedWriter(new OutputStreamWriter(fos, UTF_8));
+        try (FileOutputStream fos = new FileOutputStream(file);
+             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos, UTF_8))) {
             bw.write(body);
-        } finally {
-            if (bw != null) {
-                bw.close();
-            }
-            fos.close();
         }
     }
 
@@ -160,24 +152,24 @@ public class BookieStatus {
                     }
                 }
             } catch (IOException e) {
-                LOG.warn("IOException while trying to read bookie status from directory {}." +
-                    " This is fine if not all directories failed.", dir);
-            } catch (IllegalArgumentException e ){
-                LOG.warn("IllegalArgumentException while trying to read bookie status from directory {}." +
-                    " This is fine if not all directories failed.", dir);
+                LOG.warn("IOException while trying to read bookie status from directory {}."
+                    + " This is fine if not all directories failed.", dir);
+            } catch (IllegalArgumentException e) {
+                LOG.warn("IllegalArgumentException while trying to read bookie status from directory {}."
+                    + " This is fine if not all directories failed.", dir);
             }
         }
         if (success) {
             LOG.info("Successfully retrieve bookie status {} from disks.", getBookieMode());
         } else {
-            LOG.warn("Failed to retrieve bookie status from disks." +
-                    " Fall back to current or default bookie status: {}", getBookieMode());
+            LOG.warn("Failed to retrieve bookie status from disks."
+                    + " Fall back to current or default bookie status: {}", getBookieMode());
         }
     }
 
 
     /**
-     * Function to read the bookie status from a single file
+     * Function to read the bookie status from a single file.
      *
      * @param file file to read from
      * @return BookieStatus if not error, null if file not exist or any exception happens
@@ -188,7 +180,7 @@ public class BookieStatus {
         if (!file.exists()) {
             return null;
         }
-        
+
         try (BufferedReader reader = new BufferedReader(
             new InputStreamReader(new FileInputStream(file), UTF_8))) {
             return parse(reader);
@@ -196,7 +188,7 @@ public class BookieStatus {
     }
 
     /**
-     * Parse the bookie status object using appropriate layout version
+     * Parse the bookie status object using appropriate layout version.
      *
      * @param reader
      * @return BookieStatus if parse succeed, otherwise return null

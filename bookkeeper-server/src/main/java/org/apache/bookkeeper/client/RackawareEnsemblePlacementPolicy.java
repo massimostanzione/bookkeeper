@@ -17,18 +17,18 @@
  */
 package org.apache.bookkeeper.client;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import io.netty.util.HashedWheelTimer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieNode;
 import org.apache.bookkeeper.net.DNSToSwitchMapping;
 import org.apache.bookkeeper.net.Node;
+import org.apache.bookkeeper.proto.BookieAddressResolver;
 import org.apache.bookkeeper.stats.StatsLogger;
-
-import io.netty.util.HashedWheelTimer;
 
 /**
  * A placement policy implementation use rack information for placing ensembles.
@@ -36,14 +36,14 @@ import io.netty.util.HashedWheelTimer;
  * @see EnsemblePlacementPolicy
  */
 public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacementPolicyImpl
-        implements ITopologyAwareEnsemblePlacementPolicy<TopologyAwareEnsemblePlacementPolicy.BookieNode> {
+        implements ITopologyAwareEnsemblePlacementPolicy<BookieNode> {
     RackawareEnsemblePlacementPolicyImpl slave = null;
 
-    RackawareEnsemblePlacementPolicy() {
+    public RackawareEnsemblePlacementPolicy() {
         super();
     }
 
-    RackawareEnsemblePlacementPolicy(boolean enforceDurability) {
+    public RackawareEnsemblePlacementPolicy(boolean enforceDurability) {
         super(enforceDurability);
     }
 
@@ -52,17 +52,27 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
                                                           HashedWheelTimer timer,
                                                           boolean reorderReadsRandom,
                                                           int stabilizePeriodSeconds,
+                                                          int reorderThresholdPendingRequests,
                                                           boolean isWeighted,
                                                           int maxWeightMultiple,
-                                                          StatsLogger statsLogger) {
+                                                          int minNumRacksPerWriteQuorum,
+                                                          boolean enforceMinNumRacksPerWriteQuorum,
+                                                          boolean ignoreLocalNodeInPlacementPolicy,
+            StatsLogger statsLogger, BookieAddressResolver bookieAddressResolver) {
         if (stabilizePeriodSeconds > 0) {
-            super.initialize(dnsResolver, timer, reorderReadsRandom, 0, isWeighted, maxWeightMultiple, statsLogger);
+            super.initialize(dnsResolver, timer, reorderReadsRandom, 0, reorderThresholdPendingRequests, isWeighted,
+                    maxWeightMultiple, minNumRacksPerWriteQuorum, enforceMinNumRacksPerWriteQuorum,
+                    ignoreLocalNodeInPlacementPolicy, statsLogger, bookieAddressResolver);
             slave = new RackawareEnsemblePlacementPolicyImpl(enforceDurability);
-            slave.initialize(dnsResolver, timer, reorderReadsRandom, stabilizePeriodSeconds, isWeighted,
-                    maxWeightMultiple, statsLogger);
+            slave.initialize(dnsResolver, timer, reorderReadsRandom, stabilizePeriodSeconds,
+                    reorderThresholdPendingRequests, isWeighted, maxWeightMultiple, minNumRacksPerWriteQuorum,
+                    enforceMinNumRacksPerWriteQuorum, ignoreLocalNodeInPlacementPolicy, statsLogger,
+                    bookieAddressResolver);
         } else {
-            super.initialize(dnsResolver, timer, reorderReadsRandom, stabilizePeriodSeconds, isWeighted,
-                    maxWeightMultiple, statsLogger);
+            super.initialize(dnsResolver, timer, reorderReadsRandom, stabilizePeriodSeconds,
+                    reorderThresholdPendingRequests, isWeighted, maxWeightMultiple, minNumRacksPerWriteQuorum,
+                    enforceMinNumRacksPerWriteQuorum, ignoreLocalNodeInPlacementPolicy, statsLogger,
+                    bookieAddressResolver);
             slave = null;
         }
         return this;
@@ -77,8 +87,9 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
     }
 
     @Override
-    public Set<BookieSocketAddress> onClusterChanged(Set<BookieSocketAddress> writableBookies, Set<BookieSocketAddress> readOnlyBookies) {
-        Set<BookieSocketAddress> deadBookies = super.onClusterChanged(writableBookies, readOnlyBookies);
+    public Set<BookieId> onClusterChanged(Set<BookieId> writableBookies,
+            Set<BookieId> readOnlyBookies) {
+        Set<BookieId> deadBookies = super.onClusterChanged(writableBookies, readOnlyBookies);
         if (null != slave) {
             deadBookies = slave.onClusterChanged(writableBookies, readOnlyBookies);
         }
@@ -86,8 +97,8 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
     }
 
     @Override
-    public ArrayList<BookieSocketAddress> newEnsemble(
-        int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map<String, byte[]> customMetadata, Set<BookieSocketAddress> excludeBookies)
+    public PlacementResult<List<BookieId>> newEnsemble(int ensembleSize, int writeQuorumSize,
+            int ackQuorumSize, Map<String, byte[]> customMetadata, Set<BookieId> excludeBookies)
             throws BKException.BKNotEnoughBookiesException {
         try {
             return super.newEnsemble(ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata, excludeBookies);
@@ -101,8 +112,9 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
     }
 
     @Override
-    public BookieSocketAddress replaceBookie(
-        int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map<String, byte[]> customMetadata, Collection<BookieSocketAddress> currentEnsemble, BookieSocketAddress bookieToReplace, Set<BookieSocketAddress> excludeBookies)
+    public PlacementResult<BookieId> replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize,
+            Map<String, byte[]> customMetadata, List<BookieId> currentEnsemble,
+            BookieId bookieToReplace, Set<BookieId> excludeBookies)
             throws BKException.BKNotEnoughBookiesException {
        try {
             return super.replaceBookie(ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata,
@@ -111,7 +123,7 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
             if (slave == null) {
                 throw bnebe;
             } else {
-                return slave.replaceBookie(ensembleSize, writeQuorumSize, ackQuorumSize,customMetadata,
+                return slave.replaceBookie(ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata,
                         currentEnsemble, bookieToReplace, excludeBookies);
             }
         }
@@ -119,29 +131,29 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
 
     @Override
     public DistributionSchedule.WriteSet reorderReadSequence(
-            ArrayList<BookieSocketAddress> ensemble,
-            Map<BookieSocketAddress, Long> bookieFailureHistory,
+            List<BookieId> ensemble,
+            BookiesHealthInfo bookiesHealthInfo,
             DistributionSchedule.WriteSet writeSet) {
-        return super.reorderReadSequence(ensemble, bookieFailureHistory,
+        return super.reorderReadSequence(ensemble, bookiesHealthInfo,
                                          writeSet);
     }
 
     @Override
     public DistributionSchedule.WriteSet reorderReadLACSequence(
-            ArrayList<BookieSocketAddress> ensemble,
-            Map<BookieSocketAddress, Long> bookieFailureHistory,
+            List<BookieId> ensemble,
+            BookiesHealthInfo bookiesHealthInfo,
             DistributionSchedule.WriteSet writeSet) {
-        return super.reorderReadLACSequence(ensemble, bookieFailureHistory,
+        return super.reorderReadLACSequence(ensemble, bookiesHealthInfo,
                                             writeSet);
     }
 
     @Override
-    public ArrayList<BookieSocketAddress> newEnsemble(int ensembleSize,
-                                                    int writeQuorumSize,
-                                                    int ackQuorumSize,
-                                                    Set<BookieSocketAddress> excludeBookies,
-                                                    Ensemble<BookieNode> parentEnsemble,
-                                                    Predicate<BookieNode> parentPredicate)
+    public PlacementResult<List<BookieId>> newEnsemble(int ensembleSize,
+                                                 int writeQuorumSize,
+                                                 int ackQuorumSize,
+                                                 Set<BookieId> excludeBookies,
+                                                 Ensemble<BookieNode> parentEnsemble,
+                                                 Predicate<BookieNode> parentPredicate)
             throws BKException.BKNotEnoughBookiesException {
         try {
             return super.newEnsemble(
@@ -166,21 +178,66 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
             String networkLoc,
             Set<Node> excludeBookies,
             Predicate<BookieNode> predicate,
-            Ensemble<BookieNode> ensemble)
+            Ensemble<BookieNode> ensemble,
+            boolean fallbackToRandom)
             throws BKException.BKNotEnoughBookiesException {
         try {
-            return super.selectFromNetworkLocation(networkLoc, excludeBookies, predicate, ensemble);
+            return super.selectFromNetworkLocation(networkLoc, excludeBookies, predicate, ensemble,
+                    fallbackToRandom);
         } catch (BKException.BKNotEnoughBookiesException bnebe) {
             if (slave == null) {
                 throw bnebe;
             } else {
-                return slave.selectFromNetworkLocation(networkLoc, excludeBookies, predicate, ensemble);
+                return slave.selectFromNetworkLocation(networkLoc, excludeBookies, predicate, ensemble,
+                        fallbackToRandom);
             }
         }
     }
 
     @Override
-    public void handleBookiesThatLeft(Set<BookieSocketAddress> leftBookies) {
+    public BookieNode selectFromNetworkLocation(
+            Set<String> excludeRacks,
+            Set<Node> excludeBookies,
+            Predicate<BookieNode> predicate,
+            Ensemble<BookieNode> ensemble,
+            boolean fallbackToRandom)
+                    throws BKException.BKNotEnoughBookiesException {
+        try {
+            return super.selectFromNetworkLocation(excludeRacks, excludeBookies, predicate, ensemble, fallbackToRandom);
+        } catch (BKException.BKNotEnoughBookiesException bnebe) {
+            if (slave == null) {
+                throw bnebe;
+            } else {
+                return slave.selectFromNetworkLocation(excludeRacks, excludeBookies, predicate, ensemble,
+                        fallbackToRandom);
+            }
+        }
+    }
+
+    @Override
+    public BookieNode selectFromNetworkLocation(
+            String networkLoc,
+            Set<String> excludeRacks,
+            Set<Node> excludeBookies,
+            Predicate<BookieNode> predicate,
+            Ensemble<BookieNode> ensemble,
+            boolean fallbackToRandom)
+            throws BKNotEnoughBookiesException {
+        try {
+            return super.selectFromNetworkLocation(networkLoc, excludeRacks, excludeBookies, predicate, ensemble,
+                    fallbackToRandom);
+        } catch (BKException.BKNotEnoughBookiesException bnebe) {
+            if (slave == null) {
+                throw bnebe;
+            } else {
+                return slave.selectFromNetworkLocation(networkLoc, excludeRacks, excludeBookies, predicate, ensemble,
+                        fallbackToRandom);
+            }
+        }
+    }
+
+    @Override
+    public void handleBookiesThatLeft(Set<BookieId> leftBookies) {
         super.handleBookiesThatLeft(leftBookies);
         if (null != slave) {
             slave.handleBookiesThatLeft(leftBookies);
@@ -188,7 +245,7 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
     }
 
     @Override
-    public void handleBookiesThatJoined(Set<BookieSocketAddress> joinedBookies) {
+    public void handleBookiesThatJoined(Set<BookieId> joinedBookies) {
         super.handleBookiesThatJoined(joinedBookies);
         if (null != slave) {
             slave.handleBookiesThatJoined(joinedBookies);

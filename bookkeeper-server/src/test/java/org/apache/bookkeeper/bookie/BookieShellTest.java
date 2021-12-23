@@ -19,21 +19,38 @@
 
 package org.apache.bookkeeper.bookie;
 
+<<<<<<< HEAD
 import static com.google.common.base.Charsets.UTF_8;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+=======
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+<<<<<<< HEAD
+=======
+import static org.powermock.api.mockito.PowerMockito.spy;
+import static org.powermock.api.mockito.PowerMockito.verifyNew;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.powermock.api.mockito.PowerMockito.whenNew;
 
 import com.google.common.collect.Maps;
 import java.util.Set;
 import java.util.SortedMap;
+<<<<<<< HEAD
 import org.apache.bookkeeper.bookie.BookieShell.MyCommand;
 import org.apache.bookkeeper.bookie.BookieShell.RecoverCmd;
 import org.apache.bookkeeper.client.BookKeeperAdmin;
@@ -43,6 +60,26 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.discover.RegistrationManager.RegistrationListener;
 import org.apache.bookkeeper.discover.ZKRegistrationManager;
 import org.apache.bookkeeper.stats.NullStatsLogger;
+=======
+import java.util.function.Function;
+import org.apache.bookkeeper.bookie.BookieShell.MyCommand;
+import org.apache.bookkeeper.bookie.BookieShell.RecoverCmd;
+import org.apache.bookkeeper.client.BookKeeperAdmin;
+import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.discover.RegistrationManager;
+import org.apache.bookkeeper.meta.MetadataBookieDriver;
+import org.apache.bookkeeper.meta.MetadataDrivers;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.tools.cli.commands.bookie.LastMarkCommand;
+import org.apache.bookkeeper.tools.cli.commands.bookies.ListBookiesCommand;
+import org.apache.bookkeeper.tools.cli.commands.bookies.RecoverCommand;
+import org.apache.bookkeeper.tools.cli.commands.client.SimpleTestCommand;
+import org.apache.bookkeeper.tools.framework.CliFlags;
+import org.apache.bookkeeper.util.EntryFormatter;
+import org.apache.bookkeeper.util.LedgerIdFormatter;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.versioning.LongVersion;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.bookkeeper.versioning.Versioned;
@@ -61,12 +98,17 @@ import org.powermock.modules.junit4.PowerMockRunner;
  * Unit test for {@link BookieShell}.
  */
 @RunWith(PowerMockRunner.class)
+<<<<<<< HEAD
 @PrepareForTest(BookieShell.class)
+=======
+@PrepareForTest({ BookieShell.class, MetadataDrivers.class, RecoverCommand.class })
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 public class BookieShellTest {
 
     private ClientConfiguration clientConf;
     private BookieShell shell;
     private BookKeeperAdmin admin;
+<<<<<<< HEAD
     private ZKRegistrationManager rm;
     private Cookie cookie;
     private Version version;
@@ -74,27 +116,108 @@ public class BookieShellTest {
     @Before
     public void setup() throws Exception {
         this.shell = new BookieShell();
+=======
+    private RegistrationManager rm;
+    private MetadataBookieDriver driver;
+    private Cookie cookie;
+    private Version version;
+
+    // commands
+    private LastMarkCommand mockLastMarkCommand;
+    private SimpleTestCommand.Flags mockSimpleTestFlags;
+    private SimpleTestCommand mockSimpleTestCommand;
+    private ListBookiesCommand.Flags mockListBookiesFlags;
+    private ListBookiesCommand mockListBookiesCommand;
+
+    @Before
+    public void setup() throws Exception {
+        // setup the required mocks before constructing bookie shell.
+        this.mockLastMarkCommand = mock(LastMarkCommand.class);
+        whenNew(LastMarkCommand.class)
+            .withNoArguments()
+            .thenReturn(mockLastMarkCommand);
+
+        // setup the mocks for simple test command
+        this.mockSimpleTestFlags = spy(new SimpleTestCommand.Flags());
+        whenNew(SimpleTestCommand.Flags.class)
+            .withNoArguments()
+            .thenReturn(mockSimpleTestFlags);
+
+        this.mockSimpleTestCommand = spy(new SimpleTestCommand());
+        doReturn(true).when(mockSimpleTestCommand)
+            .apply(any(ServerConfiguration.class), any(SimpleTestCommand.Flags.class));
+        whenNew(SimpleTestCommand.class)
+            .withParameterTypes(SimpleTestCommand.Flags.class)
+            .withArguments(mockSimpleTestFlags)
+            .thenReturn(mockSimpleTestCommand);
+
+        // setup the mocks for list bookies command
+        this.mockListBookiesFlags = spy(new ListBookiesCommand.Flags());
+        whenNew(ListBookiesCommand.Flags.class)
+            .withNoArguments()
+            .thenReturn(mockListBookiesFlags);
+
+        this.mockListBookiesCommand = spy(new ListBookiesCommand());
+        doReturn(true).when(mockListBookiesCommand)
+            .apply(any(ServerConfiguration.class), any(ListBookiesCommand.Flags.class));
+        whenNew(ListBookiesCommand.class)
+            .withParameterTypes(ListBookiesCommand.Flags.class)
+            .withArguments(mockListBookiesFlags)
+            .thenReturn(mockListBookiesCommand);
+
+        // construct the bookie shell.
+        this.shell = new BookieShell(LedgerIdFormatter.LONG_LEDGERID_FORMATTER, EntryFormatter.STRING_FORMATTER);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         this.admin = PowerMockito.mock(BookKeeperAdmin.class);
         whenNew(BookKeeperAdmin.class)
             .withParameterTypes(ClientConfiguration.class)
             .withArguments(any(ClientConfiguration.class))
             .thenReturn(admin);
         this.clientConf = new ClientConfiguration();
+<<<<<<< HEAD
         when(admin.getConf()).thenReturn(this.clientConf);
         this.rm = PowerMockito.mock(ZKRegistrationManager.class);
         this.cookie = Cookie.newBuilder()
             .setBookieHost("127.0.0.1:3181")
+=======
+        this.clientConf.setMetadataServiceUri("zk://127.0.0.1/path/to/ledgers");
+        when(admin.getConf()).thenReturn(this.clientConf);
+        this.rm = PowerMockito.mock(RegistrationManager.class);
+        this.cookie = Cookie.newBuilder()
+            .setBookieId("127.0.0.1:3181")
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             .setInstanceId("xyz")
             .setJournalDirs("/path/to/journal/dir")
             .setLedgerDirs("/path/to/journal/dir")
             .setLayoutVersion(Cookie.CURRENT_COOKIE_LAYOUT_VERSION)
             .build();
         this.version = new LongVersion(1L);
+<<<<<<< HEAD
         when(rm.readCookie(anyString()))
             .thenReturn(new Versioned<>(cookie.toString().getBytes(UTF_8), version));
         whenNew(ZKRegistrationManager.class)
             .withNoArguments()
             .thenReturn(rm);
+=======
+        when(rm.readCookie(any(BookieId.class)))
+            .thenReturn(new Versioned<>(cookie.toString().getBytes(UTF_8), version));
+
+        this.driver = mock(MetadataBookieDriver.class);
+        when(driver.getRegistrationManager())
+            .thenReturn(rm);
+
+        PowerMockito.mockStatic(MetadataDrivers.class);
+        PowerMockito.doAnswer(invocationOnMock -> {
+            Function<RegistrationManager, Object> function = invocationOnMock.getArgument(1);
+            function.apply(rm);
+            return null;
+        }).when(
+            MetadataDrivers.class,
+            "runFunctionWithRegistrationManager",
+            any(ServerConfiguration.class),
+            any(Function.class)
+        );
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     private static CommandLine parseCommandLine(MyCommand cmd, String... args) throws ParseException {
@@ -118,7 +241,11 @@ public class BookieShellTest {
     @Test
     public void testRecoverCmdInvalidBookieAddress() throws Exception {
         RecoverCmd cmd = (RecoverCmd) shell.commands.get("recover");
+<<<<<<< HEAD
         CommandLine cmdLine = parseCommandLine(cmd, "127.0.0.1");
+=======
+        CommandLine cmdLine = parseCommandLine(cmd, "non.valid$$bookie.id");
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         assertEquals(-1, cmd.runCmd(cmdLine));
         PowerMockito.verifyNew(BookKeeperAdmin.class, never()).withArguments(any(ClientConfiguration.class));
     }
@@ -196,6 +323,7 @@ public class BookieShellTest {
             .recoverBookieData(eq(ledgerId), any(Set.class), eq(dryrun), eq(skipOpenLedgers));
         verify(admin, times(1)).close();
         if (removeCookies) {
+<<<<<<< HEAD
             PowerMockito
                 .verifyNew(ZKRegistrationManager.class, times(1))
                 .withNoArguments();
@@ -207,6 +335,15 @@ public class BookieShellTest {
             PowerMockito
                 .verifyNew(ZKRegistrationManager.class, never())
                 .withNoArguments();
+=======
+            PowerMockito.verifyStatic(MetadataDrivers.class);
+            MetadataDrivers.runFunctionWithRegistrationManager(any(ServerConfiguration.class), any(Function.class));
+            verify(rm, times(1)).readCookie(any(BookieId.class));
+            verify(rm, times(1)).removeCookie(any(BookieId.class), eq(version));
+        } else {
+            verify(rm, times(0)).readCookie(any(BookieId.class));
+            verify(rm, times(0)).removeCookie(any(BookieId.class), eq(version));
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         }
     }
 
@@ -265,6 +402,7 @@ public class BookieShellTest {
             .recoverBookieData(any(Set.class), eq(dryrun), eq(skipOpenLedgers));
         verify(admin, times(1)).close();
         if (removeCookies) {
+<<<<<<< HEAD
             PowerMockito
                 .verifyNew(ZKRegistrationManager.class, times(1))
                 .withNoArguments();
@@ -278,4 +416,122 @@ public class BookieShellTest {
                 .withNoArguments();
         }
     }
+=======
+            PowerMockito.verifyStatic(MetadataDrivers.class);
+            MetadataDrivers.runFunctionWithRegistrationManager(any(ServerConfiguration.class), any(Function.class));
+            verify(rm, times(1)).readCookie(any(BookieId.class));
+            verify(rm, times(1)).removeCookie(any(BookieId.class), eq(version));
+        } else {
+            verify(rm, times(0)).readCookie(any(BookieId.class));
+            verify(rm, times(0)).removeCookie(any(BookieId.class), eq(version));
+        }
+    }
+
+    @Test
+    public void testLastMarkCmd() throws Exception {
+        shell.run(new String[] { "lastmark"});
+        verifyNew(LastMarkCommand.class, times(1)).withNoArguments();
+        verify(mockLastMarkCommand, times(1))
+            .apply(same(shell.bkConf), any(CliFlags.class));
+    }
+
+    @Test
+    public void testSimpleTestCmd() throws Exception {
+        shell.run(new String[] {
+            "simpletest",
+            "-e", "10",
+            "-w", "5",
+            "-a", "3",
+            "-n", "200"
+        });
+        verifyNew(SimpleTestCommand.class, times(1))
+            .withArguments(same(mockSimpleTestFlags));
+        verify(mockSimpleTestCommand, times(1))
+            .apply(same(shell.bkConf), same(mockSimpleTestFlags));
+        verify(mockSimpleTestFlags, times(1)).ensembleSize(eq(10));
+        verify(mockSimpleTestFlags, times(1)).writeQuorumSize(eq(5));
+        verify(mockSimpleTestFlags, times(1)).ackQuorumSize(eq(3));
+        verify(mockSimpleTestFlags, times(1)).numEntries(eq(200));
+    }
+
+    @Test
+    public void testListBookiesCmdNoArgs() throws Exception {
+        assertEquals(1, shell.run(new String[] {
+            "listbookies"
+        }));
+        verifyNew(ListBookiesCommand.class, times(0)).withNoArguments();
+    }
+
+    @Test
+    public void testListBookiesCmdConflictArgs() throws Exception {
+        assertEquals(1, shell.run(new String[] {
+            "listbookies", "-rw", "-ro"
+        }));
+        verifyNew(ListBookiesCommand.class, times(0)).withNoArguments();
+    }
+
+    @Test
+    public void testListBookiesCmdReadOnly() throws Exception {
+        assertEquals(0, shell.run(new String[] {
+            "listbookies", "-ro"
+        }));
+        verifyNew(ListBookiesCommand.class, times(1))
+            .withArguments(same(mockListBookiesFlags));
+        verify(mockListBookiesCommand, times(1))
+            .apply(same(shell.bkConf), same(mockListBookiesFlags));
+        verify(mockListBookiesFlags, times(1)).readonly(true);
+        verify(mockListBookiesFlags, times(1)).readwrite(false);
+        verify(mockListBookiesFlags, times(1)).all(false);
+    }
+
+    @Test
+    public void testListBookiesCmdReadWrite() throws Exception {
+        assertEquals(0, shell.run(new String[] {
+            "listbookies", "-rw"
+        }));
+        verifyNew(ListBookiesCommand.class, times(1))
+            .withArguments(same(mockListBookiesFlags));
+        verify(mockListBookiesCommand, times(1))
+            .apply(same(shell.bkConf), same(mockListBookiesFlags));
+        verify(mockListBookiesFlags, times(1)).readonly(false);
+        verify(mockListBookiesFlags, times(1)).readwrite(true);
+        verify(mockListBookiesFlags, times(1)).all(false);
+    }
+
+    @Test
+    public void testListBookiesCmdAll() throws Exception {
+        assertEquals(0, shell.run(new String[] {
+            "listbookies", "-a"
+        }));
+        verifyNew(ListBookiesCommand.class, times(1))
+            .withArguments(same(mockListBookiesFlags));
+        verify(mockListBookiesCommand, times(1))
+            .apply(same(shell.bkConf), same(mockListBookiesFlags));
+        verify(mockListBookiesFlags, times(1)).readonly(false);
+        verify(mockListBookiesFlags, times(1)).readwrite(false);
+        verify(mockListBookiesFlags, times(1)).all(true);
+    }
+
+    @Test
+    public void testForceAuditChecksWithNoArgs() throws Exception {
+        assertEquals(-1, shell.run(new String[] {
+                "forceauditchecks"
+        }));
+    }
+
+    @Test
+    public void testForceAuditChecksWithSomeArgs() throws Exception {
+        assertEquals(0, shell.run(new String[] {
+                "forceauditchecks", "-calc"
+        }));
+    }
+
+    @Test
+    public void testForceAuditChecksWithAllArgs() throws Exception {
+        assertEquals(0, shell.run(new String[] {
+                "forceauditchecks", "-calc", "-rc", "-ppc"
+        }));
+    }
+
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

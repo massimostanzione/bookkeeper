@@ -19,7 +19,11 @@
 
 package org.apache.bookkeeper.client.api;
 
+<<<<<<< HEAD
 import static com.google.common.base.Charsets.UTF_8;
+=======
+import static java.nio.charset.StandardCharsets.UTF_8;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.junit.Assert.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -59,47 +63,78 @@ public class WriteAdvHandleTest {
             ByteBuf buf = invocationOnMock.getArgument(1);
             entryQueue.add(buf);
             return FutureUtils.value(-1L);
+<<<<<<< HEAD
         }).when(handle).write(anyLong(), any(ByteBuf.class));
         when(handle.write(anyLong(), any(byte[].class))).thenCallRealMethod();
         when(handle.write(anyLong(), any(byte[].class), anyInt(), anyInt())).thenCallRealMethod();
         when(handle.write(anyLong(), any(ByteBuffer.class))).thenCallRealMethod();
+=======
+        }).when(handle).writeAsync(anyLong(), any(ByteBuf.class));
+        when(handle.writeAsync(anyLong(), any(byte[].class))).thenCallRealMethod();
+        when(handle.writeAsync(anyLong(), any(byte[].class), anyInt(), anyInt())).thenCallRealMethod();
+        when(handle.writeAsync(anyLong(), any(ByteBuffer.class))).thenCallRealMethod();
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @Test
     public void testAppendBytes() throws Exception {
         byte[] testData = runtime.getMethodName().getBytes(UTF_8);
+<<<<<<< HEAD
         handle.write(entryId, testData);
+=======
+        handle.writeAsync(entryId, testData);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
         ByteBuf buffer = entryQueue.take();
         byte[] bufferData = ByteBufUtil.getBytes(buffer);
         assertArrayEquals(testData, bufferData);
+<<<<<<< HEAD
         verify(handle, times(1)).write(eq(entryId), any(ByteBuf.class));
+=======
+        verify(handle, times(1)).writeAsync(eq(entryId), any(ByteBuf.class));
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @Test
     public void testAppendBytes2() throws Exception {
         byte[] testData = runtime.getMethodName().getBytes(UTF_8);
+<<<<<<< HEAD
         handle.write(entryId, testData, 1, testData.length / 2);
+=======
+        handle.writeAsync(entryId, testData, 1, testData.length / 2);
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         byte[] expectedData = new byte[testData.length / 2];
         System.arraycopy(testData, 1, expectedData, 0, testData.length / 2);
 
         ByteBuf buffer = entryQueue.take();
         byte[] bufferData = ByteBufUtil.getBytes(buffer);
         assertArrayEquals(expectedData, bufferData);
+<<<<<<< HEAD
         verify(handle, times(1)).write(eq(entryId), any(ByteBuf.class));
+=======
+        verify(handle, times(1)).writeAsync(eq(entryId), any(ByteBuf.class));
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @Test
     public void testAppendByteBuffer() throws Exception {
         byte[] testData = runtime.getMethodName().getBytes(UTF_8);
+<<<<<<< HEAD
         handle.write(entryId, ByteBuffer.wrap(testData, 1, testData.length / 2));
+=======
+        handle.writeAsync(entryId, ByteBuffer.wrap(testData, 1, testData.length / 2));
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         byte[] expectedData = new byte[testData.length / 2];
         System.arraycopy(testData, 1, expectedData, 0, testData.length / 2);
 
         ByteBuf buffer = entryQueue.take();
         byte[] bufferData = ByteBufUtil.getBytes(buffer);
         assertArrayEquals(expectedData, bufferData);
+<<<<<<< HEAD
         verify(handle, times(1)).write(eq(entryId), any(ByteBuf.class));
+=======
+        verify(handle, times(1)).writeAsync(eq(entryId), any(ByteBuf.class));
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
 }

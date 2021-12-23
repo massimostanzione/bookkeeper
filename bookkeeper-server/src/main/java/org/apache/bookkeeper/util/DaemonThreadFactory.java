@@ -18,9 +18,12 @@
 
 package org.apache.bookkeeper.util;
 
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
+/**
+ * Daemon thread factory.
+ */
 public class DaemonThreadFactory implements ThreadFactory {
     private ThreadFactory defaultThreadFactory = Executors.defaultThreadFactory();
     private int priority = Thread.NORM_PRIORITY;
@@ -30,6 +33,7 @@ public class DaemonThreadFactory implements ThreadFactory {
         assert priority >= Thread.MIN_PRIORITY && priority <= Thread.MAX_PRIORITY;
         this.priority = priority;
     }
+    @Override
     public Thread newThread(Runnable r) {
         Thread thread = defaultThreadFactory.newThread(r);
         thread.setDaemon(true);

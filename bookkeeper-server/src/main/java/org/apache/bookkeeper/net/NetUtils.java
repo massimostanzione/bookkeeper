@@ -17,6 +17,9 @@
  */
 package org.apache.bookkeeper.net;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -24,10 +27,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Network Utilities.
+ */
 public class NetUtils {
     private static final Logger logger = LoggerFactory.getLogger(NetUtils.class);
 
@@ -63,20 +68,26 @@ public class NetUtils {
         return hostNames;
     }
 
-    public static String resolveNetworkLocation(DNSToSwitchMapping dnsResolver, InetSocketAddress addr) {
+    public static String resolveNetworkLocation(DNSToSwitchMapping dnsResolver,
+                                                BookieSocketAddress addr) {
         List<String> names = new ArrayList<String>(1);
 
+        InetSocketAddress inetSocketAddress = addr.getSocketAddress();
         if (dnsResolver.useHostName()) {
             names.add(addr.getHostName());
-        }
-        else {
-            names.add(addr.getAddress().getHostAddress());
+        } else {
+            InetAddress inetAddress = inetSocketAddress.getAddress();
+            if (null == inetAddress) {
+                names.add(addr.getHostName());
+            } else {
+                names.add(inetAddress.getHostAddress());
+            }
         }
 
         // resolve network addresses
         List<String> rNames = dnsResolver.resolve(names);
-        Preconditions.checkNotNull(rNames, "DNS Resolver should not return null response.");
-        Preconditions.checkState(rNames.size() == 1, "Expected exactly one element");
+        checkNotNull(rNames, "DNS Resolver should not return null response.");
+        checkState(rNames.size() == 1, "Expected exactly one element");
 
         return rNames.get(0);
     }

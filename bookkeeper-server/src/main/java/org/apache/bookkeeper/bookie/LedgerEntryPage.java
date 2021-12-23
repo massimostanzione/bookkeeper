@@ -23,6 +23,8 @@ package org.apache.bookkeeper.bookie;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.NoSuchElementException;
+import java.util.PrimitiveIterator.OfLong;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.bookkeeper.proto.BookieProtocol;
 import org.apache.bookkeeper.util.ZeroBuffer;
@@ -33,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * This is a page in the LedgerCache. It holds the locations
  * (entrylogfile, offset) for entry ids.
  */
-public class LedgerEntryPage {
+public class LedgerEntryPage implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LedgerEntryPage.class);
 
@@ -47,6 +49,7 @@ public class LedgerEntryPage {
     private final AtomicInteger version = new AtomicInteger(0);
     private volatile int last = -1; // Last update position
     private final LEPStateChangeCallback callback;
+    private boolean deleted;
 
     public static int getIndexEntrySize() {
         return indexEntrySize;
@@ -75,11 +78,20 @@ public class LedgerEntryPage {
         entryKey = new EntryKey(-1, BookieProtocol.INVALID_ENTRY_ID);
         clean = true;
         useCount.set(0);
+        deleted = false;
         if (null != this.callback) {
             callback.onResetInUse(this);
         }
     }
 
+    public void markDeleted() {
+        deleted = true;
+        version.incrementAndGet();
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
 
     @Override
     public String toString() {
@@ -187,14 +199,14 @@ public class LedgerEntryPage {
                     + " tried to get " + page.capacity() + " from position "
                     + getFirstEntryPosition() + " still need " + page.remaining(), sre);
         } catch (IllegalArgumentException iae) {
-            LOG.error("IllegalArgumentException when trying to read ledger {} from position {}"
-                , new Object[]{getLedger(), getFirstEntryPosition(), iae});
+            LOG.error("IllegalArgumentException when trying to read ledger {} from position {}",
+                    getLedger(), getFirstEntryPosition(), iae);
             throw iae;
         }
         // make sure we don't include partial index entry
         if (page.remaining() != 0) {
             LOG.info("Short page read of ledger {} : tried to read {} bytes from position {}, but only {} bytes read.",
-                     new Object[] { getLedger(), page.capacity(), getFirstEntryPosition(), page.position() });
+                    getLedger(), page.capacity(), getFirstEntryPosition(), page.position());
             if (page.position() % indexEntrySize != 0) {
                 int partialIndexEntryStart = page.position() - page.position() % indexEntrySize;
                 page.putLong(partialIndexEntryStart, 0L);
@@ -207,14 +219,15 @@ public class LedgerEntryPage {
     public ByteBuffer getPageToWrite() {
         checkPage();
         page.clear();
-        return page;
+        // Different callers to this method should be able to reasonably expect independent read pointers
+        return page.duplicate();
     }
 
     long getLedger() {
         return entryKey.getLedgerId();
     }
 
-    int getVersion() {
+    public int getVersion() {
         return version.get();
     }
 
@@ -260,5 +273,60 @@ public class LedgerEntryPage {
             int index = getLastEntryIndex();
             return index >= 0 ? (index + entryKey.getEntryId()) : 0;
         }
+    }
+
+    /**
+     * Interface for getEntries to propagate entry, pos pairs.
+     */
+    public interface EntryVisitor {
+        boolean visit(long entry, long pos) throws Exception;
+    }
+
+    /**
+     * Iterates over non-empty entry mappings.
+     *
+     * @param vis Consumer for entry position pairs.
+     * @throws Exception
+     */
+    public void getEntries(EntryVisitor vis) throws Exception {
+        // process a page
+        for (int i = 0; i < entriesPerPage; i++) {
+            long offset = getOffset(i * 8);
+            if (offset != 0) {
+                if (!vis.visit(getFirstEntry() + i, offset)) {
+                    return;
+                }
+            }
+        }
+    }
+
+    public OfLong getEntriesIterator() {
+        return new OfLong() {
+            long firstEntry = getFirstEntry();
+            int curDiffEntry = 0;
+
+            @Override
+            public boolean hasNext() {
+                while ((curDiffEntry < entriesPerPage) && (getOffset(curDiffEntry * 8) == 0)) {
+                    curDiffEntry++;
+                }
+                return (curDiffEntry != entriesPerPage);
+            }
+
+            @Override
+            public long nextLong() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                long nextEntry = firstEntry + curDiffEntry;
+                curDiffEntry++;
+                return nextEntry;
+            }
+        };
+    }
+
+    @Override
+    public void close() throws Exception {
+        releasePage();
     }
 }

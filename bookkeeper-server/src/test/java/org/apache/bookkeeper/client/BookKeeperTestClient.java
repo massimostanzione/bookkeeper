@@ -1,5 +1,3 @@
-package org.apache.bookkeeper.client;
-
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -20,8 +18,12 @@ package org.apache.bookkeeper.client;
  * under the License.
  *
  */
+package org.apache.bookkeeper.client;
+
+import io.netty.buffer.UnpooledByteBufAllocator;
 
 import java.io.IOException;
+<<<<<<< HEAD
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.CompletableFuture;
@@ -29,8 +31,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.discover.RegistrationClient.RegistrationListener;
 import org.apache.bookkeeper.net.BookieSocketAddress;
+=======
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+
+import lombok.extern.slf4j.Slf4j;
+
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.discover.RegistrationClient.RegistrationListener;
+import org.apache.bookkeeper.net.BookieId;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.proto.BookieClient;
-import org.apache.zookeeper.KeeperException;
+import org.apache.bookkeeper.stats.NullStatsLogger;
+import org.apache.bookkeeper.test.TestStatsProvider;
 import org.apache.zookeeper.ZooKeeper;
 
 /**
@@ -39,9 +53,19 @@ import org.apache.zookeeper.ZooKeeper;
  */
 @Slf4j
 public class BookKeeperTestClient extends BookKeeper {
-    public BookKeeperTestClient(ClientConfiguration conf)
+    TestStatsProvider statsProvider;
+
+    public BookKeeperTestClient(ClientConfiguration conf, TestStatsProvider statsProvider)
             throws IOException, InterruptedException, BKException {
-        super(conf);
+        super(conf, null, null, new UnpooledByteBufAllocator(false),
+              statsProvider == null ? NullStatsLogger.INSTANCE : statsProvider.getStatsLogger(""),
+              null, null, null);
+        this.statsProvider = statsProvider;
+    }
+
+    public BookKeeperTestClient(ClientConfiguration conf)
+            throws InterruptedException, BKException, IOException {
+        this(conf, null);
     }
 
     public ZooKeeper getZkHandle() {
@@ -56,12 +80,20 @@ public class BookKeeperTestClient extends BookKeeper {
         return bookieClient;
     }
 
+<<<<<<< HEAD
     public Future<?> waitForReadOnlyBookie(BookieSocketAddress b)
+=======
+    public Future<?> waitForReadOnlyBookie(BookieId b)
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             throws Exception {
         return waitForBookieInSet(b, false);
     }
 
+<<<<<<< HEAD
     public Future<?> waitForWritableBookie(BookieSocketAddress b)
+=======
+    public Future<?> waitForWritableBookie(BookieId b)
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             throws Exception {
         return waitForBookieInSet(b, true);
     }
@@ -71,8 +103,13 @@ public class BookKeeperTestClient extends BookKeeper {
      * or the read only set of bookies. Also ensure that it doesn't exist
      * in the other set before completing.
      */
+<<<<<<< HEAD
     private Future<?> waitForBookieInSet(BookieSocketAddress b,
                                                        boolean writable) {
+=======
+    private Future<?> waitForBookieInSet(BookieId b,
+                                                       boolean writable) throws Exception {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         log.info("Wait for {} to become {}",
                  b, writable ? "writable" : "readonly");
 
@@ -92,8 +129,41 @@ public class BookKeeperTestClient extends BookKeeper {
             }
         };
 
+<<<<<<< HEAD
         regClient.watchWritableBookies(writableListener);
         regClient.watchReadOnlyBookies(readOnlyListener);
         return CompletableFuture.allOf(writableFuture, readOnlyFuture);
+=======
+        getMetadataClientDriver().getRegistrationClient().watchWritableBookies(writableListener);
+        getMetadataClientDriver().getRegistrationClient().watchReadOnlyBookies(readOnlyListener);
+
+        if (writable) {
+            return writableFuture
+                .thenCompose(ignored -> getMetadataClientDriver().getRegistrationClient().getReadOnlyBookies())
+                .thenCompose(readonlyBookies -> {
+                    if (readonlyBookies.getValue().contains(b)) {
+                        // if the bookie still shows up at readonly path, wait for it to disappear
+                        return readOnlyFuture;
+                    } else {
+                        return FutureUtils.Void();
+                    }
+                });
+        } else {
+            return readOnlyFuture
+                .thenCompose(ignored -> getMetadataClientDriver().getRegistrationClient().getWritableBookies())
+                .thenCompose(writableBookies -> {
+                    if (writableBookies.getValue().contains(b)) {
+                        // if the bookie still shows up at writable path, wait for it to disappear
+                        return writableFuture;
+                    } else {
+                        return FutureUtils.Void();
+                    }
+                });
+        }
+    }
+
+    public TestStatsProvider getTestStatsProvider() {
+        return statsProvider;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 }

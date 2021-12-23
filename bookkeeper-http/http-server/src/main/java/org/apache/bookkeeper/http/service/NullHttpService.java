@@ -20,12 +20,19 @@
  */
 package org.apache.bookkeeper.http.service;
 
+import org.apache.bookkeeper.http.HttpServer;
+
 /**
- * HttpEndpointService that return empty content.
+ * HttpEndpointService that return fixed content.
  */
 public class NullHttpService implements HttpEndpointService {
+    public static final String CONTENT = "NullHttpService\n";
+
     @Override
     public HttpServiceResponse handle(HttpServiceRequest request) {
-        return new HttpServiceResponse();
+        if (request.getBody() != null) {
+            return new HttpServiceResponse(request.getBody(), HttpServer.StatusCode.OK);
+        }
+        return new HttpServiceResponse(CONTENT, HttpServer.StatusCode.OK);
     }
 }

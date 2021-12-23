@@ -21,7 +21,11 @@
   <parent>
     <artifactId>bookkeeper</artifactId>
     <groupId>org.apache.bookkeeper</groupId>
+<<<<<<< HEAD
     <version>4.6.0</version>
+=======
+    <version>4.15.0-SNAPSHOT</version>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
   </parent>
   <groupId>org.apache.bookkeeper</groupId>
   <artifactId>bookkeeper-benchmark</artifactId>
@@ -32,46 +36,19 @@
   <build>
     <plugins>
       <plugin>
+<<<<<<< HEAD
       	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-surefire-plugin</artifactId>
 	<configuration>
+=======
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
           <systemPropertyVariables>
             <test.latency.file>target/latencyDump.dat</test.latency.file>
           </systemPropertyVariables>
-	</configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>${maven-checkstyle-plugin.version}</version>
-        <dependencies>
-          <dependency>
-            <groupId>com.puppycrawl.tools</groupId>
-            <artifactId>checkstyle</artifactId>
-            <version>${puppycrawl.checkstyle.version}</version>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.bookkeeper</groupId>
-            <artifactId>buildtools</artifactId>
-            <version>${project.parent.version}</version>
-          </dependency>
-        </dependencies>
-        <configuration>
-          <configLocation>bookkeeper/checkstyle.xml</configLocation>
-          <suppressionsLocation>bookkeeper/suppressions.xml</suppressionsLocation>
-          <encoding>UTF-8</encoding>
-          <consoleOutput>true</consoleOutput>
-          <failsOnError>true</failsOnError>
         </configuration>
-        <executions>
-          <execution>
-            <id>checkstyle</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
@@ -79,41 +56,46 @@
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
-      <version>${zookeeper.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
+<<<<<<< HEAD
+=======
+       <!-- needed by ZooKeeper server -->
+       <groupId>org.xerial.snappy</groupId>
+       <artifactId>snappy-java</artifactId>
+       <scope>test</scope>
+    </dependency>
+    <dependency>
+        <!-- needed by ZooKeeper server -->
+       <groupId>io.dropwizard.metrics</groupId>
+       <artifactId>metrics-core</artifactId>
+       <scope>test</scope>
+    </dependency>
+    <dependency>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
       <groupId>org.apache.bookkeeper</groupId>
       <artifactId>bookkeeper-server</artifactId>
-      <version>${project.parent.version}</version>
+      <version>${project.version}</version>
       <scope>compile</scope>
-      <type>jar</type>
     </dependency>
     <dependency>
       <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>bookkeeper-server</artifactId>
-      <version>${project.parent.version}</version>
-      <scope>test</scope>
+      <artifactId>bookkeeper-common</artifactId>
+      <version>${project.version}</version>
       <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
+<<<<<<< HEAD
+=======
+    <dependency>
+      <groupId>org.apache.bookkeeper</groupId>
+      <artifactId>bookkeeper-server</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
   </dependencies>
 </project>

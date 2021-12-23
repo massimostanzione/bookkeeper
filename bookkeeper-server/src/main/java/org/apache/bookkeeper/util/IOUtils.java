@@ -43,13 +43,26 @@ public class IOUtils {
      */
     public static void close(Logger log, java.io.Closeable... closeables) {
         for (java.io.Closeable c : closeables) {
-            if (c != null) {
-                try {
-                    c.close();
-                } catch (IOException e) {
-                    if (log != null && log.isDebugEnabled()) {
-                        log.debug("Exception in closing " + c, e);
-                    }
+            close(log, c);
+        }
+    }
+
+    /**
+     * Close the Closeable object and <b>ignore</b> any {@link IOException} or
+     * null pointers. Must only be used for cleanup in exception handlers.
+     *
+     * @param log
+     *            the log to record problems to at debug level. Can be null.
+     * @param closeable
+     *            the objects to close
+     */
+    public static void close(Logger log, java.io.Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                if (log != null && log.isDebugEnabled()) {
+                    log.debug("Exception in closing " + closeable, e);
                 }
             }
         }
@@ -116,7 +129,25 @@ public class IOUtils {
      */
     public static File createTempDir(String prefix, String suffix)
             throws IOException {
-        File tmpDir = File.createTempFile(prefix, suffix);
+        return createTempDir(prefix, suffix, null);
+    }
+
+    /**
+     * Create a temp directory with given <i>prefix</i> and <i>suffix</i> in the specified <i>dir</i>.
+     *
+     * @param prefix
+     *          prefix of the directory name
+     * @param suffix
+     *          suffix of the directory name
+     * @param dir
+     *          The directory in which the file is to be created,
+     *          or null if the default temporary-file directory is to be used
+     * @return directory created
+     * @throws IOException
+     */
+    public static File createTempDir(String prefix, String suffix, File dir)
+            throws IOException {
+        File tmpDir = File.createTempFile(prefix, suffix, dir);
         if (!tmpDir.delete()) {
             throw new IOException("Couldn't delete directory " + tmpDir);
         }

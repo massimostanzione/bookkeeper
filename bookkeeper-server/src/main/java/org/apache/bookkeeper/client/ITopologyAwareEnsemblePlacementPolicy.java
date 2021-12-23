@@ -17,13 +17,17 @@
  */
 package org.apache.bookkeeper.client;
 
+import java.util.List;
+import java.util.Set;
+
+import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
+import org.apache.bookkeeper.client.ITopologyAwareEnsemblePlacementPolicy.Ensemble;
+import org.apache.bookkeeper.client.ITopologyAwareEnsemblePlacementPolicy.Predicate;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience;
 import org.apache.bookkeeper.common.annotation.InterfaceStability;
-import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieNode;
 import org.apache.bookkeeper.net.Node;
-
-import java.util.ArrayList;
-import java.util.Set;
 
 /**
  * Interface for topology aware ensemble placement policy.
@@ -39,37 +43,37 @@ public interface ITopologyAwareEnsemblePlacementPolicy<T extends Node> extends E
     /**
      * Predicate used when choosing an ensemble.
      */
-    static interface Predicate<T extends Node> {
+    interface Predicate<T extends Node> {
         boolean apply(T candidate, Ensemble<T> chosenBookies);
     }
 
     /**
      * Ensemble used to hold the result of an ensemble selected for placement.
      */
-    static interface Ensemble<T extends Node> {
+    interface Ensemble<T extends Node> {
 
         /**
          * Append the new bookie node to the ensemble only if the ensemble doesnt
-         * already contain the same bookie
+         * already contain the same bookie.
          *
          * @param node
          *          new candidate bookie node.
          * @return
          *          true if the node was added
          */
-        public boolean addNode(T node);
+        boolean addNode(T node);
 
         /**
          * @return list of addresses representing the ensemble
          */
-        public ArrayList<BookieSocketAddress> toList();
+        List<BookieId> toList();
 
         /**
-         * Validates if an ensemble is valid
+         * Validates if an ensemble is valid.
          *
          * @return true if the ensemble is valid; false otherwise
          */
-        public boolean validate();
+        boolean validate();
 
     }
 
@@ -89,11 +93,11 @@ public interface ITopologyAwareEnsemblePlacementPolicy<T extends Node> extends E
      * @return list of bookies forming the ensemble
      * @throws BKException.BKNotEnoughBookiesException
      */
-    ArrayList<BookieSocketAddress> newEnsemble(
+    PlacementResult<List<BookieId>> newEnsemble(
             int ensembleSize,
             int writeQuorumSize,
             int ackQuorumSize,
-            Set<BookieSocketAddress> excludeBookies,
+            Set<BookieId> excludeBookies,
             Ensemble<T> parentEnsemble,
             Predicate<T> parentPredicate)
             throws BKException.BKNotEnoughBookiesException;
@@ -109,14 +113,62 @@ public interface ITopologyAwareEnsemblePlacementPolicy<T extends Node> extends E
      *          predicate to apply
      * @param ensemble
      *          ensemble
+     * @param fallbackToRandom
+     *          fallbackToRandom
      * @return the selected bookie.
      * @throws BKException.BKNotEnoughBookiesException
      */
     T selectFromNetworkLocation(String networkLoc,
                                 Set<Node> excludeBookies,
                                 Predicate<T> predicate,
-                                Ensemble<T> ensemble)
+                                Ensemble<T> ensemble,
+                                boolean fallbackToRandom)
             throws BKException.BKNotEnoughBookiesException;
+
+    /**
+     * Select a node from cluster excluding excludeBookies and bookie nodes of
+     * excludeRacks. If there isn't a BookieNode excluding those racks and
+     * nodes, then if fallbackToRandom is set to true then pick a random node
+     * from cluster just excluding excludeBookies.
+     *
+     * @param excludeRacks
+     * @param excludeBookies
+     * @param predicate
+     * @param ensemble
+     * @param fallbackToRandom
+     * @return
+     * @throws BKException.BKNotEnoughBookiesException
+     */
+    T selectFromNetworkLocation(Set<String> excludeRacks,
+                                Set<Node> excludeBookies,
+                                Predicate<BookieNode> predicate,
+                                Ensemble<BookieNode> ensemble,
+                                boolean fallbackToRandom)
+            throws BKException.BKNotEnoughBookiesException;
+
+    /**
+     * Select a node from networkLoc rack excluding excludeBookies. If there
+     * isn't any node in 'networkLoc', then it will try to get a node from
+     * cluster excluding excludeRacks and excludeBookies. If fallbackToRandom is
+     * set to true then it will get a random bookie from cluster excluding
+     * excludeBookies if it couldn't find a bookie
+     *
+     * @param networkLoc
+     * @param excludeRacks
+     * @param excludeBookies
+     * @param predicate
+     * @param ensemble
+     * @param fallbackToRandom
+     * @return
+     * @throws BKNotEnoughBookiesException
+     */
+    T selectFromNetworkLocation(String networkLoc,
+                                Set<String> excludeRacks,
+                                Set<Node> excludeBookies,
+                                Predicate<BookieNode> predicate,
+                                Ensemble<BookieNode> ensemble,
+                                boolean fallbackToRandom)
+            throws BKNotEnoughBookiesException;
 
     /**
      * Handle bookies that left.
@@ -124,13 +176,20 @@ public interface ITopologyAwareEnsemblePlacementPolicy<T extends Node> extends E
      * @param leftBookies
      *          bookies that left
      */
-    void handleBookiesThatLeft(Set<BookieSocketAddress> leftBookies);
+    void handleBookiesThatLeft(Set<BookieId> leftBookies);
 
     /**
-     * Handle bookies that joined
+     * Handle bookies that joined.
      *
      * @param joinedBookies
      *          bookies that joined.
      */
-    void handleBookiesThatJoined(Set<BookieSocketAddress> joinedBookies);
+    void handleBookiesThatJoined(Set<BookieId> joinedBookies);
+
+    /**
+     * Handle rack change for the bookies.
+     *
+     * @param bookieAddressList
+     */
+    void onBookieRackChange(List<BookieId> bookieAddressList);
 }

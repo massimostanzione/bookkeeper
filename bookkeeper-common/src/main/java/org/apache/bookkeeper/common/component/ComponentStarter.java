@@ -18,8 +18,10 @@
 
 package org.apache.bookkeeper.common.component;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
+
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
 
 /**
  * Utils to start components.
@@ -30,24 +32,25 @@ public class ComponentStarter {
     static class ComponentShutdownHook implements Runnable {
 
         private final LifecycleComponent component;
-        private final CountDownLatch aliveLatch;
+        private final CompletableFuture<Void> future;
 
         ComponentShutdownHook(LifecycleComponent component,
-                              CountDownLatch aliveLatch) {
+                              CompletableFuture<Void> future) {
             this.component = component;
-            this.aliveLatch = aliveLatch;
+            this.future = future;
         }
 
         @Override
         public void run() {
-            aliveLatch.countDown();
             log.info("Closing component {} in shutdown hook.", component.getName());
             try {
                 component.close();
                 log.info("Closed component {} in shutdown hook successfully. Exiting.", component.getName());
-            } catch (Exception e) {
+                FutureUtils.complete(future, null);
+            } catch (Throwable e) {
                 log.error("Failed to close component {} in shutdown hook gracefully, Exiting anyway",
                     component.getName(), e);
+                future.completeExceptionally(e);
             }
         }
 
@@ -58,14 +61,30 @@ public class ComponentStarter {
      *
      * @param component component to start.
      */
-    public static void startComponent(LifecycleComponent component,
-                                      CountDownLatch aliveLatch) {
-        Runtime.getRuntime().addShutdownHook(new Thread(
-            new ComponentShutdownHook(component, aliveLatch), "component-shutdown-thread"));
+    public static CompletableFuture<Void> startComponent(LifecycleComponent component) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        final Thread shutdownHookThread = new Thread(
+            new ComponentShutdownHook(component, future),
+            "component-shutdown-thread"
+        );
+
+        // register a shutdown hook
+        Runtime.getRuntime().addShutdownHook(shutdownHookThread);
+
+        // register a component exception handler
+        component.setExceptionHandler((t, e) -> {
+            log.error("Triggered exceptionHandler of Component: {} because of Exception in Thread: {}",
+                    component.getName(), t, e);
+            // start the shutdown hook when an uncaught exception happen in the lifecycle component.
+            shutdownHookThread.start();
+        });
+
+        component.publishInfo(new ComponentInfoPublisher());
 
         log.info("Starting component {}.", component.getName());
         component.start();
         log.info("Started component {}.", component.getName());
+        return future;
     }
 
 }

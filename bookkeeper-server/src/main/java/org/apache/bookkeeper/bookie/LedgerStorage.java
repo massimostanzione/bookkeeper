@@ -21,11 +21,19 @@
 
 package org.apache.bookkeeper.bookie;
 
+import com.google.common.util.concurrent.RateLimiter;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+
 import java.io.IOException;
-import java.util.Observable;
-import java.util.Observer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.PrimitiveIterator;
+
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
+import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.stats.StatsLogger;
@@ -46,9 +54,17 @@ public interface LedgerStorage {
                     LedgerManager ledgerManager,
                     LedgerDirsManager ledgerDirsManager,
                     LedgerDirsManager indexDirsManager,
+<<<<<<< HEAD
                     CheckpointSource checkpointSource,
                     Checkpointer checkpointer,
                     StatsLogger statsLogger)
+=======
+                    StateManager stateManager,
+                    CheckpointSource checkpointSource,
+                    Checkpointer checkpointer,
+                    StatsLogger statsLogger,
+                    ByteBufAllocator allocator)
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             throws IOException;
 
     /**
@@ -100,7 +116,7 @@ public interface LedgerStorage {
      *
      * @return the entry id of the entry added
      */
-    long addEntry(ByteBuf entry) throws IOException;
+    long addEntry(ByteBuf entry) throws IOException, BookieException;
 
     /**
      * Read an entry from storage.
@@ -119,12 +135,24 @@ public interface LedgerStorage {
     /**
      * Wait for last add confirmed update.
      *
-     * @param previoisLAC - The threshold beyond which we would wait for the update
-     * @param observer  - Observer to notify on update
+     * @param previousLAC - The threshold beyond which we would wait for the update
+     * @param watcher  - Watcher to notify on update
      * @return
      * @throws IOException
      */
-    Observable waitForLastAddConfirmedUpdate(long ledgerId, long previoisLAC, Observer observer) throws IOException;
+    boolean waitForLastAddConfirmedUpdate(long ledgerId,
+                                          long previousLAC,
+                                          Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException;
+
+    /**
+     * Cancel a previous wait for last add confirmed update.
+     *
+     * @param ledgerId The ledger being watched.
+     * @param watcher The watcher to cancel.
+     * @throws IOException
+     */
+    void cancelWaitForLastAddConfirmedUpdate(long ledgerId,
+                                                Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException;
 
     /**
      * Flushes all data in the storage. Once this is called,
@@ -141,7 +169,6 @@ public interface LedgerStorage {
      *
      * @param checkpoint Check Point that {@link Checkpoint} proposed.
      * @throws IOException
-     * @return the checkpoint that the ledger storage finished.
      */
     void checkpoint(Checkpoint checkpoint) throws IOException;
 
@@ -165,7 +192,93 @@ public interface LedgerStorage {
      */
     void registerLedgerDeletionListener(LedgerDeletionListener listener);
 
-    void setExplicitlac(long ledgerId, ByteBuf lac) throws IOException;
+    void setExplicitLac(long ledgerId, ByteBuf lac) throws IOException;
 
-    ByteBuf getExplicitLac(long ledgerId);
+    ByteBuf getExplicitLac(long ledgerId) throws IOException;
+
+    // for testability
+    default LedgerStorage getUnderlyingLedgerStorage() {
+        return this;
+    }
+
+    /**
+     * Force trigger Garbage Collection.
+     */
+    default void forceGC() {
+        return;
+    }
+
+    /**
+     * Class for describing location of a generic inconsistency.  Implementations should
+     * ensure that detail is populated with an exception which adequately describes the
+     * nature of the problem.
+     */
+    class DetectedInconsistency {
+        private long ledgerId;
+        private long entryId;
+        private Exception detail;
+
+        DetectedInconsistency(long ledgerId, long entryId, Exception detail) {
+            this.ledgerId = ledgerId;
+            this.entryId = entryId;
+            this.detail = detail;
+        }
+
+        public long getLedgerId() {
+            return ledgerId;
+        }
+
+        public long getEntryId() {
+            return entryId;
+        }
+
+        public Exception getException() {
+            return detail;
+        }
+    }
+
+    /**
+     * Performs internal check of local storage logging any inconsistencies.
+     * @param rateLimiter Provide to rate of entry checking.  null for unlimited.
+     * @return List of inconsistencies detected
+     * @throws IOException
+     */
+    default List<DetectedInconsistency> localConsistencyCheck(Optional<RateLimiter> rateLimiter) throws IOException {
+        return new ArrayList<>();
+    }
+
+    /**
+     * Whether force triggered Garbage Collection is running or not.
+     *
+     * @return
+     *      true  -- force triggered Garbage Collection is running,
+     *      false -- force triggered Garbage Collection is not running
+     */
+    default boolean isInForceGC() {
+        return false;
+    }
+
+
+    /**
+     * Get Garbage Collection status.
+     * Since DbLedgerStorage is a list of storage instances, we should return a list.
+     */
+    default List<GarbageCollectionStatus> getGarbageCollectionStatus() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns the primitive long iterator for entries of the ledger, stored in
+     * this LedgerStorage. The returned iterator provide weakly consistent state
+     * of the ledger. It is guaranteed that entries of the ledger added to this
+     * LedgerStorage by the time this method is called will be available but
+     * modifications made after method invocation may not be available.
+     *
+     * @param ledgerId
+     *            - id of the ledger
+     * @return the list of entries of the ledger available in this
+     *         ledgerstorage.
+     * @throws Exception
+     */
+    PrimitiveIterator.OfLong getListOfEntriesOfLedger(long ledgerId) throws IOException;
 }

@@ -20,38 +20,39 @@
  */
 package org.apache.bookkeeper.client.api;
 
+import static org.apache.bookkeeper.client.api.WriteFlag.DEFERRED_SYNC;
 import static org.apache.bookkeeper.common.concurrent.FutureUtils.result;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
-
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BKException.BKClientClosedException;
-import org.apache.bookkeeper.client.BKException.BKDigestMatchException;
 import org.apache.bookkeeper.client.BKException.BKIncorrectParameterException;
-import org.apache.bookkeeper.client.BKException.BKNoSuchLedgerExistsException;
+import org.apache.bookkeeper.client.BKException.BKNoSuchLedgerExistsOnMetadataServerException;
 import org.apache.bookkeeper.client.BookKeeper;
-import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.LedgerMetadataBuilder;
 import org.apache.bookkeeper.client.MockBookKeeperTestCase;
-
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.proto.BookieProtocol;
-
 import org.junit.Test;
 
 /**
- * Unit tests of builders
+ * Unit tests of builders.
  */
 public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
 
-    private final static int ensembleSize = 3;
-    private final static int writeQuorumSize = 2;
-    private final static int ackQuorumSize = 1;
-    private final static long ledgerId = 12342L;
-    private final static Map<String, byte[]> customMetadata = new HashMap<>();
-    private final static byte[] password = new byte[3];
-    private final static byte[] entryData = new byte[32];
+    private static final int ensembleSize = 3;
+    private static final int writeQuorumSize = 2;
+    private static final int ackQuorumSize = 1;
+    private static final long ledgerId = 12342L;
+    private static final Map<String, byte[]> customMetadata = new HashMap<>();
+    private static final byte[] password = new byte[3];
+    private static final byte[] entryData = new byte[32];
+    private static final EnumSet<WriteFlag> writeFlagsDeferredSync = EnumSet.of(DEFERRED_SYNC);
 
     @Test
     public void testCreateLedger() throws Exception {
@@ -85,6 +86,14 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
         result(newCreateLedgerOp()
             .withEnsembleSize(2)
             .withWriteQuorumSize(0)
+            .withPassword(password)
+            .execute());
+    }
+
+    @Test(expected = BKIncorrectParameterException.class)
+    public void testFailNullWriteFlags() throws Exception {
+        result(newCreateLedgerOp()
+            .withWriteFlags((EnumSet<WriteFlag>) null)
             .withPassword(password)
             .execute());
     }
@@ -144,7 +153,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
     public void testFailDigestTypeNullAndAutodetectionTrue() throws Exception {
         ClientConfiguration config = new ClientConfiguration();
         config.setEnableDigestTypeAutodetection(true);
-        setBookkeeperConfig(config);
+        setBookKeeperConfig(config);
         result(newCreateLedgerOp()
             .withDigestType(null)
             .withPassword(password)
@@ -155,7 +164,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
     public void testFailDigestTypeNullAndAutodetectionFalse() throws Exception {
         ClientConfiguration config = new ClientConfiguration();
         config.setEnableDigestTypeAutodetection(false);
-        setBookkeeperConfig(config);
+        setBookKeeperConfig(config);
         result(newCreateLedgerOp()
             .withDigestType(null)
             .withPassword(password)
@@ -192,6 +201,94 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
         assertArrayEquals(password, metadata.getPassword());
     }
 
+    @Test
+    public void testDefaultWriteFlagsEmpty() throws Exception {
+        setNewGeneratedLedgerId(ledgerId);
+        WriteHandle writer = newCreateLedgerOp()
+            .withAckQuorumSize(ackQuorumSize)
+            .withEnsembleSize(ensembleSize)
+            .withPassword(password)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .execute()
+            .get();
+        assertEquals(ledgerId, writer.getId());
+        LedgerMetadata metadata = getLedgerMetadata(ledgerId);
+        assertEquals(ensembleSize, metadata.getEnsembleSize());
+        assertEquals(ackQuorumSize, metadata.getAckQuorumSize());
+        assertEquals(writeQuorumSize, metadata.getWriteQuorumSize());
+        assertArrayEquals(password, metadata.getPassword());
+        LedgerHandle lh = (LedgerHandle) writer;
+        assertEquals(WriteFlag.NONE, lh.getWriteFlags());
+    }
+
+    @Test
+    public void testCreateAdvLedgerWriteFlags() throws Exception {
+        setNewGeneratedLedgerId(ledgerId);
+        WriteAdvHandle writer = newCreateLedgerOp()
+            .withWriteFlags(writeFlagsDeferredSync)
+            .withAckQuorumSize(ackQuorumSize)
+            .withEnsembleSize(ensembleSize)
+            .withPassword(password)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .makeAdv()
+            .execute()
+            .get();
+        assertEquals(ledgerId, writer.getId());
+        LedgerMetadata metadata = getLedgerMetadata(ledgerId);
+        assertEquals(ensembleSize, metadata.getEnsembleSize());
+        assertEquals(ackQuorumSize, metadata.getAckQuorumSize());
+        assertEquals(writeQuorumSize, metadata.getWriteQuorumSize());
+        assertArrayEquals(password, metadata.getPassword());
+        LedgerHandle lh = (LedgerHandle) writer;
+        assertEquals(writeFlagsDeferredSync, lh.getWriteFlags());
+    }
+
+    @Test
+    public void testCreateLedgerWriteFlags() throws Exception {
+        setNewGeneratedLedgerId(ledgerId);
+        WriteHandle writer = newCreateLedgerOp()
+            .withWriteFlags(writeFlagsDeferredSync)
+            .withAckQuorumSize(ackQuorumSize)
+            .withEnsembleSize(ensembleSize)
+            .withPassword(password)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .execute()
+            .get();
+        assertEquals(ledgerId, writer.getId());
+        LedgerMetadata metadata = getLedgerMetadata(ledgerId);
+        assertEquals(ensembleSize, metadata.getEnsembleSize());
+        assertEquals(ackQuorumSize, metadata.getAckQuorumSize());
+        assertEquals(writeQuorumSize, metadata.getWriteQuorumSize());
+        assertArrayEquals(password, metadata.getPassword());
+        LedgerHandle lh = (LedgerHandle) writer;
+        assertEquals(writeFlagsDeferredSync, lh.getWriteFlags());
+    }
+
+    @Test
+    public void testCreateLedgerWriteFlagsVarargs() throws Exception {
+        setNewGeneratedLedgerId(ledgerId);
+        WriteHandle writer = newCreateLedgerOp()
+            .withWriteFlags(DEFERRED_SYNC)
+            .withAckQuorumSize(ackQuorumSize)
+            .withEnsembleSize(ensembleSize)
+            .withPassword(password)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .execute()
+            .get();
+        assertEquals(ledgerId, writer.getId());
+        LedgerMetadata metadata = getLedgerMetadata(ledgerId);
+        assertEquals(ensembleSize, metadata.getEnsembleSize());
+        assertEquals(ackQuorumSize, metadata.getAckQuorumSize());
+        assertEquals(writeQuorumSize, metadata.getWriteQuorumSize());
+        assertArrayEquals(password, metadata.getPassword());
+        LedgerHandle lh = (LedgerHandle) writer;
+        assertEquals(writeFlagsDeferredSync, lh.getWriteFlags());
+    }
+
     @Test(expected = BKIncorrectParameterException.class)
     public void testFailCreateAdvLedgerBadFixedLedgerIdMinus1() throws Exception {
         result(newCreateLedgerOp()
@@ -211,12 +308,12 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
         fail("shoud not be able to create a ledger with such specs");
     }
 
-    @Test(expected = BKNoSuchLedgerExistsException.class)
+    @Test(expected = BKNoSuchLedgerExistsOnMetadataServerException.class)
     public void testOpenLedgerNoId() throws Exception {
         result(newOpenLedgerOp().execute());
     }
 
-    @Test(expected = BKNoSuchLedgerExistsException.class)
+    @Test(expected = BKNoSuchLedgerExistsOnMetadataServerException.class)
     public void testOpenLedgerBadId() throws Exception {
         result(newOpenLedgerOp()
             .withPassword(password)
@@ -239,10 +336,10 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
             writeQuorumSize, ackQuorumSize, password, customMetadata);
         registerMockLedgerMetadata(ledgerId, ledgerMetadata);
 
-        ledgerMetadata.getEnsembles().values().forEach(bookieAddressList -> {
+        ledgerMetadata.getAllEnsembles().values().forEach(bookieAddressList -> {
             bookieAddressList.forEach(bookieAddress -> {
-                registerMockEntryForRead(ledgerId, BookieProtocol.LAST_ADD_CONFIRMED, bookieAddress, entryData, -1);
-                registerMockEntryForRead(ledgerId, 0, bookieAddress, entryData, -1);
+                    registerMockEntryForRead(ledgerId, BookieProtocol.LAST_ADD_CONFIRMED, bookieAddress, entryData, -1);
+                    registerMockEntryForRead(ledgerId, 0, bookieAddress, entryData, -1);
             });
         });
 
@@ -250,7 +347,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
             .withPassword(ledgerMetadata.getPassword())
             .withDigestType(DigestType.CRC32)
             .withLedgerId(ledgerId)
-            .withRecovery(true)
+            .withRecovery(false)
             .execute());
     }
 
@@ -260,7 +357,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
             writeQuorumSize, ackQuorumSize, password, customMetadata);
         registerMockLedgerMetadata(ledgerId, ledgerMetadata);
 
-        ledgerMetadata.getEnsembles().values().forEach(bookieAddressList -> {
+        ledgerMetadata.getAllEnsembles().values().forEach(bookieAddressList -> {
             bookieAddressList.forEach(bookieAddress -> {
                 registerMockEntryForRead(ledgerId, BookieProtocol.LAST_ADD_CONFIRMED, bookieAddress, entryData, -1);
                 registerMockEntryForRead(ledgerId, 0, bookieAddress, entryData, -1);
@@ -270,7 +367,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
             .withPassword(ledgerMetadata.getPassword())
             .withDigestType(DigestType.CRC32)
             .withLedgerId(ledgerId)
-            .withRecovery(false)
+            .withRecovery(true)
             .execute());
     }
 
@@ -308,6 +405,7 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
 
     protected LedgerMetadata generateLedgerMetadata(int ensembleSize,
         int writeQuorumSize, int ackQuorumSize, byte[] password,
+<<<<<<< HEAD
         Map<String, byte[]> customMetadata) {
         LedgerMetadata ledgerMetadata = new LedgerMetadata(
             ensembleSize,
@@ -319,6 +417,66 @@ public class BookKeeperBuildersTest extends MockBookKeeperTestCase {
             true);
         ledgerMetadata.addEnsemble(0, generateNewEnsemble(ensembleSize));
         return ledgerMetadata;
+=======
+        Map<String, byte[]> customMetadata) throws BKException.BKNotEnoughBookiesException {
+        return LedgerMetadataBuilder.create()
+            .withId(12L)
+            .withEnsembleSize(ensembleSize)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withAckQuorumSize(ackQuorumSize)
+            .withPassword(password)
+            .withDigestType(BookKeeper.DigestType.CRC32.toApiDigestType())
+            .withCustomMetadata(customMetadata)
+            .withCreationTime(System.currentTimeMillis())
+            .newEnsembleEntry(0, generateNewEnsemble(ensembleSize)).build();
+    }
+
+    @Test
+    public void testCreateLedgerWithOpportunisticStriping() throws Exception {
+
+        maxNumberOfAvailableBookies =  4;
+        int bigEnsembleSize = 15;
+        int expectedWriteQuorumSize = 4;
+
+        ClientConfiguration config = new ClientConfiguration();
+        config.setOpportunisticStriping(true);
+        setBookKeeperConfig(config);
+
+        setNewGeneratedLedgerId(ledgerId);
+        WriteHandle writer = newCreateLedgerOp()
+            .withAckQuorumSize(expectedWriteQuorumSize)
+            .withEnsembleSize(bigEnsembleSize)
+            .withWriteQuorumSize(expectedWriteQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .withPassword(password)
+            .execute()
+            .get();
+        assertEquals(ledgerId, writer.getId());
+        LedgerMetadata metadata = getLedgerMetadata(ledgerId);
+        assertEquals(expectedWriteQuorumSize, metadata.getEnsembleSize());
+        assertEquals(expectedWriteQuorumSize, metadata.getAckQuorumSize());
+        assertEquals(expectedWriteQuorumSize, metadata.getWriteQuorumSize());
+        assertArrayEquals(password, metadata.getPassword());
+
+    }
+
+    @Test(expected = BKException.BKNotEnoughBookiesException.class)
+    public void testNotEnoughBookies() throws Exception {
+
+        maxNumberOfAvailableBookies =  1;
+        ClientConfiguration config = new ClientConfiguration();
+        config.setOpportunisticStriping(false);
+        setBookKeeperConfig(config);
+
+        setNewGeneratedLedgerId(ledgerId);
+        result(newCreateLedgerOp()
+            .withAckQuorumSize(ackQuorumSize)
+            .withEnsembleSize(ensembleSize)
+            .withWriteQuorumSize(writeQuorumSize)
+            .withCustomMetadata(customMetadata)
+            .withPassword(password)
+            .execute());
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
 }

@@ -17,13 +17,19 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
+<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/ListUnderReplicatedLedgerService.java
+=======
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/ListUnderReplicatedLedgerService.java
+
 import com.google.common.collect.Lists;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
@@ -31,16 +37,16 @@ import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
 import org.apache.bookkeeper.meta.LedgerUnderreplicationManager;
-import org.apache.bookkeeper.util.JsonUtil;
+import org.apache.bookkeeper.meta.UnderreplicatedLedger;
+import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.commons.lang.StringUtils;
-import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * HttpEndpointService that handle Bookkeeper list under replicated ledger related http request.
  *
- * The GET method will list all ledger_ids of under replicated ledger.
+ * <p>The GET method will list all ledger_ids of under replicated ledger.
  * User can filer wanted ledger by set parameter "missingreplica" and "excludingmissingreplica"
  */
 public class ListUnderReplicatedLedgerService implements HttpEndpointService {
@@ -48,12 +54,12 @@ public class ListUnderReplicatedLedgerService implements HttpEndpointService {
     static final Logger LOG = LoggerFactory.getLogger(ListUnderReplicatedLedgerService.class);
 
     protected ServerConfiguration conf;
-    protected ZooKeeper zk;
+    protected BookieServer bookieServer;
 
-    public ListUnderReplicatedLedgerService(ServerConfiguration conf, ZooKeeper zk) {
-        Preconditions.checkNotNull(conf);
+    public ListUnderReplicatedLedgerService(ServerConfiguration conf, BookieServer bookieServer) {
+        checkNotNull(conf);
         this.conf = conf;
-        this.zk = zk;
+        this.bookieServer = bookieServer;
     }
 
     /*
@@ -68,6 +74,8 @@ public class ListUnderReplicatedLedgerService implements HttpEndpointService {
         if (HttpServer.Method.GET == request.getMethod()) {
             final String includingBookieId;
             final String excludingBookieId;
+            boolean printMissingReplica = false;
+
             if (params != null && params.containsKey("missingreplica")) {
                 includingBookieId = params.get("missingreplica");
             } else {
@@ -77,6 +85,9 @@ public class ListUnderReplicatedLedgerService implements HttpEndpointService {
                 excludingBookieId = params.get("excludingmissingreplica");
             } else {
                 excludingBookieId = null;
+            }
+            if (params != null && params.containsKey("printmissingreplica")) {
+                printMissingReplica = true;
             }
             Predicate<List<String>> predicate = null;
             if (!StringUtils.isBlank(includingBookieId) && !StringUtils.isBlank(excludingBookieId)) {
@@ -89,21 +100,38 @@ public class ListUnderReplicatedLedgerService implements HttpEndpointService {
             }
 
             try {
-                List<Long> outputLedgers = Lists.newArrayList();
-                LedgerManagerFactory mFactory = LedgerManagerFactory.newLedgerManagerFactory(conf, zk);
+                boolean hasURLedgers = false;
+                List<Long> outputLedgers = null;
+                Map<Long, List<String>> outputLedgersWithMissingReplica = null;
+                LedgerManagerFactory mFactory = bookieServer.getBookie().getLedgerManagerFactory();
                 LedgerUnderreplicationManager underreplicationManager = mFactory.newLedgerUnderreplicationManager();
-                Iterator<Long> iter = underreplicationManager.listLedgersToRereplicate(predicate);
+                Iterator<UnderreplicatedLedger> iter = underreplicationManager.listLedgersToRereplicate(predicate);
 
-                while (iter.hasNext()) {
-                    outputLedgers.add(iter.next());
+                hasURLedgers = iter.hasNext();
+                if (hasURLedgers) {
+                    if (printMissingReplica) {
+                        outputLedgersWithMissingReplica = new LinkedHashMap<Long, List<String>>();
+                    } else {
+                        outputLedgers = Lists.newArrayList();
+                    }
                 }
-                if (outputLedgers.isEmpty()) {
+                while (iter.hasNext()) {
+                    if (printMissingReplica) {
+                        UnderreplicatedLedger underreplicatedLedger = iter.next();
+                        outputLedgersWithMissingReplica.put(underreplicatedLedger.getLedgerId(),
+                                underreplicatedLedger.getReplicaList());
+                    } else {
+                        outputLedgers.add(iter.next().getLedgerId());
+                    }
+                }
+                if (!hasURLedgers) {
                     response.setCode(HttpServer.StatusCode.NOT_FOUND);
                     response.setBody("No under replicated ledgers found");
                     return response;
                 } else {
                     response.setCode(HttpServer.StatusCode.OK);
-                    String jsonResponse = JsonUtil.toJson(outputLedgers);
+                    String jsonResponse = JsonUtil
+                            .toJson(printMissingReplica ? outputLedgersWithMissingReplica : outputLedgers);
                     LOG.debug("output body: " + jsonResponse);
                     response.setBody(jsonResponse);
                     return response;

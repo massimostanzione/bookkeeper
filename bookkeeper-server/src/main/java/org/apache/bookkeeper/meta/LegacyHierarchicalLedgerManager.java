@@ -18,6 +18,7 @@
 package org.apache.bookkeeper.meta;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -37,8 +38,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Hierarchical Ledger Manager which manages ledger meta in zookeeper using 2-level hierarchical znodes.
  *
- * <p>
- * LegacyHierarchicalLedgerManager splits the generated id into 3 parts (2-4-4):
+ * <p>LegacyHierarchicalLedgerManager splits the generated id into 3 parts (2-4-4):
  * <pre>&lt;level1 (2 digits)&gt;&lt;level2 (4 digits)&gt;&lt;level3 (4 digits)&gt;</pre>
  * These 3 parts are used to form the actual ledger node path used to store ledger metadata:
  * <pre>(ledgersRootPath)/level1/level2/L(level3)</pre>
@@ -60,9 +60,9 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
             return new StringBuilder();
         }
     };
-    
+
     /**
-     * Constructor
+     * Constructor.
      *
      * @param conf
      *          Configuration object
@@ -92,7 +92,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
     //
 
     /**
-     * Get the smallest cache id in a specified node /level1/level2
+     * Get the smallest cache id in a specified node /level1/level2.
      *
      * @param level1
      *          1st level node name
@@ -105,7 +105,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
     }
 
     /**
-     * Get the largest cache id in a specified node /level1/level2
+     * Get the largest cache id in a specified node /level1/level2.
      *
      * @param level1
      *          1st level node name
@@ -125,7 +125,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
         asyncProcessLevelNodes(ledgerRootPath, new Processor<String>() {
             @Override
             public void process(final String l1Node, final AsyncCallback.VoidCallback cb1) {
-                if (isSpecialZnode(l1Node)) {
+                if (!isLedgerParentNode(l1Node)) {
                     cb1.processResult(successRc, null, context);
                     return;
                 }
@@ -147,27 +147,33 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
         }, finalCb, context, successRc, failureRc);
     }
 
-    protected static boolean isSpecialZnode(String znode) {
-        return IDGEN_ZNODE.equals(znode) || LongHierarchicalLedgerManager.IDGEN_ZNODE.equals(znode) || AbstractHierarchicalLedgerManager.isSpecialZnode(znode);
+    @Override
+    protected String getLedgerParentNodeRegex() {
+        return StringUtils.LEGACYHIERARCHICAL_LEDGER_PARENT_NODE_REGEX;
     }
 
     @Override
-    public LedgerRangeIterator getLedgerRanges() {
-        return new HierarchicalLedgerRangeIterator();
+    public LedgerRangeIterator getLedgerRanges(long zkOpTimeoutMs) {
+        return new LegacyHierarchicalLedgerRangeIterator(zkOpTimeoutMs);
     }
 
     /**
-     * Iterator through each metadata bucket with hierarchical mode
+     * Iterator through each metadata bucket with hierarchical mode.
      */
-    private class HierarchicalLedgerRangeIterator implements LedgerRangeIterator {
+    private class LegacyHierarchicalLedgerRangeIterator implements LedgerRangeIterator {
         private Iterator<String> l1NodesIter = null;
         private Iterator<String> l2NodesIter = null;
         private String curL1Nodes = "";
         private boolean iteratorDone = false;
         private LedgerRange nextRange = null;
+        private final long zkOpTimeoutMs;
+
+        public LegacyHierarchicalLedgerRangeIterator(long zkOpTimeoutMs) {
+            this.zkOpTimeoutMs = zkOpTimeoutMs;
+        }
 
         /**
-         * iterate next level1 znode
+         * Iterate next level1 znode.
          *
          * @return false if have visited all level1 nodes
          * @throws InterruptedException/KeeperException if error occurs reading zookeeper children
@@ -181,7 +187,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
                     return false;
                 }
                 // Top level nodes are always exactly 2 digits long. (Don't pick up long hierarchical top level nodes)
-                if (isSpecialZnode(curL1Nodes) || curL1Nodes.length() > 2) {
+                if (!isLedgerParentNode(curL1Nodes)) {
                     continue;
                 }
                 List<String> l2Nodes = zk.getChildren(ledgerRootPath + "/" + curL1Nodes, null);
@@ -195,7 +201,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
             return true;
         }
 
-        synchronized private void preload() throws IOException {
+        private synchronized void preload() throws IOException {
             while (nextRange == null && !iteratorDone) {
                 boolean hasMoreElements = false;
                 try {
@@ -227,13 +233,13 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
         }
 
         @Override
-        synchronized public boolean hasNext() throws IOException {
+        public synchronized boolean hasNext() throws IOException {
             preload();
             return nextRange != null && !iteratorDone;
         }
 
         @Override
-        synchronized public LedgerRange next() throws IOException {
+        public synchronized LedgerRange next() throws IOException {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
@@ -243,7 +249,7 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
         }
 
         /**
-         * Get a single node level1/level2
+         * Get a single node level1/level2.
          *
          * @param level1
          *          1st level node name
@@ -260,8 +266,13 @@ class LegacyHierarchicalLedgerManager extends AbstractHierarchicalLedgerManager 
             String nodePath = nodeBuilder.toString();
             List<String> ledgerNodes = null;
             try {
-                ledgerNodes = ZkUtils.getChildrenInSingleNode(zk, nodePath);
+                ledgerNodes = ZkUtils.getChildrenInSingleNode(zk, nodePath, zkOpTimeoutMs);
+            } catch (KeeperException.NoNodeException e) {
+                /* If the node doesn't exist, we must have raced with a recursive node removal, just
+                 * return an empty list. */
+                ledgerNodes = new ArrayList<>();
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 throw new IOException("Error when get child nodes from zk", e);
             }
             NavigableSet<Long> zkActiveLedgers = ledgerListToSet(ledgerNodes, nodePath);

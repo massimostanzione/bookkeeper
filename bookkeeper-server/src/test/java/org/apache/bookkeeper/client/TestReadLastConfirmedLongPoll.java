@@ -20,21 +20,47 @@ package org.apache.bookkeeper.client;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.junit.Test;
-
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.bookkeeper.bookie.InterleavedLedgerStorage;
+import org.apache.bookkeeper.bookie.LedgerStorage;
+import org.apache.bookkeeper.bookie.SortedLedgerStorage;
+import org.apache.bookkeeper.bookie.storage.ldb.DbLedgerStorage;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+/**
+ * Test read last confirmed long by polling.
+ */
+@RunWith(Parameterized.class)
 public class TestReadLastConfirmedLongPoll extends BookKeeperClusterTestCase {
+    private static final Logger log = LoggerFactory.getLogger(TestReadLastConfirmedLongPoll.class);
     final DigestType digestType;
 
-    public TestReadLastConfirmedLongPoll() {
+    public TestReadLastConfirmedLongPoll(Class<? extends LedgerStorage> storageClass) {
         super(6);
         this.digestType = DigestType.CRC32;
+        baseConf.setLedgerStorageClass(storageClass.getName());
+    }
+
+    @Parameters
+    public static Collection<Object[]> configs() {
+        return Arrays.asList(new Object[][] {
+            { InterleavedLedgerStorage.class },
+            { SortedLedgerStorage.class },
+            { DbLedgerStorage.class },
+        });
     }
 
     @Test
@@ -70,9 +96,10 @@ public class TestReadLastConfirmedLongPoll extends BookKeeperClusterTestCase {
         // try read last confirmed again
         success.set(false);
         numCallbacks.set(0);
-        long entryId = readLh.getLastAddConfirmed()+1;
+        long entryId = readLh.getLastAddConfirmed() + 1;
         final CountDownLatch secondReadComplete = new CountDownLatch(1);
-        readLh.asyncReadLastConfirmedAndEntry(entryId++, 1000, true, new AsyncCallback.ReadLastConfirmedAndEntryCallback() {
+        readLh.asyncReadLastConfirmedAndEntry(entryId++, 1000, true,
+                new AsyncCallback.ReadLastConfirmedAndEntryCallback() {
             @Override
             public void readLastConfirmedAndEntryComplete(int rc, long lastConfirmed, LedgerEntry entry, Object ctx) {
                 numCallbacks.incrementAndGet();
@@ -93,7 +120,8 @@ public class TestReadLastConfirmedLongPoll extends BookKeeperClusterTestCase {
         success.set(false);
         numCallbacks.set(0);
         final CountDownLatch thirdReadComplete = new CountDownLatch(1);
-        readLh.asyncReadLastConfirmedAndEntry(entryId++, 1000, false, new AsyncCallback.ReadLastConfirmedAndEntryCallback() {
+        readLh.asyncReadLastConfirmedAndEntry(entryId++, 1000, false,
+                new AsyncCallback.ReadLastConfirmedAndEntryCallback() {
             @Override
             public void readLastConfirmedAndEntryComplete(int rc, long lastConfirmed, LedgerEntry entry, Object ctx) {
                 numCallbacks.incrementAndGet();
@@ -128,7 +156,7 @@ public class TestReadLastConfirmedLongPoll extends BookKeeperClusterTestCase {
             ServerConfiguration[] confs = new ServerConfiguration[numEntries - 1];
             for (int j = 0; j < numEntries - 1; j++) {
                 int idx = (i + 1 + j) % numEntries;
-                confs[j] = killBookie(lh.getLedgerMetadata().currentEnsemble.get(idx));
+                confs[j] = killBookie(LedgerMetadataUtils.getLastEnsembleValue(lh.getLedgerMetadata()).get(idx));
             }
 
             final AtomicBoolean entryAsExpected = new AtomicBoolean(false);
@@ -161,8 +189,7 @@ public class TestReadLastConfirmedLongPoll extends BookKeeperClusterTestCase {
 
             // start the bookies
             for (ServerConfiguration conf : confs) {
-                bs.add(startBookie(conf));
-                bsConfs.add(conf);
+                startAndAddBookie(conf);
             }
         }
     }

@@ -23,7 +23,11 @@
   <parent>
     <artifactId>bookkeeper-dist</artifactId>
     <groupId>org.apache.bookkeeper</groupId>
+<<<<<<< HEAD
     <version>4.6.0</version>
+=======
+    <version>4.15.0-SNAPSHOT</version>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     <relativePath>..</relativePath>
   </parent>
 
@@ -55,11 +59,14 @@
       <artifactId>prometheus-metrics-provider</artifactId>
       <version>${project.version}</version>
     </dependency>
+<<<<<<< HEAD
     <dependency>
       <groupId>org.apache.bookkeeper.stats</groupId>
       <artifactId>twitter-finagle-provider</artifactId>
       <version>${project.version}</version>
     </dependency>
+=======
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     <!-- bookkeeper.http -->
     <dependency>
@@ -69,6 +76,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.bookkeeper.http</groupId>
+<<<<<<< HEAD
       <artifactId>twitter-http-server</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -78,6 +86,35 @@
       <version>${project.version}</version>
     </dependency>
 
+=======
+      <artifactId>vertx-http-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- bookkeeper.tools (new CLI) -->
+    <dependency>
+      <groupId>org.apache.bookkeeper</groupId>
+      <artifactId>bookkeeper-tools</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- dlog -->
+    <dependency>
+      <groupId>org.apache.distributedlog</groupId>
+      <artifactId>distributedlog-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+
+    <!-- stream.storage -->
+    <dependency>
+       <groupId>org.apache.bookkeeper</groupId>
+       <artifactId>stream-storage-server</artifactId>
+       <version>${project.version}</version>
+    </dependency>
+
+    <!-- bookkeeper benchmark -->
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     <dependency>
       <groupId>org.apache.bookkeeper</groupId>
       <artifactId>bookkeeper-benchmark</artifactId>
@@ -88,7 +125,21 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
+<<<<<<< HEAD
       <version>${slf4j.version}</version>
+=======
+    </dependency>
+
+    <dependency>
+       <!-- needed by ZooKeeper server -->
+       <groupId>org.xerial.snappy</groupId>
+       <artifactId>snappy-java</artifactId>
+    </dependency>
+    <dependency>
+        <!-- needed by ZooKeeper server -->
+       <groupId>io.dropwizard.metrics</groupId>
+       <artifactId>metrics-core</artifactId>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
     </dependency>
   </dependencies>
 
@@ -103,6 +154,10 @@
           <descriptors>
             <descriptor>../src/assemble/bin-all.xml</descriptor>
           </descriptors>
+<<<<<<< HEAD
+=======
+          <tarLongFileMode>posix</tarLongFileMode>
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
         </configuration>
         <executions>
           <execution>

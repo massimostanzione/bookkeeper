@@ -81,7 +81,7 @@ The DistributedLog API for BookKeeper provides a number of guarantees for applic
 
 ## API
 
-Documentation for the DistributedLog API can be found [here](https://distributedlog.incubator.apache.org/docs/latest/user_guide/api/core).
+Documentation for the DistributedLog API can be found [here](https://bookkeeper.apache.org/distributedlog/docs/latest/user_guide/api/core).
 
 > At a later date, the DistributedLog API docs will be added here.
 
@@ -115,12 +115,12 @@ If you're using [Gradle](https://gradle.org/), add this to your [`build.gradle`]
 
 ```groovy
 dependencies {
-    compile group: 'org.apache.bookkeeper', name: 'bookkeeper-server', version: '4.5.0'
+    compile group: 'org.apache.bookkeeper', name: 'bookkeeper-server', version: '4.5.1'
 }
 
 // Alternatively:
 dependencies {
-    compile 'org.apache.bookkeeper:bookkeeper-server:4.5.0'
+    compile 'org.apache.bookkeeper:bookkeeper-server:4.5.1'
 }
 ```
 

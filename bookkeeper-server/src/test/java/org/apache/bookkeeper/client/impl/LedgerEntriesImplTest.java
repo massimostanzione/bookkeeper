@@ -19,7 +19,11 @@
 
 package org.apache.bookkeeper.client.impl;
 
+<<<<<<< HEAD
 import static com.google.common.base.Charsets.UTF_8;
+=======
+import static java.nio.charset.StandardCharsets.UTF_8;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -50,7 +54,11 @@ public class LedgerEntriesImplTest {
     private final ArrayList<ByteBuf> bufs = Lists.newArrayListWithExpectedSize(entryNumber);
 
     public LedgerEntriesImplTest () {
+<<<<<<< HEAD
         for(int i = 0; i < entryNumber; i++) {
+=======
+        for (int i = 0; i < entryNumber; i++) {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             ByteBuf buf = Unpooled.wrappedBuffer(dataBytes);
             bufs.add(buf);
 
@@ -87,7 +95,11 @@ public class LedgerEntriesImplTest {
 
     @Test
     public void testGetEntry() {
+<<<<<<< HEAD
         for(int i = 0; i < entryNumber; i ++) {
+=======
+        for (int i = 0; i < entryNumber; i++) {
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367
             LedgerEntry entry = ledgerEntriesImpl.getEntry(entryId + i);
             assertEquals(entryList.get(i).getLedgerId(),  entry.getLedgerId());
             assertEquals(entryList.get(i).getEntryId(),  entry.getEntryId());
@@ -121,4 +133,8 @@ public class LedgerEntriesImplTest {
         Iterator<LedgerEntry> entryIterator = ledgerEntriesImpl.iterator();
         entryIterator.forEachRemaining(ledgerEntry -> assertEquals(1, ledgerEntry.getEntryBuffer().refCnt()));
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367

@@ -21,14 +21,13 @@
 
 package org.apache.bookkeeper.bookie;
 
-import static org.apache.bookkeeper.bookie.Bookie.METAENTRY_ID_FENCE_KEY;
-
-import com.google.common.util.concurrent.SettableFuture;
+import static org.apache.bookkeeper.bookie.BookieImpl.METAENTRY_ID_FENCE_KEY;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
-import java.util.Observable;
-import java.util.Observer;
+import java.util.PrimitiveIterator.OfLong;
+import java.util.concurrent.CompletableFuture;
+import org.apache.bookkeeper.common.util.Watcher;
 
 /**
  * Implements a ledger inside a bookie. In particular, it implements operations
@@ -60,7 +59,7 @@ public abstract class LedgerDescriptor {
         return bb;
     }
 
-    abstract void checkAccess(byte masterKey[]) throws BookieException, IOException;
+    abstract void checkAccess(byte[] masterKey) throws BookieException, IOException;
 
     abstract long getLedgerId();
 
@@ -71,16 +70,23 @@ public abstract class LedgerDescriptor {
      * then log the fence entry in Journal so that we can rebuild the state.
      *
      * <p>We should satisfy the future only after we complete logging fence entry in Journal
+     * @return
      */
-    abstract SettableFuture<Boolean> fenceAndLogInJournal(Journal journal) throws IOException;
+    abstract CompletableFuture<Boolean> fenceAndLogInJournal(Journal journal) throws IOException;
 
-    abstract long addEntry(ByteBuf entry) throws IOException;
+    abstract long addEntry(ByteBuf entry) throws IOException, BookieException;
     abstract ByteBuf readEntry(long entryId) throws IOException;
 
     abstract long getLastAddConfirmed() throws IOException;
-    abstract Observable waitForLastAddConfirmedUpdate(long previoisLAC, Observer observer) throws IOException;
+    abstract boolean waitForLastAddConfirmedUpdate(long previousLAC,
+                                                   Watcher<LastAddConfirmedUpdateNotification> watcher)
+        throws IOException;
+    abstract void cancelWaitForLastAddConfirmedUpdate(Watcher<LastAddConfirmedUpdateNotification> watcher)
+            throws IOException;
 
     abstract void setExplicitLac(ByteBuf entry) throws IOException;
 
-    abstract  ByteBuf getExplicitLac();
+    abstract  ByteBuf getExplicitLac() throws IOException;
+
+    abstract OfLong getListOfEntriesOfLedger(long ledgerId) throws IOException;
 }

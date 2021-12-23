@@ -17,23 +17,29 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
+<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/GetLastLogMarkService.java
+=======
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/GetLastLogMarkService.java
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.bookkeeper.bookie.Journal;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
 import org.apache.bookkeeper.bookie.LogMark;
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
 import org.apache.bookkeeper.util.DiskChecker;
-import org.apache.bookkeeper.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +47,9 @@ import org.slf4j.LoggerFactory;
  * HttpEndpointService that handle Bookkeeper get last log mark related http request.
  * The GET method will get the last log position of each journal.
  *
- * output would be like this:
+ * <p>output would be like this:
  *  {
- *    "<Journal_id>" : "<Pos>",
+ *    "&lt;Journal_id&gt;" : "&lt;Pos&gt;",
  *    ...
  *  }
  */
@@ -54,7 +60,7 @@ public class GetLastLogMarkService implements HttpEndpointService {
     protected ServerConfiguration conf;
 
     public GetLastLogMarkService(ServerConfiguration conf) {
-        Preconditions.checkNotNull(conf);
+        checkNotNull(conf);
         this.conf = conf;
     }
 
@@ -67,15 +73,16 @@ public class GetLastLogMarkService implements HttpEndpointService {
                 /**
                  * output:
                  *  {
-                 *    "<Journal_id>" : "<Pos>",
+                 *    "&lt;Journal_id&gt;" : "&lt;Pos&gt;",
                  *    ...
                  *  }
                  */
                 Map<String, String> output = Maps.newHashMap();
 
                 List<Journal> journals = Lists.newArrayListWithCapacity(conf.getJournalDirs().length);
+                int idx = 0;
                 for (File journalDir : conf.getJournalDirs()) {
-                    journals.add(new Journal(journalDir, conf, new LedgerDirsManager(conf, conf.getLedgerDirs(),
+                    journals.add(new Journal(idx++, journalDir, conf, new LedgerDirsManager(conf, conf.getLedgerDirs(),
                       new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold()))));
                 }
                 for (Journal journal : journals) {

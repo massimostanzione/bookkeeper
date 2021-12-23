@@ -17,6 +17,8 @@
  */
 package org.apache.bookkeeper.proto;
 
+import io.netty.channel.Channel;
+
 import java.util.concurrent.TimeUnit;
 
 import org.apache.bookkeeper.proto.BookieProtocol.Request;
@@ -26,16 +28,17 @@ import org.apache.bookkeeper.util.SafeRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.channel.Channel;
-
-abstract class PacketProcessorBase extends SafeRunnable {
-    private final static Logger logger = LoggerFactory.getLogger(PacketProcessorBase.class);
-    Request request;
+/**
+ * A base class for bookeeper packet processors.
+ */
+abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
+    private static final Logger logger = LoggerFactory.getLogger(PacketProcessorBase.class);
+    T request;
     Channel channel;
     BookieRequestProcessor requestProcessor;
     long enqueueNanos;
 
-    protected void init(Request request, Channel channel, BookieRequestProcessor requestProcessor) {
+    protected void init(T request, Channel channel, BookieRequestProcessor requestProcessor) {
         this.request = request;
         this.channel = channel;
         this.requestProcessor = requestProcessor;
@@ -71,12 +74,33 @@ abstract class PacketProcessorBase extends SafeRunnable {
         }
     }
 
+    /**
+     * Write on the channel and wait until the write is completed.
+     *
+     * <p>That will make the thread to get blocked until we're able to
+     * write everything on the TCP stack, providing auto-throttling
+     * and avoiding using too much memory when handling read-requests.
+     */
+    protected void sendResponseAndWait(int rc, Object response, OpStatsLogger statsLogger) {
+        try {
+            channel.writeAndFlush(response).await();
+        } catch (InterruptedException e) {
+            return;
+        }
+
+        if (BookieProtocol.EOK == rc) {
+            statsLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
+        } else {
+            statsLogger.registerFailedEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
+        }
+    }
+
     @Override
     public void safeRun() {
         if (!isVersionCompatible()) {
             sendResponse(BookieProtocol.EBADVERSION,
                          ResponseBuilder.buildErrorResponse(BookieProtocol.EBADVERSION, request),
-                         requestProcessor.readRequestStats);
+                         requestProcessor.getRequestStats().getReadRequestStats());
             return;
         }
         processPacket();
