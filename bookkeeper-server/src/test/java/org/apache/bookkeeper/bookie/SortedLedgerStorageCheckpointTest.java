@@ -26,11 +26,6 @@ import static org.mockito.Mockito.mock;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-<<<<<<< HEAD
-=======
-import io.netty.buffer.UnpooledByteBufAllocator;
-
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -44,10 +39,6 @@ import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.junit.After;
-<<<<<<< HEAD
-=======
-import org.junit.Assert;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.junit.Before;
 import org.junit.Test;
 
@@ -107,12 +98,7 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
 
     public SortedLedgerStorageCheckpointTest() {
         super();
-<<<<<<< HEAD
         conf.setEntryLogSizeLimit(1);
-=======
-        conf.setEntryLogSizeLimit(1024);
-        conf.setEntryLogFilePreAllocationEnabled(false);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         this.checkpoints = new LinkedBlockingQueue<>();
     }
 
@@ -124,7 +110,6 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
         // initial checkpoint
 
         this.storage = new SortedLedgerStorage();
-<<<<<<< HEAD
         this.checkpointer = checkpoint -> storage.getScheduler().submit(() -> {
             log.info("Checkpoint the storage at {}", checkpoint);
             try {
@@ -134,45 +119,14 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
                 log.error("Failed to checkpoint at {}", checkpoint, e);
             }
         });
-=======
-        this.checkpointer = new Checkpointer() {
-            @Override
-            public void startCheckpoint(Checkpoint checkpoint) {
-                storage.getScheduler().submit(() -> {
-                    log.info("Checkpoint the storage at {}", checkpoint);
-                    try {
-                        storage.checkpoint(checkpoint);
-                        checkpoints.add(checkpoint);
-                    } catch (IOException e) {
-                        log.error("Failed to checkpoint at {}", checkpoint, e);
-                    }
-                });
-            }
-
-            @Override
-            public void start() {
-                // no-op
-            }
-        };
-
-        // if the SortedLedgerStorage need not to change bookie's state, pass StateManager==null is ok
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         this.storage.initialize(
             conf,
             mock(LedgerManager.class),
             ledgerDirsManager,
             ledgerDirsManager,
-<<<<<<< HEAD
             checkpointSrc,
             checkpointer,
             NullStatsLogger.INSTANCE);
-=======
-            null,
-            checkpointSrc,
-            checkpointer,
-            NullStatsLogger.INSTANCE,
-            UnpooledByteBufAllocator.DEFAULT);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @After
@@ -215,10 +169,6 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
         assertEquals(new TestCheckpoint(0), memtableCp);
 
         // trigger a memtable flush
-<<<<<<< HEAD
-=======
-        Assert.assertNotNull("snapshot shouldn't have returned null", storage.memTable.snapshot());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         storage.onSizeLimitReached(checkpointSrc.newCheckpoint());
         // wait for checkpoint to complete
         checkpoints.poll(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -251,25 +201,13 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
             try {
                 readyLatch.await();
             } catch (InterruptedException e) {
-<<<<<<< HEAD
-=======
-                Thread.currentThread().interrupt();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             }
         });
 
         // simulate entry log is rotated (due to compaction)
-<<<<<<< HEAD
         storage.entryLogger.rollLog();
         long leastUnflushedLogId = storage.entryLogger.getLeastUnflushedLogId();
         long currentLogId = storage.entryLogger.getCurrentLogId();
-=======
-        EntryLogManagerForSingleEntryLog entryLogManager = (EntryLogManagerForSingleEntryLog) storage.getEntryLogger()
-                .getEntryLogManager();
-        entryLogManager.createNewLog(EntryLogger.UNASSIGNED_LEDGERID);
-        long leastUnflushedLogId = storage.getEntryLogger().getLeastUnflushedLogId();
-        long currentLogId = entryLogManager.getCurrentLogId();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         log.info("Least unflushed entry log : current = {}, leastUnflushed = {}", currentLogId, leastUnflushedLogId);
 
         readyLatch.countDown();
@@ -278,10 +216,6 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
         assertEquals(20, storage.memTable.kvmap.size());
 
         // trigger a memtable flush
-<<<<<<< HEAD
-=======
-        Assert.assertNotNull("snapshot shouldn't have returned null", storage.memTable.snapshot());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         storage.onSizeLimitReached(checkpointSrc.newCheckpoint());
         assertEquals(new TestCheckpoint(100), checkpoints.poll(Long.MAX_VALUE, TimeUnit.MILLISECONDS));
 
@@ -290,13 +224,8 @@ public class SortedLedgerStorageCheckpointTest extends LedgerStorageTestBase {
         assertEquals(0, storage.memTable.kvmap.size());
         assertTrue(
             "current log " + currentLogId + " contains entries added from memtable should be forced to disk"
-<<<<<<< HEAD
             + " but least unflushed log is " + storage.entryLogger.getLeastUnflushedLogId(),
             storage.entryLogger.getLeastUnflushedLogId() > currentLogId);
-=======
-            + " but least unflushed log is " + storage.getEntryLogger().getLeastUnflushedLogId(),
-            storage.getEntryLogger().getLeastUnflushedLogId() > currentLogId);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
 }

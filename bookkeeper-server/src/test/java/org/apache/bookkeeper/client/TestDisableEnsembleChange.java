@@ -20,15 +20,16 @@
  */
 package org.apache.bookkeeper.client;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.bookkeeper.util.BookKeeperConstants.FEATURE_DISABLE_ENSEMBLE_CHANGE;
-import static org.apache.bookkeeper.util.TestUtils.assertEventuallyTrue;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import com.google.common.util.concurrent.RateLimiter;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.feature.SettableFeature;
+import org.apache.bookkeeper.feature.SettableFeatureProvider;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,22 +38,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.feature.SettableFeature;
-import org.apache.bookkeeper.feature.SettableFeatureProvider;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.google.common.base.Charsets.UTF_8;
+import static org.apache.bookkeeper.util.BookKeeperConstants.*;
+import static org.junit.Assert.*;
 
 /**
- * Test Case on Disabling Ensemble Change Feature.
+ * Test Case on Disabling Ensemble Change Feature
  */
 public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestDisableEnsembleChange.class);
+    static final Logger logger = LoggerFactory.getLogger(TestDisableEnsembleChange.class);
 
     public TestDisableEnsembleChange() {
         super(4);
@@ -70,7 +65,7 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
 
     void disableEnsembleChangeTest(boolean startNewBookie) throws Exception {
         ClientConfiguration conf = new ClientConfiguration();
-        conf.setMetadataServiceUri(metadataServiceUri)
+        conf.setZkServers(zkUtil.getZooKeeperConnectString())
             .setDelayEnsembleChange(false)
             .setDisableEnsembleChangeFeatureName(FEATURE_DISABLE_ENSEMBLE_CHANGE);
 
@@ -88,9 +83,9 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
         final AtomicBoolean failTest = new AtomicBoolean(false);
         final byte[] entry = "test-disable-ensemble-change".getBytes(UTF_8);
 
-        assertEquals(1, lh.getLedgerMetadata().getAllEnsembles().size());
-        ArrayList<BookieId> ensembleBeforeFailure =
-                new ArrayList<>(lh.getLedgerMetadata().getAllEnsembles().entrySet().iterator().next().getValue());
+        assertEquals(1, lh.getLedgerMetadata().getEnsembles().size());
+        ArrayList<BookieSocketAddress> ensembleBeforeFailure =
+                new ArrayList<BookieSocketAddress>(lh.getLedgerMetadata().getEnsembles().entrySet().iterator().next().getValue());
 
         final RateLimiter rateLimiter = RateLimiter.create(10);
 
@@ -120,11 +115,11 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
 
         // check the ensemble after failure
         assertEquals("No new ensemble should be added when disable ensemble change.",
-                1, lh.getLedgerMetadata().getAllEnsembles().size());
-        ArrayList<BookieId> ensembleAfterFailure =
-                new ArrayList<>(lh.getLedgerMetadata().getAllEnsembles().entrySet().iterator().next().getValue());
-        assertArrayEquals(ensembleBeforeFailure.toArray(new BookieId[ensembleBeforeFailure.size()]),
-                ensembleAfterFailure.toArray(new BookieId[ensembleAfterFailure.size()]));
+                1, lh.getLedgerMetadata().getEnsembles().size());
+        ArrayList<BookieSocketAddress> ensembleAfterFailure =
+                new ArrayList<BookieSocketAddress>(lh.getLedgerMetadata().getEnsembles().entrySet().iterator().next().getValue());
+        assertArrayEquals(ensembleBeforeFailure.toArray(new BookieSocketAddress[ensembleBeforeFailure.size()]),
+                ensembleAfterFailure.toArray(new BookieSocketAddress[ensembleAfterFailure.size()]));
 
         // enable ensemble change
         disableEnsembleChangeFeature.set(false);
@@ -161,20 +156,19 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
             assertFalse("Ledger should be closed when enable ensemble change again.",
                     lh.getLedgerMetadata().isClosed());
             assertEquals("New ensemble should be added when enable ensemble change again.",
-                    2, lh.getLedgerMetadata().getAllEnsembles().size());
+                    2, lh.getLedgerMetadata().getEnsembles().size());
         } else {
             assertTrue("Should fail adding entries when enable ensemble change again.",
                     failTest.get());
-            // The ledger close occurs in the background, so assert that it happens eventually
-            assertEventuallyTrue("Ledger should be closed when enable ensemble change again.",
-                                 () -> lh.getLedgerMetadata().isClosed());
+            assertTrue("Ledger should be closed when enable ensemble change again.",
+                    lh.getLedgerMetadata().isClosed());
         }
     }
 
     @Test
     public void testRetryFailureBookie() throws Exception {
         ClientConfiguration conf = new ClientConfiguration();
-        conf.setMetadataServiceUri(metadataServiceUri)
+        conf.setZkServers(zkUtil.getZooKeeperConnectString())
             .setDelayEnsembleChange(false)
             .setDisableEnsembleChangeFeatureName(FEATURE_DISABLE_ENSEMBLE_CHANGE);
 
@@ -188,7 +182,7 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
 
         LedgerHandle lh = bkc.createLedger(4, 4, 4, BookKeeper.DigestType.CRC32, new byte[] {});
         byte[] entry = "testRetryFailureBookie".getBytes();
-        for (int i = 0; i < 10; i++) {
+        for (int i=0; i<10; i++) {
             lh.addEntry(entry);
         }
         // kill a bookie
@@ -209,7 +203,8 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
                 addLatch.await(1000, TimeUnit.MILLISECONDS));
         assertEquals(res.get(), 0xdeadbeef);
         // start the original bookie
-        startAndAddBookie(killedConf);
+        bsConfs.add(killedConf);
+        bs.add(startBookie(killedConf));
         assertTrue("Add entry operation should complete at this point.",
                 addLatch.await(10000, TimeUnit.MILLISECONDS));
         assertEquals(res.get(), BKException.Code.OK);
@@ -220,11 +215,12 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
         final int readTimeout = 2;
 
         ClientConfiguration conf = new ClientConfiguration();
-        conf.setReadEntryTimeout(readTimeout)
+        conf.setZkServers(zkUtil.getZooKeeperConnectString())
+            .setReadEntryTimeout(readTimeout)
             .setAddEntryTimeout(readTimeout)
             .setDelayEnsembleChange(false)
-            .setDisableEnsembleChangeFeatureName(FEATURE_DISABLE_ENSEMBLE_CHANGE)
-            .setMetadataServiceUri(metadataServiceUri);
+            .setDisableEnsembleChangeFeatureName(FEATURE_DISABLE_ENSEMBLE_CHANGE);
+
 
         SettableFeatureProvider featureProvider = new SettableFeatureProvider("test", 0);
         BookKeeper bkc = BookKeeper.forConfig(conf)
@@ -236,11 +232,11 @@ public class TestDisableEnsembleChange extends BookKeeperClusterTestCase {
 
         LedgerHandle lh = bkc.createLedger(4, 4, 4, BookKeeper.DigestType.CRC32, new byte[] {});
         byte[] entry = "testRetryFailureBookie".getBytes();
-        for (int i = 0; i < 10; i++) {
+        for (int i=0; i<10; i++) {
             lh.addEntry(entry);
         }
 
-        List<BookieId> curEns = lh.getCurrentEnsemble();
+        List<BookieSocketAddress> curEns = lh.getLedgerMetadata().currentEnsemble;
 
         final CountDownLatch wakeupLatch = new CountDownLatch(1);
         final CountDownLatch suspendLatch = new CountDownLatch(1);

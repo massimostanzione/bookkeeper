@@ -1,5 +1,5 @@
 ---
-title: Apache BookKeeper 4.15.0-SNAPSHOT Release Notes
+title: Apache BookKeeper 4.6.0-SNAPSHOT Release Notes
 ---
 
 Apache BookKeeper {{ site.latest_version }} is still under developement.
@@ -10,9 +10,3 @@ If you want to learn the progress of `{{ site.latest_version }}`, you can do:
 - Or [subscribe](mailto:dev-subscribe@bookkeeper.apache.org) the [dev@bookkeeper.apache.org](mailto:dev@bookkeeper.apache.org)
     to join development discussions, propose new ideas and connect with contributors.
 - Or [join us on Slack](https://apachebookkeeper.herokuapp.com/) to connect with Apache BookKeeper committers and contributors.
-
-### Dependencies Changes
-
-Here is a list of dependencies changed in 4.15.0-SNAPSHOT:
-
-### Existing API changes

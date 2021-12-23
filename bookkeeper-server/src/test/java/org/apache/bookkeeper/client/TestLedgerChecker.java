@@ -20,26 +20,18 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.util.List;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.bookkeeper.net.BookieId;
+
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.Assert.*;
 
 /**
  * Tests the functionality of LedgerChecker. This Ledger checker should be able
@@ -49,7 +41,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
     private static final byte[] TEST_LEDGER_ENTRY_DATA = "TestCheckerData"
             .getBytes();
     private static final byte[] TEST_LEDGER_PASSWORD = "testpasswd".getBytes();
-    private static final Logger LOG = LoggerFactory.getLogger(TestLedgerChecker.class);
+    private final static Logger LOG = LoggerFactory.getLogger(TestLedgerChecker.class);
 
     public TestLedgerChecker() {
         super(3);
@@ -72,7 +64,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
 
     /**
      * Tests that the LedgerChecker should detect the underReplicated fragments
-     * on multiple Bookie crashes.
+     * on multiple Bookie crashes
      */
     @Test
     public void testChecker() throws Exception {
@@ -84,7 +76,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         for (int i = 0; i < 10; i++) {
             lh.addEntry(TEST_LEDGER_ENTRY_DATA);
         }
-        BookieId replicaToKill = lh.getLedgerMetadata().getAllEnsembles()
+        BookieSocketAddress replicaToKill = lh.getLedgerMetadata().getEnsembles()
                 .get(0L).get(0);
         LOG.info("Killing {}", replicaToKill);
         killBookie(replicaToKill);
@@ -98,13 +90,17 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         for (LedgerFragment r : result) {
             LOG.info("unreplicated fragment: {}", r);
         }
-
         assertEquals("Should have one missing fragment", 1, result.size());
-        assertTrue("Fragment should be missing from first replica",
-            result.iterator().next().getAddresses().contains(replicaToKill));
+        assertEquals("There should be 1 fragments. But returned fragments are "
+            + result, 1, result.size());
+        LedgerFragment lf = result.iterator().next();
+        assertEquals("There should be 1 failed bookies in first fragment " + lf,
+            1, lf.getBookiesIndexes().size());
+        assertEquals("Fragment should be missing from first replica",
+            lf.getAddress(0), replicaToKill);
 
-        BookieId replicaToKill2 = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L).get(1);
+        BookieSocketAddress replicaToKill2 = lh.getLedgerMetadata()
+                .getEnsembles().get(0L).get(1);
         LOG.info("Killing {}", replicaToKill2);
         killBookie(replicaToKill2);
 
@@ -113,10 +109,16 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         for (LedgerFragment r : result) {
             LOG.info("unreplicated fragment: {}", r);
         }
-
-        AtomicInteger number = new AtomicInteger();
-        result.forEach(ledgerFragment -> number.addAndGet(ledgerFragment.getAddresses().size()));
-        assertEquals("Should have three missing fragments", 3, number.get());
+        assertEquals("Should have two missing fragments", 2, result.size());
+        for (LedgerFragment fragment : result) {
+            if (fragment.getFirstEntryId() == 0L) {
+                assertEquals("There should be 2 failed bookies in first fragment",
+                    2, fragment.getBookiesIndexes().size());
+            } else {
+                assertEquals("There should be 1 failed bookies in second fragment",
+                    1, fragment.getBookiesIndexes().size());
+            }
+        }
     }
 
     /**
@@ -143,9 +145,9 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         // Entry should have added in first 2 Bookies.
 
         // Kill the 3rd BK from ensemble.
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
-        BookieId lastBookieFromEnsemble = firstEnsemble.get(2);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
+        BookieSocketAddress lastBookieFromEnsemble = firstEnsemble.get(2);
         LOG.info("Killing " + lastBookieFromEnsemble + " from ensemble="
                 + firstEnsemble);
         killBookie(lastBookieFromEnsemble);
@@ -153,13 +155,13 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         startNewBookie();
 
         LOG.info("Ensembles after first entry :"
-                + lh.getLedgerMetadata().getAllEnsembles());
+                + lh.getLedgerMetadata().getEnsembles());
 
         // Adding one more entry. Here enseble should be reformed.
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
 
         LOG.info("Ensembles after second entry :"
-                + lh.getLedgerMetadata().getAllEnsembles());
+                + lh.getLedgerMetadata().getEnsembles());
 
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh);
 
@@ -174,7 +176,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
 
     /**
      * Tests that LedgerChecker should give two fragments when 2 bookies failed
-     * in same ensemble when ensemble = 3, quorum = 2.
+     * in same ensemble when ensemble = 3, quorum = 2
      */
     @Test
     public void testShouldGetTwoFrgamentsIfTwoBookiesFailedInSameEnsemble()
@@ -186,13 +188,13 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         startNewBookie();
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
 
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
 
-        BookieId firstBookieFromEnsemble = firstEnsemble.get(0);
+        BookieSocketAddress firstBookieFromEnsemble = firstEnsemble.get(0);
         killBookie(firstEnsemble, firstBookieFromEnsemble);
 
-        BookieId secondBookieFromEnsemble = firstEnsemble.get(1);
+        BookieSocketAddress secondBookieFromEnsemble = firstEnsemble.get(1);
         killBookie(firstEnsemble, secondBookieFromEnsemble);
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh);
@@ -219,9 +221,9 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         LedgerHandle lh = bkc.createLedger(3, 2, BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
-        BookieId firstBookieFromEnsemble = firstEnsemble.get(0);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
+        BookieSocketAddress firstBookieFromEnsemble = firstEnsemble.get(0);
         killBookie(firstBookieFromEnsemble);
         startNewBookie();
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
@@ -249,7 +251,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
 
     /**
      * Tests that LedgerChecker should get failed ensemble number of fragments
-     * if ensemble bookie failures on next entry.
+     * if ensemble bookie failures on next entry
      */
     @Test
     public void testShouldGetFailedEnsembleNumberOfFgmntsIfEnsembleBookiesFailedOnNextWrite()
@@ -264,9 +266,9 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         }
 
         // Kill all three bookies
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
-        for (BookieId bkAddr : firstEnsemble) {
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
+        for (BookieSocketAddress bkAddr : firstEnsemble) {
             killBookie(firstEnsemble, bkAddr);
         }
 
@@ -285,7 +287,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
 
     /**
      * Tests that LedgerChecker should not get any fragments as underReplicated
-     * if Ledger itself is empty.
+     * if Ledger itself is empty
      */
     @Test
     public void testShouldNotGetAnyFragmentWithEmptyLedger() throws Exception {
@@ -308,7 +310,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
     public void testShouldGet2FragmentsWithEmptyLedgerButBookiesDead() throws Exception {
         LedgerHandle lh = bkc.createLedger(3, 2, BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
-        for (BookieId b : lh.getLedgerMetadata().getAllEnsembles().get(0L)) {
+        for (BookieSocketAddress b : lh.getLedgerMetadata().getEnsembles().get(0L)) {
             killBookie(b);
         }
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh);
@@ -327,9 +329,9 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         LedgerHandle lh = bkc.createLedger(3, 3, BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
-        BookieId lastBookieFromEnsemble = firstEnsemble.get(0);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
+        BookieSocketAddress lastBookieFromEnsemble = firstEnsemble.get(0);
         LOG.info("Killing " + lastBookieFromEnsemble + " from ensemble="
                 + firstEnsemble);
         killBookie(lastBookieFromEnsemble);
@@ -337,7 +339,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         startNewBookie();
 
         //Open ledger separately for Ledger checker.
-        LedgerHandle lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        LedgerHandle lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh1);
@@ -361,10 +363,12 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         for (int i = 0; i < 10; i++) {
             lh.addEntry(TEST_LEDGER_ENTRY_DATA);
         }
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
-        DistributionSchedule.WriteSet writeSet = lh.getDistributionSchedule().getWriteSet(lh.getLastAddPushed());
-        BookieId lastBookieFromEnsemble = firstEnsemble.get(writeSet.get(0));
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
+        DistributionSchedule.WriteSet writeSet
+            = lh.getDistributionSchedule().getWriteSet(lh.getLastAddPushed());
+        BookieSocketAddress lastBookieFromEnsemble
+            = firstEnsemble.get(writeSet.get(0));
         LOG.info("Killing " + lastBookieFromEnsemble + " from ensemble="
                 + firstEnsemble);
         killBookie(lastBookieFromEnsemble);
@@ -380,7 +384,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         killBookie(lastBookieFromEnsemble);
 
         //Open ledger separately for Ledger checker.
-        LedgerHandle lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        LedgerHandle lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh1);
@@ -406,17 +410,17 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
     public void testClosedEmptyLedger() throws Exception {
         LedgerHandle lh = bkc.createLedger(3, 3, BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-                .getAllEnsembles().get(0L);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+                .getEnsembles().get(0L);
         lh.close();
 
-        BookieId lastBookieFromEnsemble = firstEnsemble.get(0);
+        BookieSocketAddress lastBookieFromEnsemble = firstEnsemble.get(0);
         LOG.info("Killing " + lastBookieFromEnsemble + " from ensemble="
                 + firstEnsemble);
         killBookie(lastBookieFromEnsemble);
 
         //Open ledger separately for Ledger checker.
-        LedgerHandle lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        LedgerHandle lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh1);
@@ -433,19 +437,19 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
     public void testClosedSingleEntryLedger() throws Exception {
         LedgerHandle lh = bkc.createLedger(3, 2, BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
-        List<BookieId> firstEnsemble = lh.getLedgerMetadata()
-            .getAllEnsembles().get(0L);
+        ArrayList<BookieSocketAddress> firstEnsemble = lh.getLedgerMetadata()
+            .getEnsembles().get(0L);
         lh.addEntry(TEST_LEDGER_ENTRY_DATA);
         lh.close();
 
         // kill bookie 2
-        BookieId lastBookieFromEnsemble = firstEnsemble.get(2);
+        BookieSocketAddress lastBookieFromEnsemble = firstEnsemble.get(2);
         LOG.info("Killing " + lastBookieFromEnsemble + " from ensemble="
                 + firstEnsemble);
         killBookie(lastBookieFromEnsemble);
 
         //Open ledger separately for Ledger checker.
-        LedgerHandle lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        LedgerHandle lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         Set<LedgerFragment> result = getUnderReplicatedFragments(lh1);
@@ -462,7 +466,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         startNewBookie();
 
         //Open ledger separately for Ledger checker.
-        lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         result = getUnderReplicatedFragments(lh1);
@@ -481,7 +485,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         startNewBookie();
 
         //Open ledger separately for Ledger checker.
-        lh1 = bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
+        lh1 =bkc.openLedgerNoRecovery(lh.getId(), BookKeeper.DigestType.CRC32,
                 TEST_LEDGER_PASSWORD);
 
         result = getUnderReplicatedFragments(lh1);
@@ -493,29 +497,6 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         lh1.close();
     }
 
-    @Test
-    public void testVerifyLedgerFragmentSkipsUnavailableBookie() throws Exception {
-        // Initialize LedgerChecker with mocked watcher to validate interactions
-        BookieWatcher bookieWatcher = mock(BookieWatcher.class);
-        when(bookieWatcher.isBookieUnavailable(any())).thenReturn(true);
-        LedgerChecker mockedChecker = new LedgerChecker(bkc.getBookieClient(), bookieWatcher);
-
-        LedgerHandle ledgerHandle = bkc.createLedger(BookKeeper.DigestType.CRC32, TEST_LEDGER_PASSWORD);
-
-        // Add entries to ensure the right code path is validated
-        ledgerHandle.addEntry(TEST_LEDGER_ENTRY_DATA);
-        ledgerHandle.addEntry(TEST_LEDGER_ENTRY_DATA);
-        ledgerHandle.addEntry(TEST_LEDGER_ENTRY_DATA);
-
-        CheckerCallback cb = new CheckerCallback();
-        mockedChecker.checkLedger(ledgerHandle, cb);
-        Set<LedgerFragment> result = cb.waitAndGetResult();
-
-        // Note that the bookieWatcher mock is set to make the ledger underreplicated
-        assertEquals("The one ledger should be considered underreplicated.", 1, result.size());
-        verify(bookieWatcher, times(3)).isBookieUnavailable(any());
-    }
-
     private Set<LedgerFragment> getUnderReplicatedFragments(LedgerHandle lh)
             throws InterruptedException {
         LedgerChecker checker = new LedgerChecker(bkc);
@@ -525,7 +506,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
         return result;
     }
 
-    private void killBookie(List<BookieId> firstEnsemble, BookieId ensemble)
+    private void killBookie(ArrayList<BookieSocketAddress> firstEnsemble, BookieSocketAddress ensemble)
             throws Exception {
         LOG.info("Killing " + ensemble + " from ensemble=" + firstEnsemble);
         killBookie(ensemble);

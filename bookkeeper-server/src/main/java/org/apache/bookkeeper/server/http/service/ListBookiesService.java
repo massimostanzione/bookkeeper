@@ -17,27 +17,20 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/ListBookiesService.java
-=======
 
-import static com.google.common.base.Preconditions.checkNotNull;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/ListBookiesService.java
-
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
-
 import org.apache.bookkeeper.client.BookKeeperAdmin;
-import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +46,7 @@ public class ListBookiesService implements HttpEndpointService {
     protected BookKeeperAdmin bka;
 
     public ListBookiesService(ServerConfiguration conf, BookKeeperAdmin bka) {
-        checkNotNull(conf);
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
         this.bka = bka;
     }
@@ -63,17 +56,17 @@ public class ListBookiesService implements HttpEndpointService {
         HttpServiceResponse response = new HttpServiceResponse();
         // GET
         if (HttpServer.Method.GET == request.getMethod()) {
-            Collection<BookieId> bookies = new ArrayList<BookieId>();
+            Collection<BookieSocketAddress> bookies = new ArrayList<BookieSocketAddress>();
 
             Map<String, String> params = request.getParams();
             // default print rw
-            boolean readOnly = (params != null)
-                && params.containsKey("type")
-                && params.get("type").equals("ro");
+            boolean readOnly = (params != null) &&
+              params.containsKey("type") &&
+              params.get("type").equals("ro");
             // default not print hostname
-            boolean printHostname = (params != null)
-                && params.containsKey("print_hostnames")
-                && params.get("print_hostnames").equals("true");
+            boolean printHostname = (params != null) &&
+              params.containsKey("print_hostnames") &&
+              params.get("print_hostnames").equals("true");
 
             if (readOnly) {
                 bookies.addAll(bka.getReadOnlyBookies());
@@ -83,14 +76,9 @@ public class ListBookiesService implements HttpEndpointService {
 
             // output <bookieSocketAddress: hostname>
             Map<String, String> output = Maps.newHashMap();
-            for (BookieId b : bookies) {
-                String hostname = null;
-                if (printHostname) {
-                    BookieSocketAddress resolved = bka.getBookieAddressResolver().resolve(b);
-                    hostname = resolved.getHostName();
-                }
-                output.putIfAbsent(b.toString(), hostname);
-                LOG.debug("bookie: " + b.toString() + " hostname:" + hostname);
+            for (BookieSocketAddress b : bookies) {
+                output.putIfAbsent(b.toString(), printHostname ? b.getHostName() : null);
+                LOG.debug("bookie: " + b.toString() + " hostname:" + b.getHostName());
             }
             String jsonResponse = JsonUtil.toJson(output);
 

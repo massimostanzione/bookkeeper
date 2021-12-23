@@ -21,23 +21,24 @@
 package org.apache.bookkeeper.test;
 
 import java.io.IOException;
-
+import org.apache.bookkeeper.client.BookKeeperTestClient;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.client.BookKeeperTestClient;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.zookeeper.KeeperException;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.junit.Assert.*;
+
 /**
  * Tests conditional set of the ledger metadata znode.
  */
 public class ConditionalSetTest extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(ConditionalSetTest.class);
+    private final static Logger LOG = LoggerFactory.getLogger(ConditionalSetTest.class);
 
     byte[] entry;
     private final DigestType digestType;
@@ -90,9 +91,15 @@ public class ConditionalSetTest extends BookKeeperClusterTestCase {
         LOG.debug("Opened the ledger already");
 
         /*
-         * Writer tries to close the ledger, and it should succeed as recovery closed
-         * the ledger already, but with the correct LAC and length
+         * Writer tries to close the ledger, and if should fail.
          */
-        lhWrite.close();
+        try{
+            lhWrite.close();
+            fail("Should have received an exception when trying to close the ledger.");
+        } catch (BKException e) {
+            /*
+             * Correctly failed to close the ledger
+             */
+        }
     }
 }

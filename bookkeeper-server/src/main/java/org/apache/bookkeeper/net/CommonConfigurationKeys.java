@@ -20,15 +20,12 @@
  */
 package org.apache.bookkeeper.net;
 
-/**
- * Common Configuration Keys.
- */
 public interface CommonConfigurationKeys {
 
     // script file name to resolve network topology
-    String NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY = "networkTopologyScriptFileName";
+    public static final String NET_TOPOLOGY_SCRIPT_FILE_NAME_KEY = "networkTopologyScriptFileName";
     // number of arguments that network topology resolve script used
-    String NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_KEY = "networkTopologyScriptNumberArgs";
+    public static final String NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_KEY = "networkTopologyScriptNumberArgs";
     // default value of NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_KEY
-    int NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_DEFAULT = 100;
+    public static final int NET_TOPOLOGY_SCRIPT_NUMBER_ARGS_DEFAULT = 100;
 }

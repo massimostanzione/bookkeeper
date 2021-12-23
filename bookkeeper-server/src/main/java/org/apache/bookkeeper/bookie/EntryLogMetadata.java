@@ -21,9 +21,8 @@
 
 package org.apache.bookkeeper.bookie;
 
-import java.util.function.LongPredicate;
-
-import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Records the total size, remaining size and the set of ledgers that comprise a entry log.
@@ -32,19 +31,32 @@ public class EntryLogMetadata {
     private final long entryLogId;
     private long totalSize;
     private long remainingSize;
-    private final ConcurrentLongLongHashMap ledgersMap;
+    private ConcurrentHashMap<Long, Long> ledgersMap;
 
     public EntryLogMetadata(long logId) {
         this.entryLogId = logId;
 
         totalSize = remainingSize = 0;
-        ledgersMap = new ConcurrentLongLongHashMap(256, 1);
+        ledgersMap = new ConcurrentHashMap<Long, Long>();
     }
 
     public void addLedgerSize(long ledgerId, long size) {
         totalSize += size;
         remainingSize += size;
-        ledgersMap.addAndGet(ledgerId, size);
+        Long ledgerSize = ledgersMap.get(ledgerId);
+        if (null == ledgerSize) {
+            ledgerSize = 0L;
+        }
+        ledgerSize += size;
+        ledgersMap.put(ledgerId, ledgerSize);
+    }
+
+    public void removeLedger(long ledgerId) {
+        Long size = ledgersMap.remove(ledgerId);
+        if (null == size) {
+            return;
+        }
+        remainingSize -= size;
     }
 
     public boolean containsLedger(long ledgerId) {
@@ -74,18 +86,8 @@ public class EntryLogMetadata {
         return remainingSize;
     }
 
-    public ConcurrentLongLongHashMap getLedgersMap() {
+    Map<Long, Long> getLedgersMap() {
         return ledgersMap;
-    }
-
-    public void removeLedgerIf(LongPredicate predicate) {
-        ledgersMap.removeIf((ledgerId, size) -> {
-            boolean shouldRemove = predicate.test(ledgerId);
-            if (shouldRemove) {
-                remainingSize -= size;
-            }
-            return shouldRemove;
-        });
     }
 
     @Override

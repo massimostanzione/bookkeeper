@@ -20,7 +20,7 @@
  */
 package org.apache.bookkeeper.benchmark;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.common.base.Charsets.UTF_8;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -103,7 +103,6 @@ public class TestClient {
             final long timeout = Long.parseLong(cmd.getOptionValue("timeout", "360")) * 1000;
 
             timeouter.schedule(new TimerTask() {
-                    @Override
                     public void run() {
                         System.err.println("Timing out benchmark after " + timeout + "ms");
                         System.exit(-1);
@@ -127,7 +126,7 @@ public class TestClient {
 
                 ClientConfiguration conf = new ClientConfiguration();
                 conf.setThrottleValue(bkthrottle);
-                conf.setMetadataServiceUri("zk://" + zkservers + "/ledgers");
+                conf.setZkServers(zkservers);
 
                 bkc = new BookKeeper(conf);
                 List<LedgerHandle> handles = new ArrayList<LedgerHandle>();
@@ -181,7 +180,6 @@ public class TestClient {
             LOG.error("I/O exception during benchmark", ioe);
         } catch (InterruptedException ie) {
             LOG.error("Benchmark interrupted", ie);
-            Thread.currentThread().interrupt();
         } finally {
             if (bkc != null) {
                 try {
@@ -190,7 +188,6 @@ public class TestClient {
                     LOG.error("Error closing bookkeeper client", bke);
                 } catch (InterruptedException ie) {
                     LOG.warn("Interrupted closing bookkeeper client", ie);
-                    Thread.currentThread().interrupt();
                 }
             }
         }
@@ -210,7 +207,6 @@ public class TestClient {
             this.r = new Random(System.identityHashCode(this));
         }
 
-        @Override
         public Long call() {
             try {
                 long count = 0;
@@ -255,7 +251,6 @@ public class TestClient {
             this.sync = sync;
         }
 
-        @Override
         public Long call() {
             try {
                 long start = System.currentTimeMillis();
@@ -285,7 +280,6 @@ public class TestClient {
                 LOG.error("Exception in worker thread", e);
                 return 0L;
             } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
                 LOG.error("Exception in worker thread", ie);
                 return 0L;
             }

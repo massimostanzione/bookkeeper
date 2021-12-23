@@ -23,18 +23,18 @@ package org.apache.bookkeeper.util.collections;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.Lists;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
 
+import com.google.common.collect.Lists;
+
 /**
- * Concurrent hash set.
- *
- * <p>Provides similar methods as a {@code ConcurrentMap<K,V>} but since it's an open hash map with linear probing,
- * no node allocations are required to store the values
+ * Concurrent hash set
+ * 
+ * Provides similar methods as a ConcurrentMap<K,V> but since it's an open hash map with linear probing, no node
+ * allocations are required to store the values
  *
  * @param <V>
  */
@@ -67,7 +67,7 @@ public class ConcurrentOpenHashSet<V> {
         int numSections = concurrencyLevel;
         int perSectionExpectedItems = expectedItems / numSections;
         int perSectionCapacity = (int) (perSectionExpectedItems / MapFillFactor);
-        this.sections = new Section[numSections];
+        this.sections = (Section<V>[]) new Section[numSections];
 
         for (int i = 0; i < numSections; i++) {
             sections[i] = new Section<>(perSectionCapacity);
@@ -148,9 +148,9 @@ public class ConcurrentOpenHashSet<V> {
     // A section is a portion of the hash map that is covered by a single
     @SuppressWarnings("serial")
     private static final class Section<V> extends StampedLock {
-        private volatile V[] values;
+        private V[] values;
 
-        private volatile int capacity;
+        private int capacity;
         private volatile int size;
         private int usedBuckets;
         private int resizeThreshold;
@@ -371,11 +371,9 @@ public class ConcurrentOpenHashSet<V> {
                 }
             }
 
+            capacity = newCapacity;
             values = newValues;
             usedBuckets = size;
-            // Capacity needs to be updated after the values, so that we won't see
-            // a capacity value bigger than the actual array size
-            capacity = newCapacity;
             resizeThreshold = (int) (capacity * MapFillFactor);
         }
 
@@ -401,18 +399,18 @@ public class ConcurrentOpenHashSet<V> {
     private static final long HashMixer = 0xc6a4a7935bd1e995L;
     private static final int R = 47;
 
-    static final <K> long hash(K key) {
+    final static <K> long hash(K key) {
         long hash = key.hashCode() * HashMixer;
         hash ^= hash >>> R;
         hash *= HashMixer;
         return hash;
     }
 
-    static final int signSafeMod(long n, int max) {
-        return (int) n & (max - 1);
+    static final int signSafeMod(long n, int Max) {
+        return (int) n & (Max - 1);
     }
 
-    private static int alignToPowerOfTwo(int n) {
+    private static final int alignToPowerOfTwo(int n) {
         return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
     }
 }

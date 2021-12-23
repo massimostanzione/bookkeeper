@@ -20,31 +20,7 @@
  */
 package org.apache.bookkeeper.bookie;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.UnpooledByteBufAllocator;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.security.GeneralSecurityException;
-import java.util.Arrays;
-import java.util.Collections;
-
-import org.apache.bookkeeper.bookie.FileInfoBackingCache.CachedFileInfo;
-import org.apache.bookkeeper.client.BookKeeper;
-import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.proto.checksum.DigestManager;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.util.DiskChecker;
 import org.apache.bookkeeper.util.SnapshotMap;
@@ -52,11 +28,22 @@ import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.util.Observable;
+import java.util.Observer;
+
+import static com.google.common.base.Charsets.UTF_8;
+import static org.junit.Assert.*;
 
 /**
- * Test cases for IndexPersistenceMgr.
+ * Test cases for IndexPersistenceMgr
  */
 public class IndexPersistenceMgrTest {
+
+    static final Logger logger = LoggerFactory.getLogger(IndexPersistenceMgr.class);
 
     ServerConfiguration conf;
     File journalDir, ledgerDir;
@@ -72,19 +59,18 @@ public class IndexPersistenceMgrTest {
         ledgerDir.delete();
         ledgerDir.mkdir();
         // Create current directories
-        BookieImpl.getCurrentDirectory(journalDir).mkdir();
-        BookieImpl.getCurrentDirectory(ledgerDir).mkdir();
+        Bookie.getCurrentDirectory(journalDir).mkdir();
+        Bookie.getCurrentDirectory(ledgerDir).mkdir();
 
         conf = new ServerConfiguration();
-        conf.setMetadataServiceUri(null);
+        conf.setZkServers(null);
         conf.setJournalDirName(journalDir.getPath());
         conf.setLedgerDirNames(new String[] { ledgerDir.getPath() });
 
         ledgerDirsManager = new LedgerDirsManager(conf, conf.getLedgerDirs(),
                 new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold()));
-        ledgerMonitor = new LedgerDirsMonitor(conf,
-                new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold()),
-                Collections.singletonList(ledgerDirsManager));
+        ledgerMonitor = new LedgerDirsMonitor(conf, 
+                new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold()), ledgerDirsManager);
         ledgerMonitor.init();
     }
 
@@ -163,12 +149,12 @@ public class IndexPersistenceMgrTest {
             assertEquals(0, indexPersistenceMgr.writeFileInfoCache.size());
             assertEquals(0, indexPersistenceMgr.readFileInfoCache.size());
 
-            CachedFileInfo writeFileInfo = indexPersistenceMgr.getFileInfo(lid, masterKey);
-            assertEquals(2, writeFileInfo.getRefCount());
+            FileInfo writeFileInfo = indexPersistenceMgr.getFileInfo(lid, masterKey);
+            assertEquals(3, writeFileInfo.getUseCount());
             assertEquals(1, indexPersistenceMgr.writeFileInfoCache.size());
-            assertEquals(0, indexPersistenceMgr.readFileInfoCache.size());
+            assertEquals(1, indexPersistenceMgr.readFileInfoCache.size());
             writeFileInfo.release();
-            assertEquals(1, writeFileInfo.getRefCount());
+            assertEquals(2, writeFileInfo.getUseCount());
         } finally {
             if (null != indexPersistenceMgr) {
                 indexPersistenceMgr.close();
@@ -182,19 +168,19 @@ public class IndexPersistenceMgrTest {
         try {
             indexPersistenceMgr = createIndexPersistenceManager(1);
 
-            CachedFileInfo writeFileInfo = indexPersistenceMgr.getFileInfo(lid, masterKey);
-            assertEquals(2, writeFileInfo.getRefCount());
+            FileInfo writeFileInfo = indexPersistenceMgr.getFileInfo(lid, masterKey);
+            assertEquals(3, writeFileInfo.getUseCount());
             assertEquals(1, indexPersistenceMgr.writeFileInfoCache.size());
-            assertEquals(0, indexPersistenceMgr.readFileInfoCache.size());
+            assertEquals(1, indexPersistenceMgr.readFileInfoCache.size());
             writeFileInfo.release();
 
-            CachedFileInfo readFileInfo = indexPersistenceMgr.getFileInfo(lid, null);
-            assertEquals(3, readFileInfo.getRefCount());
+            FileInfo readFileInfo = indexPersistenceMgr.getFileInfo(lid, null);
+            assertEquals(3, readFileInfo.getUseCount());
             assertEquals(1, indexPersistenceMgr.writeFileInfoCache.size());
             assertEquals(1, indexPersistenceMgr.readFileInfoCache.size());
             readFileInfo.release();
-            assertEquals(2, writeFileInfo.getRefCount());
-            assertEquals(2, readFileInfo.getRefCount());
+            assertEquals(2, writeFileInfo.getUseCount());
+            assertEquals(2, readFileInfo.getUseCount());
         } finally {
             if (null != indexPersistenceMgr) {
                 indexPersistenceMgr.close();
@@ -208,13 +194,9 @@ public class IndexPersistenceMgrTest {
         try {
             indexPersistenceMgr = createIndexPersistenceManager(1);
             for (int i = 0; i < 3; i++) {
-                CachedFileInfo fileInfo = indexPersistenceMgr.getFileInfo(lid + i, masterKey);
+                FileInfo fileInfo = indexPersistenceMgr.getFileInfo(lid+i, masterKey);
                 // We need to make sure index file is created, otherwise the test case can be flaky
                 fileInfo.checkOpen(true);
-                fileInfo.release();
-
-                // load into read cache also
-                indexPersistenceMgr.getFileInfo(lid + i, null).release();
             }
 
             indexPersistenceMgr.getFileInfo(lid, masterKey);
@@ -228,21 +210,21 @@ public class IndexPersistenceMgrTest {
             assertEquals(1, indexPersistenceMgr.writeFileInfoCache.size());
             assertEquals(2, indexPersistenceMgr.readFileInfoCache.size());
 
-            CachedFileInfo fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid);
+            FileInfo fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid);
             assertNotNull(fileInfo);
-            assertEquals(2, fileInfo.getRefCount());
-            fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid + 1);
+            assertEquals(2, fileInfo.getUseCount());
+            fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid+1);
             assertNull(fileInfo);
-            fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid + 2);
+            fileInfo = indexPersistenceMgr.writeFileInfoCache.asMap().get(lid+2);
             assertNull(fileInfo);
             fileInfo = indexPersistenceMgr.readFileInfoCache.asMap().get(lid);
             assertNull(fileInfo);
-            fileInfo = indexPersistenceMgr.readFileInfoCache.asMap().get(lid + 1);
+            fileInfo = indexPersistenceMgr.readFileInfoCache.asMap().get(lid+1);
             assertNotNull(fileInfo);
-            assertEquals(2, fileInfo.getRefCount());
-            fileInfo = indexPersistenceMgr.readFileInfoCache.asMap().get(lid + 2);
+            assertEquals(2, fileInfo.getUseCount());
+            fileInfo = indexPersistenceMgr.readFileInfoCache.asMap().get(lid+2);
             assertNotNull(fileInfo);
-            assertEquals(2, fileInfo.getRefCount());
+            assertEquals(2, fileInfo.getUseCount());
         } finally {
             if (null != indexPersistenceMgr) {
                 indexPersistenceMgr.close();
@@ -253,171 +235,33 @@ public class IndexPersistenceMgrTest {
     @Test
     public void testEvictionShouldNotAffectLongPollRead() throws Exception {
         IndexPersistenceMgr indexPersistenceMgr = null;
-        Watcher<LastAddConfirmedUpdateNotification> watcher = notification -> notification.recycle();
+        Observer observer = (obs, obj) -> {
+            //no-ops
+        };
         try {
             indexPersistenceMgr = createIndexPersistenceManager(1);
             indexPersistenceMgr.getFileInfo(lid, masterKey);
             indexPersistenceMgr.getFileInfo(lid, null);
             indexPersistenceMgr.updateLastAddConfirmed(lid, 1);
-            // watch should succeed because ledger is not evicted or closed
-            assertTrue(
-                indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, watcher));
+            Observable observable = indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, observer);
+            // observer shouldn't be null because ledger is not evicted or closed
+            assertNotNull("Observer should not be null", observable);
             // now evict ledger 1 from write cache
             indexPersistenceMgr.getFileInfo(lid + 1, masterKey);
-            // even if ledger 1 is evicted from write cache, watcher should still succeed
-            assertTrue(
-                indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, watcher));
+            observable = indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, observer);
+            // even if ledger 1 is evicted from write cache, observer still shouldn't be null
+            assertNotNull("Observer should not be null", observable);
             // now evict ledger 1 from read cache
             indexPersistenceMgr.getFileInfo(lid + 2, masterKey);
             indexPersistenceMgr.getFileInfo(lid + 2, null);
-            // even if ledger 1 is evicted from both cache, watcher should still succeed because it
+            // even if ledger 1 is evicted from both cache, observer still shouldn't be null because it
             // will create a new FileInfo when cache miss
-            assertTrue(
-                indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, watcher));
+            observable = indexPersistenceMgr.waitForLastAddConfirmedUpdate(lid, 1, observer);
+            assertNotNull("Observer should not be null", observable);
         } finally {
             if (null != indexPersistenceMgr) {
                 indexPersistenceMgr.close();
             }
-        }
-    }
-
-    @Test
-    public void testEvictBeforeReleaseRace() throws Exception {
-        IndexPersistenceMgr indexPersistenceMgr = null;
-        Watcher<LastAddConfirmedUpdateNotification> watcher = notification -> notification.recycle();
-        try {
-            indexPersistenceMgr = createIndexPersistenceManager(1);
-
-            indexPersistenceMgr.getFileInfo(1L, masterKey);
-            indexPersistenceMgr.getFileInfo(2L, masterKey);
-            indexPersistenceMgr.getFileInfo(3L, masterKey);
-            indexPersistenceMgr.getFileInfo(4L, masterKey);
-
-            CachedFileInfo fi = indexPersistenceMgr.getFileInfo(1L, masterKey);
-
-            // trigger eviction
-            indexPersistenceMgr.getFileInfo(2L, masterKey);
-            indexPersistenceMgr.getFileInfo(3L, null);
-            indexPersistenceMgr.getFileInfo(4L, null);
-
-            Thread.sleep(1000);
-
-            fi.setFenced();
-            fi.release();
-
-            assertTrue(indexPersistenceMgr.isFenced(1));
-        } finally {
-            if (null != indexPersistenceMgr) {
-                indexPersistenceMgr.close();
-            }
-        }
-    }
-
-    /*
-     * In this testcase index files (FileInfos) are precreated with different
-     * FileInfo header versions (FileInfo.V0 and FileInfo.V1) and it is
-     * validated that the current implementation of IndexPersistenceMgr (and
-     * corresponding FileInfo) is able to function as per the specifications of
-     * FileInfo header version. If it is FileInfo.V0 then explicitLac is not
-     * persisted and if it is FileInfo.V1 then explicitLac is persisted.
-     */
-    @Test
-    public void testFileInfosOfVariousHeaderVersions() throws Exception {
-        IndexPersistenceMgr indexPersistenceMgr = null;
-        try {
-            indexPersistenceMgr = createIndexPersistenceManager(1);
-            long ledgerIdWithVersionZero = 25L;
-            validateFileInfo(indexPersistenceMgr, ledgerIdWithVersionZero, FileInfo.V0);
-
-            long ledgerIdWithVersionOne = 135L;
-            validateFileInfo(indexPersistenceMgr, ledgerIdWithVersionOne, FileInfo.V1);
-        } finally {
-            if (null != indexPersistenceMgr) {
-                indexPersistenceMgr.close();
-            }
-        }
-    }
-
-    void validateFileInfo(IndexPersistenceMgr indexPersistenceMgr, long ledgerId, int headerVersion)
-            throws IOException, GeneralSecurityException {
-        BookKeeper.DigestType digestType = BookKeeper.DigestType.CRC32;
-        boolean getUseV2WireProtocol = true;
-
-        preCreateFileInfoForLedger(ledgerId, headerVersion);
-        DigestManager digestManager = DigestManager.instantiate(ledgerId, masterKey,
-                BookKeeper.DigestType.toProtoDigestType(digestType), UnpooledByteBufAllocator.DEFAULT,
-                getUseV2WireProtocol);
-
-        CachedFileInfo fileInfo = indexPersistenceMgr.getFileInfo(ledgerId, masterKey);
-        fileInfo.readHeader();
-        assertEquals("ExplicitLac should be null", null, fileInfo.getExplicitLac());
-        assertEquals("Header Version should match with precreated fileinfos headerversion", headerVersion,
-                fileInfo.headerVersion);
-        assertTrue("Masterkey should match with precreated fileinfos masterkey",
-                Arrays.equals(masterKey, fileInfo.masterKey));
-        long explicitLac = 22;
-        ByteBuf explicitLacByteBuf = digestManager.computeDigestAndPackageForSendingLac(explicitLac).getBuffer(0);
-        explicitLacByteBuf.markReaderIndex();
-        indexPersistenceMgr.setExplicitLac(ledgerId, explicitLacByteBuf);
-        explicitLacByteBuf.resetReaderIndex();
-        assertEquals("explicitLac ByteBuf contents should match", 0,
-                ByteBufUtil.compare(explicitLacByteBuf, indexPersistenceMgr.getExplicitLac(ledgerId)));
-        /*
-         * release fileInfo untill it is marked dead and closed, so that
-         * contents of it are persisted.
-         */
-        while (fileInfo.refCount.get() != FileInfoBackingCache.DEAD_REF) {
-            fileInfo.release();
-        }
-        /*
-         * reopen the fileinfo and readHeader, so that whatever was persisted
-         * would be read.
-         */
-        fileInfo = indexPersistenceMgr.getFileInfo(ledgerId, masterKey);
-        fileInfo.readHeader();
-        assertEquals("Header Version should match with precreated fileinfos headerversion even after reopening",
-                headerVersion, fileInfo.headerVersion);
-        assertTrue("Masterkey should match with precreated fileinfos masterkey",
-                Arrays.equals(masterKey, fileInfo.masterKey));
-        if (headerVersion == FileInfo.V0) {
-            assertEquals("Since it is V0 Header, explicitLac will not be persisted and should be null after reopening",
-                    null, indexPersistenceMgr.getExplicitLac(ledgerId));
-        } else {
-            explicitLacByteBuf.resetReaderIndex();
-            assertEquals("Since it is V1 Header, explicitLac will be persisted and should not be null after reopening",
-                    0, ByteBufUtil.compare(explicitLacByteBuf, indexPersistenceMgr.getExplicitLac(ledgerId)));
-        }
-    }
-
-    void preCreateFileInfoForLedger(long ledgerId, int headerVersion) throws IOException {
-        File ledgerCurDir = BookieImpl.getCurrentDirectory(ledgerDir);
-        String ledgerName = IndexPersistenceMgr.getLedgerName(ledgerId);
-        File indexFile = new File(ledgerCurDir, ledgerName);
-        indexFile.getParentFile().mkdirs();
-        indexFile.createNewFile();
-        /*
-         * precreate index file (FileInfo) for the ledger with specified
-         * headerversion. Even in FileInfo.V1 case, it is valid for
-         * explicitLacBufLength to be 0. If it is 0, then explicitLac is
-         * considered null (not set).
-         */
-        try (RandomAccessFile raf = new RandomAccessFile(indexFile, "rw")) {
-            FileChannel fcForIndexFile = raf.getChannel();
-            ByteBuffer bb = ByteBuffer.allocate((int) FileInfo.START_OF_DATA);
-            bb.putInt(FileInfo.SIGNATURE);
-            bb.putInt(headerVersion);
-            bb.putInt(masterKey.length);
-            bb.put(masterKey);
-            // statebits
-            bb.putInt(0);
-            if (headerVersion == FileInfo.V1) {
-                // explicitLacBufLength
-                bb.putInt(0);
-            }
-            bb.rewind();
-            fcForIndexFile.position(0);
-            fcForIndexFile.write(bb);
-            fcForIndexFile.close();
         }
     }
 }

@@ -21,21 +21,11 @@
 
 package org.apache.bookkeeper.bookie;
 
-<<<<<<< HEAD
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-=======
-import io.netty.buffer.ByteBuf;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.bookkeeper.conf.ServerConfiguration;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,23 +42,11 @@ public class EntryLogCompactor extends AbstractLogCompactor {
     final CompactableLedgerStorage ledgerStorage;
     private final int maxOutstandingRequests;
 
-<<<<<<< HEAD
     public EntryLogCompactor(GarbageCollectorThread gcThread) {
         super(gcThread);
         this.maxOutstandingRequests = conf.getCompactionMaxOutstandingRequests();
         this.entryLogger = gcThread.getEntryLogger();
         this.ledgerStorage = gcThread.getLedgerStorage();
-=======
-    public EntryLogCompactor(
-            ServerConfiguration conf,
-            EntryLogger entryLogger,
-            CompactableLedgerStorage ledgerStorage,
-            LogRemovalListener logRemover) {
-        super(conf, logRemover);
-        this.maxOutstandingRequests = conf.getCompactionMaxOutstandingRequests();
-        this.entryLogger = entryLogger;
-        this.ledgerStorage = ledgerStorage;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @Override
@@ -78,11 +56,7 @@ public class EntryLogCompactor extends AbstractLogCompactor {
                 scannerFactory.newScanner(entryLogMeta));
             scannerFactory.flush();
             LOG.info("Removing entry log {} after compaction", entryLogMeta.getEntryLogId());
-<<<<<<< HEAD
             gcThread.removeEntryLog(entryLogMeta.getEntryLogId());
-=======
-            logRemovalListener.removeEntryLog(entryLogMeta.getEntryLogId());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         } catch (LedgerDirsManager.NoWritableLedgerDirException nwlde) {
             LOG.warn("No writable ledger directory available, aborting compaction", nwlde);
             return false;
@@ -111,24 +85,15 @@ public class EntryLogCompactor extends AbstractLogCompactor {
                 }
 
                 @Override
-<<<<<<< HEAD
                 public void process(final long ledgerId, long offset, ByteBuffer entry) throws IOException {
                     throttler.acquire(entry.remaining());
-=======
-                public void process(final long ledgerId, long offset, ByteBuf entry) throws IOException {
-                    throttler.acquire(entry.readableBytes());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
                     if (offsets.size() > maxOutstandingRequests) {
                         flush();
                     }
-<<<<<<< HEAD
                     entry.getLong(); // discard ledger id, we already have it
                     long entryId = entry.getLong();
                     entry.rewind();
-=======
-                    long entryId = entry.getLong(entry.readerIndex() + 8);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
                     long newoffset = entryLogger.addEntry(ledgerId, entry);
                     offsets.add(new EntryLocation(ledgerId, entryId, newoffset));
@@ -150,10 +115,6 @@ public class EntryLogCompactor extends AbstractLogCompactor {
             try {
                 entryLogger.flush();
                 ledgerStorage.updateEntriesLocations(offsets);
-<<<<<<< HEAD
-=======
-                ledgerStorage.flushEntriesLocationsIndex();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             } finally {
                 offsets.clear();
             }

@@ -21,20 +21,26 @@
 
 package org.apache.bookkeeper.util;
 
-import org.apache.bookkeeper.common.util.ReflectionUtils;
-import org.apache.bookkeeper.conf.AbstractConfiguration;
+import org.apache.commons.configuration.Configuration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Formatter to format an entry.
+ * Formatter to format an entry
  */
 public abstract class EntryFormatter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(EntryFormatter.class);
+    private final static Logger LOG = LoggerFactory.getLogger(EntryFormatter.class);
+
+    protected Configuration conf;
+
+    public void setConf(Configuration conf) {
+        this.conf = conf;
+    }
 
     /**
-     * Format an entry into a readable format.
+     * Format an entry into a readable format
      *
      * @param data
      *          Data Payload
@@ -42,36 +48,27 @@ public abstract class EntryFormatter {
     public abstract void formatEntry(byte[] data);
 
     /**
-     * Format an entry from a string into a readable format.
+     * Format an entry from a string into a readable format
      *
      * @param input
      *          Input Stream
      */
     public abstract void formatEntry(java.io.InputStream input);
-    public static final EntryFormatter STRING_FORMATTER = new StringEntryFormatter();
 
-    public static EntryFormatter newEntryFormatter(AbstractConfiguration<?> conf) {
+    public final static EntryFormatter STRING_FORMATTER = new StringEntryFormatter();
+
+    public static EntryFormatter newEntryFormatter(Configuration conf, String clsProperty) {
+        String cls = conf.getString(clsProperty, StringEntryFormatter.class.getName());
+        ClassLoader classLoader = EntryFormatter.class.getClassLoader();
         EntryFormatter formatter;
         try {
-            Class<? extends EntryFormatter> entryFormatterClass = conf.getEntryFormatterClass();
-            formatter = ReflectionUtils.newInstance(entryFormatterClass);
+            Class aCls = classLoader.loadClass(cls);
+            formatter = (EntryFormatter) aCls.newInstance();
+            formatter.setConf(conf);
         } catch (Exception e) {
-            LOG.warn("No formatter class found", e);
+            LOG.warn("No formatter class found : " + cls, e);
             LOG.warn("Using Default String Formatter.");
-            formatter = new StringEntryFormatter();
-        }
-        return formatter;
-    }
-
-    public static EntryFormatter newEntryFormatter(String opt, AbstractConfiguration conf) {
-        EntryFormatter formatter;
-        if ("hex".equals(opt)) {
-            formatter = new HexDumpEntryFormatter();
-        } else if ("string".equals(opt)) {
-            formatter = new StringEntryFormatter();
-        } else {
-            LOG.warn("specified unexpected entryformat {}, so default EntryFormatter is used", opt);
-            formatter = newEntryFormatter(conf);
+            formatter = STRING_FORMATTER;
         }
         return formatter;
     }

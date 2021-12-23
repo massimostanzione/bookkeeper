@@ -22,9 +22,6 @@ import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 
-/**
- * An in-memory implementation of the MetaStore interface.
- */
 public class InMemoryMetaStore implements MetaStore {
 
     static final int CUR_VERSION = 1;

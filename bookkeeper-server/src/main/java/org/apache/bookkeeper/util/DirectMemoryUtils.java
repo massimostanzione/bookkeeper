@@ -28,21 +28,18 @@ import java.lang.reflect.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * DirectMemory Utility.
- */
 public class DirectMemoryUtils {
     /**
      * Returns the max configured size of direct memory for the JVM process.
      *
-     * <p>Direct memory can be specified with the flag <code>-XX:MaxDirectMemorySize=8G</code> on the command line.
-     * If not specified, the default value will be set to the max size of the JVM heap.
+     * Direct memory can be specified with the flag <code>-XX:MaxDirectMemorySize=8G</code> on the command line. If not
+     * specified, the default value will be set to the max size of the JVM heap.
      */
     public static long maxDirectMemory() {
         try {
 
-            Class<?> vm = Class.forName("sun.misc.VM");
-            Method maxDirectMemory = vm.getDeclaredMethod("maxDirectMemory");
+            Class<?> VM = Class.forName("sun.misc.VM");
+            Method maxDirectMemory = VM.getDeclaredMethod("maxDirectMemory");
             Object result = maxDirectMemory.invoke(null, (Object[]) null);
 
             checkNotNull(result);

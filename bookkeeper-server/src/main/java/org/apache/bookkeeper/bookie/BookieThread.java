@@ -17,8 +17,6 @@
  */
 package org.apache.bookkeeper.bookie;
 
-import io.netty.util.concurrent.FastThreadLocalThread;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * Any common handing that we require for all bookie threads
  * should be implemented here
  */
-public class BookieThread extends FastThreadLocalThread implements
+public class BookieThread extends Thread implements
         Thread.UncaughtExceptionHandler {
 
     private static final Logger LOG = LoggerFactory

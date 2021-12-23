@@ -6,11 +6,13 @@ Welcome to the code for the Apache BookKeeper website! Instructions on building 
 
 The site is built using Jekyll and Sass.
 
+> I'll provide more specific info here later.
+
 ## Prerequisities
 
 In order to run the site locally, you need to have the following installed:
 
-* Ruby 2.3.1 and Rubygems
+* Ruby 2.4.1 and Rubygems
 * The Javadoc CLI tool
 
 ## Setup
@@ -55,4 +57,3 @@ Here are a few steps to follow to stage your changes:
 6. Your changes will be live on `https://<your-github-id>.github.io/bookkeeper-staging-site`.
 
 If you have any ideas to improve the review process for website, please feel free to contact us at dev@bookkeeper.apache.org.
-

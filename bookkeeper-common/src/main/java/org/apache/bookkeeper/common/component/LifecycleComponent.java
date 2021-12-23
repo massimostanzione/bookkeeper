@@ -18,8 +18,6 @@
 
 package org.apache.bookkeeper.common.component;
 
-import java.lang.Thread.UncaughtExceptionHandler;
-
 /**
  * A component based on lifecycle management.
  */
@@ -33,22 +31,9 @@ public interface LifecycleComponent extends AutoCloseable {
 
     void removeLifecycleListener(LifecycleListener listener);
 
-    default void publishInfo(ComponentInfoPublisher componentInfoPublisher) {
-    }
-
     void start();
 
     void stop();
 
-    @Override
     void close();
-
-    /**
-     * Set the default handler invoked when a lifecycle component
-     * abruptly terminates due an uncaught exception.
-     *
-     * @param handler handler invoked when an uncaught exception happens
-     *                in the lifecycle component.
-     */
-    void setExceptionHandler(UncaughtExceptionHandler handler);
 }

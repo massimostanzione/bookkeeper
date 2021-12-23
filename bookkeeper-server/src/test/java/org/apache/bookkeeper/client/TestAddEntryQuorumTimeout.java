@@ -20,27 +20,22 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test a quorum timeout for add entry operations.
- */
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+
 public class TestAddEntryQuorumTimeout extends BookKeeperClusterTestCase implements AddCallback {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestAddEntryQuorumTimeout.class);
+    final static Logger logger = LoggerFactory.getLogger(TestAddEntryQuorumTimeout.class);
 
     final DigestType digestType;
     final byte[] testPasswd = "".getBytes();
@@ -56,7 +51,7 @@ public class TestAddEntryQuorumTimeout extends BookKeeperClusterTestCase impleme
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        baseConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        baseConf.setZkServers(zkUtil.getZooKeeperConnectString());
     }
 
     private static class SyncObj {
@@ -81,13 +76,13 @@ public class TestAddEntryQuorumTimeout extends BookKeeperClusterTestCase impleme
     public void testBasicTimeout() throws Exception {
         BookKeeperTestClient bkc = new BookKeeperTestClient(baseClientConf);
         LedgerHandle lh = bkc.createLedger(3, 3, 3, digestType, testPasswd);
-        List<BookieId> curEns = lh.getCurrentEnsemble();
+        List<BookieSocketAddress> curEns = lh.getLedgerMetadata().currentEnsemble;
         byte[] data = "foobar".getBytes();
         lh.addEntry(data);
         sleepBookie(curEns.get(0), 5).await();
         try {
             lh.addEntry(data);
-            fail("should have thrown");
+            Assert.fail("should have thrown");
         } catch (BKException.BKAddEntryQuorumTimeoutException ex) {
         }
     }
@@ -105,7 +100,7 @@ public class TestAddEntryQuorumTimeout extends BookKeeperClusterTestCase impleme
     public void testTimeoutWithPendingOps() throws Exception {
         BookKeeperTestClient bkc = new BookKeeperTestClient(baseClientConf);
         LedgerHandle lh = bkc.createLedger(3, 3, 3, digestType, testPasswd);
-        List<BookieId> curEns = lh.getCurrentEnsemble();
+        List<BookieSocketAddress> curEns = lh.getLedgerMetadata().currentEnsemble;
         byte[] data = "foobar".getBytes();
 
         SyncObj syncObj1 = new SyncObj();
@@ -119,29 +114,29 @@ public class TestAddEntryQuorumTimeout extends BookKeeperClusterTestCase impleme
         lh.asyncAddEntry(data, this, syncObj3);
 
         waitForSyncObj(syncObj1);
-        assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj1.rc);
+        Assert.assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj1.rc);
         waitForSyncObj(syncObj2);
-        assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj2.rc);
+        Assert.assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj2.rc);
         waitForSyncObj(syncObj3);
-        assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj3.rc);
+        Assert.assertEquals(BKException.Code.AddEntryQuorumTimeoutException, syncObj3.rc);
     }
 
     @Test
     public void testLedgerClosedAfterTimeout() throws Exception {
         BookKeeperTestClient bkc = new BookKeeperTestClient(baseClientConf);
         LedgerHandle lh = bkc.createLedger(3, 3, 3, digestType, testPasswd);
-        List<BookieId> curEns = lh.getCurrentEnsemble();
+        List<BookieSocketAddress> curEns = lh.getLedgerMetadata().currentEnsemble;
         byte[] data = "foobar".getBytes();
         CountDownLatch b0latch = sleepBookie(curEns.get(0), 5);
         try {
             lh.addEntry(data);
-            fail("should have thrown");
+            Assert.fail("should have thrown");
         } catch (BKException.BKAddEntryQuorumTimeoutException ex) {
         }
         b0latch.await();
         try {
             lh.addEntry(data);
-            fail("should have thrown");
+            Assert.fail("should have thrown");
         } catch (BKException.BKLedgerClosedException ex) {
         }
     }

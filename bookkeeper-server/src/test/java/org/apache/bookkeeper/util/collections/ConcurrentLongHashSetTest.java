@@ -25,9 +25,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,9 +35,9 @@ import java.util.concurrent.Future;
 
 import org.junit.Test;
 
-/**
- * Test the ConcurrentLongHashSet class.
- */
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+
 public class ConcurrentLongHashSetTest {
 
     @Test
@@ -153,7 +150,7 @@ public class ConcurrentLongHashSetTest {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         final int nThreads = 16;
-        final int n = 100_000;
+        final int N = 100_000;
 
         List<Future<?>> futures = new ArrayList<>();
         for (int i = 0; i < nThreads; i++) {
@@ -162,7 +159,7 @@ public class ConcurrentLongHashSetTest {
             futures.add(executor.submit(() -> {
                 Random random = new Random();
 
-                for (int j = 0; j < n; j++) {
+                for (int j = 0; j < N; j++) {
                     long key = Math.abs(random.nextLong());
                     // Ensure keys are unique
                     key -= key % (threadIdx + 1);
@@ -176,7 +173,7 @@ public class ConcurrentLongHashSetTest {
             future.get();
         }
 
-        assertEquals(set.size(), n * nThreads);
+        assertEquals(set.size(), N * nThreads);
 
         executor.shutdown();
     }
@@ -187,7 +184,7 @@ public class ConcurrentLongHashSetTest {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         final int nThreads = 16;
-        final int n = 100_000;
+        final int N = 100_000;
 
         List<Future<?>> futures = new ArrayList<>();
         for (int i = 0; i < nThreads; i++) {
@@ -196,7 +193,7 @@ public class ConcurrentLongHashSetTest {
             futures.add(executor.submit(() -> {
                 Random random = new Random();
 
-                for (int j = 0; j < n; j++) {
+                for (int j = 0; j < N; j++) {
                     long key = Math.abs(random.nextLong());
                     // Ensure keys are unique
                     key -= key % (threadIdx + 1);
@@ -210,7 +207,7 @@ public class ConcurrentLongHashSetTest {
             future.get();
         }
 
-        assertEquals(map.size(), n * nThreads);
+        assertEquals(map.size(), N * nThreads);
 
         executor.shutdown();
     }
@@ -243,15 +240,15 @@ public class ConcurrentLongHashSetTest {
 
     @Test
     public void testHashConflictWithDeletion() {
-        final int buckets = 16;
-        ConcurrentLongHashSet set = new ConcurrentLongHashSet(buckets, 1);
+        final int Buckets = 16;
+        ConcurrentLongHashSet set = new ConcurrentLongHashSet(Buckets, 1);
 
         // Pick 2 keys that fall into the same bucket
         long key1 = 1;
         long key2 = 27;
 
-        int bucket1 = ConcurrentOpenHashSet.signSafeMod(ConcurrentOpenHashSet.hash(key1), buckets);
-        int bucket2 = ConcurrentOpenHashSet.signSafeMod(ConcurrentOpenHashSet.hash(key2), buckets);
+        int bucket1 = ConcurrentOpenHashSet.signSafeMod(ConcurrentOpenHashSet.hash(key1), Buckets);
+        int bucket2 = ConcurrentOpenHashSet.signSafeMod(ConcurrentOpenHashSet.hash(key2), Buckets);
         assertEquals(bucket1, bucket2);
 
         assertTrue(set.add(key1));

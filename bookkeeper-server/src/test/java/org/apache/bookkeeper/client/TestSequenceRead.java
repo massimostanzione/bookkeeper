@@ -22,29 +22,38 @@ package org.apache.bookkeeper.client;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.common.collect.Lists;
-
+import java.util.ArrayList;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Test reading an entry from replicas in sequence way.
  */
 public class TestSequenceRead extends BookKeeperClusterTestCase {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestSequenceRead.class);
+    static final Logger logger = LoggerFactory.getLogger(TestSequenceRead.class);
+
+    final DigestType digestType;
+    final byte[] passwd = "sequence-read".getBytes();
 
     public TestSequenceRead() {
         super(5);
+        this.digestType = DigestType.CRC32;
     }
 
-    private long createLedgerWithDuplicatedBookies() throws Exception {
-        long ledgerId = 12345L;
+    private LedgerHandle createLedgerWithDuplicatedBookies() throws Exception {
+        final LedgerHandle lh = bkc.createLedger(3, 3, 3, digestType, passwd);
         // introduce duplicated bookies in an ensemble.
-<<<<<<< HEAD
         SortedMap<Long, ArrayList<BookieSocketAddress>> ensembles = lh.getLedgerMetadata().getEnsembles();
         TreeMap<Long, ArrayList<BookieSocketAddress>> newEnsembles = new TreeMap<>();
         for (Map.Entry<Long, ArrayList<BookieSocketAddress>> entry : ensembles.entrySet()) {
@@ -71,24 +80,14 @@ public class TestSequenceRead extends BookKeeperClusterTestCase {
         latch.await();
         logger.info("Update ledger metadata with duplicated bookies for ledger {}.", lh.getId());
         return lh;
-=======
-        LedgerMetadataBuilder builder = LedgerMetadataBuilder.create()
-            .withId(ledgerId).withEnsembleSize(3).withWriteQuorumSize(3).withAckQuorumSize(3)
-            .newEnsembleEntry(0L, Lists.newArrayList(getBookie(0), getBookie(0), getBookie(0)));
-        ClientUtil.setupLedger(bkc.getLedgerManager(), ledgerId, builder);
-
-        logger.info("Update ledger metadata with duplicated bookies for ledger {}.", ledgerId);
-        return ledgerId;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     @Test
     public void testSequenceReadOnDuplicatedBookies() throws Exception {
-        final long ledgerId = createLedgerWithDuplicatedBookies();
+        final LedgerHandle lh = createLedgerWithDuplicatedBookies();
 
         // should be able to open the ledger even it has duplicated bookies
-        final LedgerHandle readLh = bkc.openLedger(
-                ledgerId, DigestType.fromApiDigestType(ClientUtil.DIGEST_TYPE), ClientUtil.PASSWD);
+        final LedgerHandle readLh = bkc.openLedger(lh.getId(), digestType, passwd);
         assertEquals(LedgerHandle.INVALID_ENTRY_ID, readLh.getLastAddConfirmed());
     }
 

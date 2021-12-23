@@ -19,23 +19,25 @@
 
 package org.apache.bookkeeper.bookie;
 
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SKIP_LIST_FLUSH_BYTES;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SKIP_LIST_GET_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SKIP_LIST_PUT_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SKIP_LIST_SNAPSHOT;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SKIP_LIST_THROTTLING;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.PrimitiveIterator;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.bookkeeper.bookie.Bookie.NoLedgerException;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
-import org.apache.bookkeeper.bookie.stats.EntryMemTableStats;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.stats.Counter;
+import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.stats.StatsLogger;
-import org.apache.bookkeeper.util.IteratorUtility;
 import org.apache.bookkeeper.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +48,9 @@ import org.slf4j.LoggerFactory;
  * We continue to serve edits out of new EntrySkipList and backing snapshot until
  * flusher reports in that the flush succeeded. At that point we let the snapshot go.
  */
-public class EntryMemTable implements AutoCloseable{
-    private static Logger logger = LoggerFactory.getLogger(EntryMemTable.class);
+public class EntryMemTable {
+    private static Logger logger = LoggerFactory.getLogger(Journal.class);
+
     /**
      * Entry skip list.
      */
@@ -100,7 +103,6 @@ public class EntryMemTable implements AutoCloseable{
     final AtomicLong size;
 
     final long skipListSizeLimit;
-    final Semaphore skipListSemaphore;
 
     SkipListArena allocator;
 
@@ -112,7 +114,11 @@ public class EntryMemTable implements AutoCloseable{
     }
 
     // Stats
-    protected final EntryMemTableStats memTableStats;
+    private final OpStatsLogger snapshotStats;
+    private final OpStatsLogger putEntryStats;
+    private final OpStatsLogger getEntryStats;
+    private final Counter flushBytesCounter;
+    private final Counter throttlingCounter;
 
     /**
     * Constructor.
@@ -130,17 +136,12 @@ public class EntryMemTable implements AutoCloseable{
         // skip list size limit
         this.skipListSizeLimit = conf.getSkipListSizeLimit();
 
-        if (skipListSizeLimit > (Integer.MAX_VALUE - 1) / 2) {
-            // gives 2*1023MB for mem table.
-            // consider a way to create semaphore with long num of permits
-            // until that 1023MB should be enough for everything (tm)
-            throw new IllegalArgumentException("skiplist size over " + ((Integer.MAX_VALUE - 1) / 2));
-        }
-        // double the size for snapshot in progress + incoming data
-        this.skipListSemaphore = new Semaphore((int) skipListSizeLimit * 2);
-
         // Stats
-        this.memTableStats = new EntryMemTableStats(statsLogger);
+        this.snapshotStats = statsLogger.getOpStatsLogger(SKIP_LIST_SNAPSHOT);
+        this.putEntryStats = statsLogger.getOpStatsLogger(SKIP_LIST_PUT_ENTRY);
+        this.getEntryStats = statsLogger.getOpStatsLogger(SKIP_LIST_GET_ENTRY);
+        this.flushBytesCounter = statsLogger.getCounter(SKIP_LIST_FLUSH_BYTES);
+        this.throttlingCounter = statsLogger.getCounter(SKIP_LIST_THROTTLING);
     }
 
     void dump() {
@@ -188,11 +189,9 @@ public class EntryMemTable implements AutoCloseable{
             }
 
             if (null != cp) {
-                memTableStats.getSnapshotStats()
-                    .registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                snapshotStats.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             } else {
-                memTableStats.getSnapshotStats()
-                    .registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                snapshotStats.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             }
         }
         return cp;
@@ -233,14 +232,10 @@ public class EntryMemTable implements AutoCloseable{
     }
 
     /**
-     * Flush snapshot and clear it iff its data is before checkpoint. Only this
-     * function change non-empty this.snapshot.
-     *
-     * <p>EntryMemTableWithParallelFlusher overrides this flushSnapshot method. So
-     * any change in functionality/behavior/characteristic of this method should
-     * also reflect in EntryMemTableWithParallelFlusher's flushSnapshot method.
+     * Flush snapshot and clear it iff its data is before checkpoint.
+     * Only this function change non-empty this.snapshot.
      */
-    long flushSnapshot(final SkipListFlusher flusher, Checkpoint checkpoint) throws IOException {
+    private long flushSnapshot(final SkipListFlusher flusher, Checkpoint checkpoint) throws IOException {
         long size = 0;
         if (this.snapshot.compareTo(checkpoint) < 0) {
             long ledger, ledgerGC = -1;
@@ -253,19 +248,18 @@ public class EntryMemTable implements AutoCloseable{
                         ledger = kv.getLedgerId();
                         if (ledgerGC != ledger) {
                             try {
-                                flusher.process(ledger, kv.getEntryId(), kv.getValueAsByteBuffer());
+                                flusher.process(ledger, kv.getEntryId(), kv.getValueAsByteBuffer().nioBuffer());
                             } catch (NoLedgerException exception) {
                                 ledgerGC = ledger;
                             }
                         }
                     }
-                    memTableStats.getFlushBytesCounter().add(size);
+                    flushBytesCounter.add(size);
                     clearSnapshot(keyValues);
                 }
             }
         }
 
-        skipListSemaphore.release((int) size);
         return size;
     }
 
@@ -274,7 +268,7 @@ public class EntryMemTable implements AutoCloseable{
      * @param keyValues The snapshot to clean out.
      * @see {@link #snapshot()}
      */
-    void clearSnapshot(final EntrySkipList keyValues) {
+    private void clearSnapshot(final EntrySkipList keyValues) {
         // Caller makes sure that keyValues not empty
         assert !keyValues.isEmpty();
         this.lock.writeLock().lock();
@@ -285,6 +279,18 @@ public class EntryMemTable implements AutoCloseable{
         } finally {
             this.lock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Throttling writer w/ 1 ms delay.
+     */
+    private void throttleWriters() {
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        throttlingCounter.inc();
     }
 
     /**
@@ -304,21 +310,9 @@ public class EntryMemTable implements AutoCloseable{
                 Checkpoint cp = snapshot();
                 if ((null != cp) || (!previousFlushSucceeded.get())) {
                     cb.onSizeLimitReached(cp);
-<<<<<<< HEAD
                 } else {
                     throttleWriters();
-=======
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                 }
-            }
-
-            final int len = entry.remaining();
-            if (!skipListSemaphore.tryAcquire(len)) {
-                memTableStats.getThrottlingCounter().inc();
-                final long throttlingStartTimeNanos = MathUtils.nowInNano();
-                skipListSemaphore.acquireUninterruptibly(len);
-                memTableStats.getThrottlingStats()
-                    .registerSuccessfulEvent(MathUtils.elapsedNanos(throttlingStartTimeNanos), TimeUnit.NANOSECONDS);
             }
 
             this.lock.readLock().lock();
@@ -332,11 +326,9 @@ public class EntryMemTable implements AutoCloseable{
             return size;
         } finally {
             if (success) {
-                memTableStats.getPutEntryStats()
-                    .registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                putEntryStats.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             } else {
-                memTableStats.getPutEntryStats()
-                    .registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                putEntryStats.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             }
         }
     }
@@ -360,8 +352,13 @@ public class EntryMemTable implements AutoCloseable{
         int offset = 0;
         int length = entry.remaining();
 
-        buf = new byte[length];
-        entry.get(buf);
+        if (entry.hasArray()) {
+            buf = entry.array();
+            offset = entry.arrayOffset();
+        } else {
+            buf = new byte[length];
+            entry.get(buf);
+        }
         return new EntryKeyValue(ledgerId, entryId, buf, offset, length);
     }
 
@@ -400,11 +397,9 @@ public class EntryMemTable implements AutoCloseable{
         } finally {
             this.lock.readLock().unlock();
             if (success) {
-                memTableStats.getGetEntryStats()
-                    .registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                getEntryStats.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             } else {
-                memTableStats.getGetEntryStats()
-                    .registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                getEntryStats.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             }
         }
 
@@ -431,11 +426,9 @@ public class EntryMemTable implements AutoCloseable{
         } finally {
             this.lock.readLock().unlock();
             if (success) {
-                memTableStats.getGetEntryStats()
-                    .registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                getEntryStats.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             } else {
-                memTableStats.getGetEntryStats()
-                    .registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
+                getEntryStats.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
             }
         }
 
@@ -458,54 +451,5 @@ public class EntryMemTable implements AutoCloseable{
      */
     boolean isEmpty() {
         return size.get() == 0 && snapshot.isEmpty();
-    }
-
-    @Override
-    public void close() throws Exception {
-        // no-op
-    }
-
-    /*
-     * returns the primitive long iterator of entries of a ledger available in
-     * this EntryMemTable. It would be in the ascending order and this Iterator
-     * is weakly consistent.
-     */
-    PrimitiveIterator.OfLong getListOfEntriesOfLedger(long ledgerId) {
-        EntryKey thisLedgerFloorEntry = new EntryKey(ledgerId, 0);
-        EntryKey thisLedgerCeilingEntry = new EntryKey(ledgerId, Long.MAX_VALUE);
-        Iterator<EntryKey> thisLedgerEntriesInKVMap;
-        Iterator<EntryKey> thisLedgerEntriesInSnapshot;
-        this.lock.readLock().lock();
-        try {
-            /*
-             * Gets a view of the portion of this map that corresponds to
-             * entries of this ledger.
-             *
-             * Here 'kvmap' is of type 'ConcurrentSkipListMap', so its 'subMap'
-             * call would return a view of the portion of this map whose keys
-             * range from fromKey to toKey and it would be of type
-             * 'ConcurrentNavigableMap'. ConcurrentNavigableMap's 'keySet' would
-             * return NavigableSet view of the keys contained in this map. This
-             * view's iterator would be weakly consistent -
-             * https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/
-             * package-summary.html#Weakly.
-             *
-             * 'weakly consistent' would guarantee 'to traverse elements as they
-             * existed upon construction exactly once, and may (but are not
-             * guaranteed to) reflect any modifications subsequent to
-             * construction.'
-             *
-             */
-            thisLedgerEntriesInKVMap = this.kvmap.subMap(thisLedgerFloorEntry, thisLedgerCeilingEntry).keySet()
-                    .iterator();
-            thisLedgerEntriesInSnapshot = this.snapshot.subMap(thisLedgerFloorEntry, thisLedgerCeilingEntry).keySet()
-                    .iterator();
-        } finally {
-            this.lock.readLock().unlock();
-        }
-        return IteratorUtility.mergeIteratorsForPrimitiveLongIterator(thisLedgerEntriesInKVMap,
-                thisLedgerEntriesInSnapshot, EntryKey.COMPARATOR, (entryKey) -> {
-                    return entryKey.entryId;
-                });
     }
 }

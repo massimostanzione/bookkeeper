@@ -17,18 +17,18 @@
  */
 package org.apache.bookkeeper.net;
 
+import org.apache.bookkeeper.util.MathUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
 
-import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This is going to provide a stabilize network topology regarding to flapping zookeeper registration.
@@ -42,7 +42,7 @@ public class StabilizeNetworkTopology implements NetworkTopology {
         boolean tentativeToRemove;
 
         NodeStatus() {
-            this.lastPresentTime = System.currentTimeMillis();
+            this.lastPresentTime = MathUtils.now();
         }
 
         synchronized boolean isTentativeToRemove() {
@@ -52,7 +52,7 @@ public class StabilizeNetworkTopology implements NetworkTopology {
         synchronized NodeStatus updateStatus(boolean tentativeToRemove) {
             this.tentativeToRemove = tentativeToRemove;
             if (!this.tentativeToRemove) {
-                this.lastPresentTime = System.currentTimeMillis();
+                this.lastPresentTime = MathUtils.now();
             }
             return this;
         }
@@ -88,10 +88,10 @@ public class StabilizeNetworkTopology implements NetworkTopology {
                 // no status of this node, remove this node from topology
                 impl.remove(node);
             } else if (status.isTentativeToRemove()) {
-                long millisSinceLastSeen = System.currentTimeMillis() - status.getLastPresentTime();
+                long millisSinceLastSeen = MathUtils.now() - status.getLastPresentTime();
                 if (millisSinceLastSeen >= stabilizePeriodMillis) {
                     logger.info("Node {} (seen @ {}) becomes stale for {} ms, remove it from the topology.",
-                            node, status.getLastPresentTime(), millisSinceLastSeen);
+                            new Object[] { node, status.getLastPresentTime(), millisSinceLastSeen });
                     impl.remove(node);
                     nodeStatuses.remove(node, status);
                 }
@@ -151,10 +151,5 @@ public class StabilizeNetworkTopology implements NetworkTopology {
     @Override
     public Set<Node> getLeaves(String loc) {
         return impl.getLeaves(loc);
-    }
-
-    @Override
-    public int countNumOfAvailableNodes(String scope, Collection<Node> excludedNodes) {
-        return impl.countNumOfAvailableNodes(scope, excludedNodes);
     }
 }

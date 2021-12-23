@@ -21,9 +21,6 @@ import java.util.Set;
 
 import org.apache.bookkeeper.metastore.MetastoreScannableTable.Order;
 
-/**
- * Async to sync converter for a metastore scannable table.
- */
 public class MetastoreScannableTableAsyncToSyncConverter extends
              MetastoreTableAsyncToSyncConverter {
 

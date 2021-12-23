@@ -1,3 +1,5 @@
+package org.apache.bookkeeper.client;
+
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -18,16 +20,14 @@
  * under the License.
  *
  */
-package org.apache.bookkeeper.client;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,11 +35,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This unit test tests ledger fencing.
+ * This unit test tests ledger fencing;
  *
  */
 public class TestReadTimeout extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(TestReadTimeout.class);
+    private final static Logger LOG = LoggerFactory.getLogger(TestReadTimeout.class);
 
     DigestType digestType;
 
@@ -61,10 +61,11 @@ public class TestReadTimeout extends BookKeeperClusterTestCase {
             writelh.addEntry(tmp.getBytes());
         }
 
-        Set<BookieId> beforeSet = new HashSet<BookieId>();
-        beforeSet.addAll(writelh.getLedgerMetadata().getEnsembleAt(numEntries));
+        Set<BookieSocketAddress> beforeSet = new HashSet<BookieSocketAddress>();
+        beforeSet.addAll(writelh.getLedgerMetadata().getEnsemble(numEntries));
 
-        final BookieId bookieToSleep = writelh.getLedgerMetadata().getEnsembleAt(numEntries).get(0);
+        final BookieSocketAddress bookieToSleep
+            = writelh.getLedgerMetadata().getEnsemble(numEntries).get(0);
         int sleeptime = baseClientConf.getReadTimeout() * 3;
         CountDownLatch latch = sleepBookie(bookieToSleep, sleeptime);
         latch.await();
@@ -79,8 +80,8 @@ public class TestReadTimeout extends BookKeeperClusterTestCase {
         Thread.sleep((baseClientConf.getReadTimeout() * 3) * 1000);
         Assert.assertTrue("Write request did not finish", completed.get());
 
-        Set<BookieId> afterSet = new HashSet<BookieId>();
-        afterSet.addAll(writelh.getLedgerMetadata().getEnsembleAt(numEntries + 1));
+        Set<BookieSocketAddress> afterSet = new HashSet<BookieSocketAddress>();
+        afterSet.addAll(writelh.getLedgerMetadata().getEnsemble(numEntries + 1));
         beforeSet.removeAll(afterSet);
         Assert.assertTrue("Bookie set should not match", beforeSet.size() != 0);
 

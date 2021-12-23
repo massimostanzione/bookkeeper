@@ -21,6 +21,12 @@
 
 package org.apache.bookkeeper.util;
 
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,36 +34,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
- * Caching layer for traversing and monitoring changes on a znode subtree.
+ * Caching layer for traversing and monitoring changes on a znode subtree
  *
- * <p>ZooKeeper does not provide a way to perform a recursive watch on a subtree.
+ * ZooKeeper does not provide a way to perform a recursive watch on a subtree.
  * In order to detect changes to a subtree, we need to maintain a
  * cache of nodes which have been listed and have not changed since.  This would
  * mirror the set of nodes with live watches in ZooKeeper (since we can't
  * cancel them at the moment).
  *
- * <p>In order to avoid having to pre-read the whole subtree up front, we'll weaken
+ * In order to avoid having to pre-read the whole subtree up front, we'll weaken
  * the guarantee to only require firing the watcher for updates on nodes read since
  * the watcher was registered which happened after the read.  We'll also permit
  * spurious events elsewhere in the tree to avoid having to distinguish between
  * nodes which were read before and after a watch was established.
  *
- * <p>Finally, we'll allow (require, even) the user to cancel a registered watcher
+ * Finally, we'll allow (require, even) the user to cancel a registered watcher
  * once no longer interested.
  */
 public class SubTreeCache {
     private static final Logger LOG = LoggerFactory.getLogger(SubTreeCache.class);
 
-    /**
-     * A tree provider.
-     */
     public interface TreeProvider {
         List<String> getChildren(
                 String path, Watcher watcher) throws InterruptedException, KeeperException;
@@ -96,7 +93,7 @@ public class SubTreeCache {
         this.provider = provider;
     }
 
-    private synchronized void handleEvent(WatchedEvent event) {
+    synchronized private void handleEvent(WatchedEvent event) {
         Set<Watcher> toReturn = pendingWatchers;
         for (Watcher watcher: pendingWatchers) {
             watcher.process(event);
@@ -106,7 +103,7 @@ public class SubTreeCache {
 
 
     /**
-     * Returns children of node.
+     * Returns children of node
      *
      * @param path Path of which to get children
      * @return Children of path
@@ -122,9 +119,9 @@ public class SubTreeCache {
     }
 
     /**
-     * Register a watcher.
-     *
-     * <p>See class header for semantics.
+     * Register a watcher
+     * <p>
+     * See class header for semantics.
      *
      * @param watcher watcher to register
      */
@@ -133,7 +130,7 @@ public class SubTreeCache {
     }
 
     /**
-     * Cancel a watcher (noop if not registered or already fired).
+     * Cancel a watcher (noop if not registered or already fired)
      *
      * @param watcher Watcher object to cancel
      */
@@ -141,9 +138,6 @@ public class SubTreeCache {
         pendingWatchers.remove(watcher);
     }
 
-    /**
-     * A watch guard.
-     */
     public class WatchGuard implements AutoCloseable {
         final Watcher w;
 
@@ -158,9 +152,9 @@ public class SubTreeCache {
     }
 
     /**
-     * Register watcher and get interest guard object which can be used with try-with-resources.
-     *
-     * <p>It's important not to leak watchers into this structure.  The returned WatchGuard
+     * Register watcher and get interest guard object which can be used with try-with-resources
+     * <p>
+     * It's important not to leak watchers into this structure.  The returned WatchGuard
      * can be used to ensure that the watch is unregistered upon exiting a scope.
      *
      * @param watcher Watcher to register

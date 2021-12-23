@@ -17,23 +17,18 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/DecommissionService.java
-=======
 
-import static com.google.common.base.Preconditions.checkNotNull;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/DecommissionService.java
-
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
-
 import org.apache.bookkeeper.client.BookKeeperAdmin;
-import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +46,7 @@ public class DecommissionService implements HttpEndpointService {
 
 
     public DecommissionService(ServerConfiguration conf, BookKeeperAdmin bka, ExecutorService executor) {
-        checkNotNull(conf);
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
         this.bka = bka;
         this.executor = executor;
@@ -77,7 +72,9 @@ public class DecommissionService implements HttpEndpointService {
             HashMap<String, String> configMap = JsonUtil.fromJson(requestBody, HashMap.class);
             if (configMap != null && configMap.containsKey("bookie_src")) {
                 try {
-                    BookieId bookieSrc = BookieId.parse(configMap.get("bookie_src"));
+                    String bookieSrcString[] = configMap.get("bookie_src").split(":");
+                    BookieSocketAddress bookieSrc = new BookieSocketAddress(
+                      bookieSrcString[0], Integer.parseInt(bookieSrcString[1]));
 
                     executor.execute(() -> {
                         try {
@@ -85,7 +82,7 @@ public class DecommissionService implements HttpEndpointService {
                             bka.decommissionBookie(bookieSrc);
                             LOG.info("Complete decommissioning bookie.");
                         } catch (Exception e) {
-                            LOG.error("Error handling decommissionBookie: {}.", bookieSrc, e);
+                            LOG.error("Error handling decommissionBookie: {} with exception {}", bookieSrc, e);
                         }
                     });
 

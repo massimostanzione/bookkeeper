@@ -20,100 +20,47 @@
  */
 package org.apache.bookkeeper.http.vertx;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 
 import org.apache.bookkeeper.http.HttpRouter;
 import org.apache.bookkeeper.http.HttpServer;
-import org.apache.bookkeeper.http.HttpServiceProvider;
 import org.apache.bookkeeper.http.NullHttpServiceProvider;
+import org.apache.bookkeeper.http.HttpServiceProvider;
 import org.apache.bookkeeper.http.service.HeartbeatService;
 import org.junit.Test;
 
-/**
- * Unit test {@link VertxHttpServer}.
- */
+import static org.junit.Assert.assertEquals;
+
 public class TestVertxHttpServer {
+
+    private int port = 8080;
+
     @Test
     public void testStartBasicHttpServer() throws Exception {
         VertxHttpServer httpServer = new VertxHttpServer();
         HttpServiceProvider httpServiceProvider = NullHttpServiceProvider.getInstance();
         httpServer.initialize(httpServiceProvider);
-        assertTrue(httpServer.startServer(0));
-        int port = httpServer.getListeningPort();
-        HttpResponse httpResponse = send(getUrl(port, HttpRouter.HEARTBEAT), HttpServer.Method.GET);
+        int port = getNextPort();
+        while (!httpServer.startServer(port)) {
+            httpServer.stopServer();
+            port = getNextPort();
+        }
+        HttpResponse httpResponse = sendGet(getUrl(port, HttpRouter.HEARTBEAT));
         assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
         assertEquals(HeartbeatService.HEARTBEAT.trim(), httpResponse.responseBody.trim());
         httpServer.stopServer();
     }
 
-    @Test
-    public void testStartMetricsServiceOnRouterPath() throws Exception {
-        VertxHttpServer httpServer = new VertxHttpServer();
-        HttpServiceProvider httpServiceProvider = NullHttpServiceProvider.getInstance();
-        httpServer.initialize(httpServiceProvider);
-        assertTrue(httpServer.startServer(0));
-        int port = httpServer.getListeningPort();
-        HttpResponse httpResponse = send(getUrl(port, HttpRouter.METRICS), HttpServer.Method.GET);
-        assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
-        httpServer.stopServer();
-    }
-
-    @Test
-    public void testHttpMethods() throws Exception {
-        VertxHttpServer httpServer = new VertxHttpServer();
-        HttpServiceProvider httpServiceProvider = NullHttpServiceProvider.getInstance();
-        httpServer.initialize(httpServiceProvider);
-        assertTrue(httpServer.startServer(0));
-        int port = httpServer.getListeningPort();
-        HttpResponse httpResponse = send(getUrl(port, HttpRouter.GC), HttpServer.Method.GET);
-        assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
-        httpResponse = send(getUrl(port, HttpRouter.GC), HttpServer.Method.POST);
-        assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
-        httpResponse = send(getUrl(port, HttpRouter.GC), HttpServer.Method.PUT);
-        assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
-        httpServer.stopServer();
-    }
-
-    @Test
-    public void testHttpMethodsWithBody() throws IOException {
-        VertxHttpServer httpServer = new VertxHttpServer();
-        HttpServiceProvider httpServiceProvider = NullHttpServiceProvider.getInstance();
-        httpServer.initialize(httpServiceProvider);
-        assertTrue(httpServer.startServer(0));
-        int port = httpServer.getListeningPort();
-        String body = "{\"bookie_src\": \"localhost:3181\"}";
-        HttpResponse httpResponse = send(getUrl(port, HttpRouter.DECOMMISSION), HttpServer.Method.PUT, body);
-        assertEquals(HttpServer.StatusCode.OK.getValue(), httpResponse.responseCode);
-        assertEquals(body, httpResponse.responseBody);
-        httpServer.stopServer();
-    }
-
-    private HttpResponse send(String url, HttpServer.Method method) throws IOException {
-        return send(url, method, "");
-    }
-
-    // HTTP request
-    private HttpResponse send(String url, HttpServer.Method method, String body) throws IOException {
+    // HTTP GET request
+    private HttpResponse sendGet(String url) throws IOException {
         URL obj = new URL(url);
         HttpURLConnection con = (HttpURLConnection) obj.openConnection();
         // optional, default is GET
-        con.setRequestMethod(method.toString());
-        if (body != "") {
-            con.setDoOutput(true);
-            con.setFixedLengthStreamingMode(body.length());
-            OutputStream outputStream = con.getOutputStream();
-            outputStream.write(body.getBytes(StandardCharsets.UTF_8));
-            outputStream.flush();
-        }
+        con.setRequestMethod("GET");
         int responseCode = con.getResponseCode();
         StringBuilder response = new StringBuilder();
         BufferedReader in = null;
@@ -143,5 +90,12 @@ public class TestVertxHttpServer {
             this.responseCode = responseCode;
             this.responseBody = responseBody;
         }
+    }
+
+    private int getNextPort() throws Exception {
+        if (port > 65535) {
+            throw new Exception("No port available");
+        }
+        return port++;
     }
 }

@@ -1,3 +1,5 @@
+package org.apache.bookkeeper.proto;
+
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -18,16 +20,14 @@
  * under the License.
  *
  */
-package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 
 import org.apache.bookkeeper.proto.BookkeeperProtocol.AuthMessage;
-import org.apache.bookkeeper.util.ByteBufList;
 
 /**
  * The packets of the Bookie protocol all have a 4-byte integer indicating the
@@ -40,22 +40,22 @@ public interface BookieProtocol {
     /**
      * Lowest protocol version which will work with the bookie.
      */
-    byte LOWEST_COMPAT_PROTOCOL_VERSION = 0;
+    public static final byte LOWEST_COMPAT_PROTOCOL_VERSION = 0;
 
     /**
      * Current version of the protocol, which client will use.
      */
-    byte CURRENT_PROTOCOL_VERSION = 2;
+    public static final byte CURRENT_PROTOCOL_VERSION = 2;
 
     /**
      * Entry Entry ID. To be used when no valid entry id can be assigned.
      */
-    long INVALID_ENTRY_ID = -1;
+    public static final long INVALID_ENTRY_ID = -1;
 
     /**
-     * Entry identifier representing a request to obtain the last add entry confirmed.
+     * Entry identifier representing a request to obtain the last add entry confirmed
      */
-    long LAST_ADD_CONFIRMED = -1;
+    public static final long LAST_ADD_CONFIRMED = -1;
 
     /**
      * The length of the master key in add packets. This
@@ -63,7 +63,7 @@ public interface BookieProtocol {
      * is always generated using the MacDigestManager regardless
      * of whether Mac is being used for the digest or not
      */
-    int MASTER_KEY_LENGTH = 20;
+    public static final int MASTER_KEY_LENGTH = 20;
 
     /**
      * The first int of a packet is the header.
@@ -72,10 +72,10 @@ public interface BookieProtocol {
      * and just had an int representing the opCode as the
      * first int. This handles that case also.
      */
-    final class PacketHeader {
+    final static class PacketHeader {
         public static int toInt(byte version, byte opCode, short flags) {
             if (version == 0) {
-                return (int) opCode;
+                return (int)opCode;
             } else {
                 return ((version & 0xFF) << 24)
                     | ((opCode & 0xFF) << 16)
@@ -84,7 +84,7 @@ public interface BookieProtocol {
         }
 
         public static byte getVersion(int packetHeader) {
-            return (byte) (packetHeader >> 24);
+            return (byte)(packetHeader >> 24);
         }
 
         public static byte getOpCode(int packetHeader) {
@@ -92,16 +92,16 @@ public interface BookieProtocol {
             if (version == 0) {
                 return (byte) packetHeader;
             } else {
-                return (byte) ((packetHeader >> 16) & 0xFF);
+                return (byte)((packetHeader >> 16) & 0xFF);
             }
         }
 
         public static short getFlags(int packetHeader) {
-            byte version = (byte) (packetHeader >> 24);
+            byte version = (byte)(packetHeader >> 24);
             if (version == 0) {
                 return 0;
             } else {
-                return (short) (packetHeader & 0xFFFF);
+                return (short)(packetHeader & 0xFFFF);
             }
         }
     }
@@ -112,7 +112,7 @@ public interface BookieProtocol {
      * error code followed by the 8-byte ledger number and 8-byte entry number
      * of the entry written.
      */
-    byte ADDENTRY = 1;
+    public static final byte ADDENTRY = 1;
     /**
      * The Read entry request payload will be the ledger number and entry number
      * to read. (The ledger number is an 8-byte integer and the entry number is
@@ -122,65 +122,59 @@ public interface BookieProtocol {
      * requested. (Note that the first sixteen bytes of the entry happen to be
      * the ledger number and entry number as well.)
      */
-    byte READENTRY = 2;
+    public static final byte READENTRY = 2;
 
     /**
      * Auth message. This code is for passing auth messages between the auth
      * providers on the client and bookie. The message payload is determined
      * by the auth providers themselves.
      */
-    byte AUTH = 3;
-    byte READ_LAC = 4;
-    byte WRITE_LAC = 5;
-    byte GET_BOOKIE_INFO = 6;
+    public static final byte AUTH = 3;
+    public static final byte READ_LAC = 4;
+    public static final byte WRITE_LAC = 5;
+    public static final byte GET_BOOKIE_INFO = 6;
 
     /**
-     * The error code that indicates success.
+     * The error code that indicates success
      */
-    int EOK = 0;
+    public static final int EOK = 0;
     /**
-     * The error code that indicates that the ledger does not exist.
+     * The error code that indicates that the ledger does not exist
      */
-    int ENOLEDGER = 1;
+    public static final int ENOLEDGER = 1;
     /**
-     * The error code that indicates that the requested entry does not exist.
+     * The error code that indicates that the requested entry does not exist
      */
-    int ENOENTRY = 2;
+    public static final int ENOENTRY = 2;
     /**
-     * The error code that indicates an invalid request type.
+     * The error code that indicates an invalid request type
      */
-    int EBADREQ = 100;
+    public static final int EBADREQ = 100;
     /**
-     * General error occurred at the server.
+     * General error occurred at the server
      */
-    int EIO = 101;
+    public static final int EIO = 101;
 
     /**
-     * Unauthorized access to ledger.
+     * Unauthorized access to ledger
      */
-    int EUA = 102;
+    public static final int EUA = 102;
 
     /**
-     * The server version is incompatible with the client.
+     * The server version is incompatible with the client
      */
-    int EBADVERSION = 103;
+    public static final int EBADVERSION = 103;
 
     /**
-     * Attempt to write to fenced ledger.
+     * Attempt to write to fenced ledger
      */
-    int EFENCED = 104;
+    public static final int EFENCED = 104;
 
     /**
-     * The server is running as read-only mode.
+     * The server is running as read-only mode
      */
-    int EREADONLY = 105;
+    public static final int EREADONLY = 105;
 
-    /**
-     * Too many concurrent requests.
-     */
-    int ETOOMANYREQUESTS = 106;
-
-<<<<<<< HEAD
     /**
      * Too many concurrent requests
      */
@@ -189,17 +183,8 @@ public interface BookieProtocol {
     public static final short FLAG_NONE = 0x0;
     public static final short FLAG_DO_FENCING = 0x0001;
     public static final short FLAG_RECOVERY_ADD = 0x0002;
-=======
-    short FLAG_NONE = 0x0;
-    short FLAG_DO_FENCING = 0x0001;
-    short FLAG_RECOVERY_ADD = 0x0002;
-    short FLAG_HIGH_PRIORITY = 0x0004;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
-    /**
-     * A Bookie request object.
-     */
-    class Request {
+    static class Request {
         byte protocolVersion;
         byte opCode;
         long ledgerId;
@@ -246,10 +231,6 @@ public interface BookieProtocol {
             return masterKey;
         }
 
-        boolean isHighPriority() {
-            return (flags & FLAG_HIGH_PRIORITY) == FLAG_HIGH_PRIORITY;
-        }
-
         @Override
         public String toString() {
             return String.format("Op(%d)[Ledger:%d,Entry:%d]", opCode, ledgerId, entryId);
@@ -258,15 +239,12 @@ public interface BookieProtocol {
         public void recycle() {}
     }
 
-    /**
-     * A Request that adds data.
-     */
-    class AddRequest extends Request {
-        ByteBufList data;
+    static class AddRequest extends Request {
+        ByteBuf data;
 
         static AddRequest create(byte protocolVersion, long ledgerId,
                                  long entryId, short flags, byte[] masterKey,
-                                 ByteBufList data) {
+                                 ByteBuf data) {
             AddRequest add = RECYCLER.get();
             add.protocolVersion = protocolVersion;
             add.opCode = ADDENTRY;
@@ -278,59 +256,7 @@ public interface BookieProtocol {
             return add;
         }
 
-        ByteBufList getData() {
-            // We need to have different ByteBufList instances for each bookie write
-            return ByteBufList.clone(data);
-        }
-
-        boolean isRecoveryAdd() {
-            return (flags & FLAG_RECOVERY_ADD) == FLAG_RECOVERY_ADD;
-        }
-
-        private final Handle<AddRequest> recyclerHandle;
-        private AddRequest(Handle<AddRequest> recyclerHandle) {
-            this.recyclerHandle = recyclerHandle;
-        }
-
-        private static final Recycler<AddRequest> RECYCLER = new Recycler<AddRequest>() {
-            @Override
-            protected AddRequest newObject(Handle<AddRequest> handle) {
-                return new AddRequest(handle);
-            }
-        };
-
-        @Override
-        public void recycle() {
-            ledgerId = -1;
-            entryId = -1;
-            masterKey = null;
-            ReferenceCountUtil.safeRelease(data);
-            data = null;
-            recyclerHandle.recycle(this);
-        }
-    }
-
-    /**
-     * This is similar to add request, but it used when processing the request on the bookie side.
-     */
-    class ParsedAddRequest extends Request {
-        ByteBuf data;
-
-        static ParsedAddRequest create(byte protocolVersion, long ledgerId, long entryId, short flags, byte[] masterKey,
-                ByteBuf data) {
-            ParsedAddRequest add = RECYCLER.get();
-            add.protocolVersion = protocolVersion;
-            add.opCode = ADDENTRY;
-            add.ledgerId = ledgerId;
-            add.entryId = entryId;
-            add.flags = flags;
-            add.masterKey = masterKey;
-            add.data = data.retain();
-            return add;
-        }
-
         ByteBuf getData() {
-            // We need to have different ByteBufList instances for each bookie write
             return data;
         }
 
@@ -342,15 +268,14 @@ public interface BookieProtocol {
             data.release();
         }
 
-        private final Handle<ParsedAddRequest> recyclerHandle;
-        private ParsedAddRequest(Handle<ParsedAddRequest> recyclerHandle) {
+        private final Handle<AddRequest> recyclerHandle;
+        private AddRequest(Handle<AddRequest> recyclerHandle) {
             this.recyclerHandle = recyclerHandle;
         }
 
-        private static final Recycler<ParsedAddRequest> RECYCLER = new Recycler<ParsedAddRequest>() {
-            @Override
-            protected ParsedAddRequest newObject(Handle<ParsedAddRequest> handle) {
-                return new ParsedAddRequest(handle);
+        private static final Recycler<AddRequest> RECYCLER = new Recycler<AddRequest>() {
+            protected AddRequest newObject(Handle<AddRequest> handle) {
+                return new AddRequest(handle);
             }
         };
 
@@ -364,24 +289,22 @@ public interface BookieProtocol {
         }
     }
 
-    /**
-     * A Request that reads data.
-     */
-    class ReadRequest extends Request {
+    static class ReadRequest extends Request {
+        ReadRequest(byte protocolVersion, long ledgerId, long entryId, short flags) {
+            init(protocolVersion, READENTRY, ledgerId, entryId, flags, null);
+        }
+
         ReadRequest(byte protocolVersion, long ledgerId, long entryId,
                     short flags, byte[] masterKey) {
             init(protocolVersion, READENTRY, ledgerId, entryId, flags, masterKey);
         }
 
-        boolean isFencing() {
+        boolean isFencingRequest() {
             return (flags & FLAG_DO_FENCING) == FLAG_DO_FENCING;
         }
     }
 
-    /**
-     * An authentication request.
-     */
-    class AuthRequest extends Request {
+    static class AuthRequest extends Request {
         final AuthMessage authMessage;
 
         AuthRequest(byte protocolVersion, AuthMessage authMessage) {
@@ -394,10 +317,7 @@ public interface BookieProtocol {
         }
     }
 
-    /**
-     * A response object.
-     */
-    abstract class Response {
+    static abstract class Response {
         byte protocolVersion;
         byte opCode;
         int errorCode;
@@ -439,24 +359,15 @@ public interface BookieProtocol {
                                  opCode, ledgerId, entryId, errorCode);
         }
 
-        void retain() {
-        }
-
-        void release() {
-        }
-
-        void recycle() {
-        }
+        abstract void recycle();
     }
 
-    /**
-     * A request that reads data.
-     */
-    class ReadResponse extends Response {
+    static class ReadResponse extends Response {
         final ByteBuf data;
 
         ReadResponse(byte protocolVersion, int errorCode, long ledgerId, long entryId) {
-            this(protocolVersion, errorCode, ledgerId, entryId, Unpooled.EMPTY_BUFFER);
+            init(protocolVersion, READENTRY, errorCode, ledgerId, entryId);
+            this.data = Unpooled.EMPTY_BUFFER;
         }
 
         ReadResponse(byte protocolVersion, int errorCode, long ledgerId, long entryId, ByteBuf data) {
@@ -472,21 +383,11 @@ public interface BookieProtocol {
             return data;
         }
 
-        @Override
-        public void retain() {
-            data.retain();
-        }
-
-        @Override
-        public void release() {
-            data.release();
+        void recycle() {
         }
     }
 
-    /**
-     * A response that adds data.
-     */
-    class AddResponse extends Response {
+    static class AddResponse extends Response {
         static AddResponse create(byte protocolVersion, int errorCode, long ledgerId, long entryId) {
             AddResponse response = RECYCLER.get();
             response.init(protocolVersion, ADDENTRY, errorCode, ledgerId, entryId);
@@ -499,32 +400,27 @@ public interface BookieProtocol {
         }
 
         private static final Recycler<AddResponse> RECYCLER = new Recycler<AddResponse>() {
-            @Override
             protected AddResponse newObject(Handle<AddResponse> handle) {
                 return new AddResponse(handle);
             }
         };
 
-        @Override
         public void recycle() {
             recyclerHandle.recycle(this);
         }
     }
 
-    /**
-     * An error response.
-     */
-    class ErrorResponse extends Response {
+    static class ErrorResponse extends Response {
         ErrorResponse(byte protocolVersion, byte opCode, int errorCode,
                       long ledgerId, long entryId) {
             init(protocolVersion, opCode, errorCode, ledgerId, entryId);
         }
+
+        void recycle() {
+        }
     }
 
-    /**
-     * A response with an authentication message.
-     */
-    class AuthResponse extends Response {
+    static class AuthResponse extends Response {
         final AuthMessage authMessage;
 
         AuthResponse(byte protocolVersion, AuthMessage authMessage) {
@@ -534,6 +430,9 @@ public interface BookieProtocol {
 
         AuthMessage getAuthMessage() {
             return authMessage;
+        }
+
+        void recycle() {
         }
     }
 

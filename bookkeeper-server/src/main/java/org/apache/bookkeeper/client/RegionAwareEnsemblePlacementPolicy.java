@@ -17,28 +17,28 @@
  */
 package org.apache.bookkeeper.client;
 
-import io.netty.util.HashedWheelTimer;
-
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-
+import io.netty.util.HashedWheelTimer;
+import java.util.Optional;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.feature.Feature;
 import org.apache.bookkeeper.feature.FeatureProvider;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.net.BookieNode;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.net.DNSToSwitchMapping;
+import org.apache.bookkeeper.net.NetUtils;
 import org.apache.bookkeeper.net.NetworkTopology;
 import org.apache.bookkeeper.net.Node;
 import org.apache.bookkeeper.net.NodeBase;
-import org.apache.bookkeeper.proto.BookieAddressResolver;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.BookKeeperConstants;
 import org.apache.commons.lang3.tuple.Pair;
@@ -55,11 +55,9 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
 
     public static final String REPP_REGIONS_TO_WRITE = "reppRegionsToWrite";
     public static final String REPP_MINIMUM_REGIONS_FOR_DURABILITY = "reppMinimumRegionsForDurability";
-    public static final String REPP_ENABLE_DURABILITY_ENFORCEMENT_IN_REPLACE =
-        "reppEnableDurabilityEnforcementInReplace";
+    public static final String REPP_ENABLE_DURABILITY_ENFORCEMENT_IN_REPLACE = "reppEnableDurabilityEnforcementInReplace";
     public static final String REPP_DISABLE_DURABILITY_FEATURE_NAME = "reppDisableDurabilityFeatureName";
-    public static final String REPP_DISALLOW_BOOKIE_PLACEMENT_IN_REGION_FEATURE_NAME =
-        "reppDisallowBookiePlacementInRegionFeatureName";
+    public static final String REPP_DISALLOW_BOOKIE_PLACEMENT_IN_REGION_FEATURE_NAME = "reppDisallowBookiePlacementInRegionFeatureName";
     public static final String REPP_DISABLE_DURABILITY_ENFORCEMENT_FEATURE = "reppDisableDurabilityEnforcementFeature";
     public static final String REPP_ENABLE_VALIDATION = "reppEnableValidation";
     public static final String REGION_AWARE_ANOMALOUS_ENSEMBLE = "region_aware_anomalous_ensemble";
@@ -69,7 +67,7 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
     static final int REMOTE_NODE_IN_REORDER_SEQUENCE = 2;
 
     protected final Map<String, TopologyAwareEnsemblePlacementPolicy> perRegionPlacement;
-    protected final ConcurrentMap<BookieId, String> address2Region;
+    protected final ConcurrentMap<BookieSocketAddress, String> address2Region;
     protected FeatureProvider featureProvider;
     protected String disallowBookiePlacementInRegionFeatureName;
     protected String myRegion = null;
@@ -77,15 +75,14 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
     protected boolean enableValidation = true;
     protected boolean enforceDurabilityInReplace = false;
     protected Feature disableDurabilityFeature;
-    private int lastRegionIndex = 0;
 
     RegionAwareEnsemblePlacementPolicy() {
         super();
         perRegionPlacement = new HashMap<String, TopologyAwareEnsemblePlacementPolicy>();
-        address2Region = new ConcurrentHashMap<BookieId, String>();
+        address2Region = new ConcurrentHashMap<BookieSocketAddress, String>();
     }
 
-    protected String getRegion(BookieId addr) {
+    protected String getRegion(BookieSocketAddress addr) {
         String region = address2Region.get(addr);
         if (null == region) {
             String networkLocation = resolveNetworkLocation(addr);
@@ -112,36 +109,34 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
     }
 
     @Override
-    public void handleBookiesThatLeft(Set<BookieId> leftBookies) {
+    public void handleBookiesThatLeft(Set<BookieSocketAddress> leftBookies) {
         super.handleBookiesThatLeft(leftBookies);
 
-        for (TopologyAwareEnsemblePlacementPolicy policy: perRegionPlacement.values()) {
+        for(TopologyAwareEnsemblePlacementPolicy policy: perRegionPlacement.values()) {
             policy.handleBookiesThatLeft(leftBookies);
         }
     }
 
     @Override
-    public void handleBookiesThatJoined(Set<BookieId> joinedBookies) {
-        Map<String, Set<BookieId>> perRegionClusterChange = new HashMap<String, Set<BookieId>>();
+    public void handleBookiesThatJoined(Set<BookieSocketAddress> joinedBookies) {
+        Map<String, Set<BookieSocketAddress>> perRegionClusterChange = new HashMap<String, Set<BookieSocketAddress>>();
 
         // node joined
-        for (BookieId addr : joinedBookies) {
+        for (BookieSocketAddress addr : joinedBookies) {
             BookieNode node = createBookieNode(addr);
             topology.add(node);
             knownBookies.put(addr, node);
             String region = getLocalRegion(node);
             if (null == perRegionPlacement.get(region)) {
                 perRegionPlacement.put(region, new RackawareEnsemblePlacementPolicy()
-                        .initialize(dnsResolver, timer, this.reorderReadsRandom, this.stabilizePeriodSeconds,
-                                this.reorderThresholdPendingRequests, this.isWeighted, this.maxWeightMultiple,
-                                this.minNumRacksPerWriteQuorum, this.enforceMinNumRacksPerWriteQuorum,
-                                this.ignoreLocalNodeInPlacementPolicy, statsLogger, bookieAddressResolver)
+                        .initialize(dnsResolver, timer, this.reorderReadsRandom, this.stabilizePeriodSeconds, 
+                                this.isWeighted, this.maxWeightMultiple, statsLogger)
                         .withDefaultRack(NetworkTopology.DEFAULT_REGION_AND_RACK));
             }
 
-            Set<BookieId> regionSet = perRegionClusterChange.get(region);
+            Set<BookieSocketAddress> regionSet = perRegionClusterChange.get(region);
             if (null == regionSet) {
-                regionSet = new HashSet<BookieId>();
+                regionSet = new HashSet<BookieSocketAddress>();
                 regionSet.add(addr);
                 perRegionClusterChange.put(region, regionSet);
             } else {
@@ -154,9 +149,9 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
         }
 
         for (Map.Entry<String, TopologyAwareEnsemblePlacementPolicy> regionEntry : perRegionPlacement.entrySet()) {
-            Set<BookieId> regionSet = perRegionClusterChange.get(regionEntry.getKey());
+            Set<BookieSocketAddress> regionSet = perRegionClusterChange.get(regionEntry.getKey());
             if (null == regionSet) {
-                regionSet = new HashSet<BookieId>();
+                regionSet = new HashSet<BookieSocketAddress>();
             }
             regionEntry.getValue().handleBookiesThatJoined(regionSet);
         }
@@ -167,9 +162,8 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                                                          Optional<DNSToSwitchMapping> optionalDnsResolver,
                                                          HashedWheelTimer timer,
                                                          FeatureProvider featureProvider,
-                                                         StatsLogger statsLogger,
-                                                         BookieAddressResolver bookieAddressResolver) {
-        super.initialize(conf, optionalDnsResolver, timer, featureProvider, statsLogger, bookieAddressResolver)
+                                                         StatsLogger statsLogger) {
+        super.initialize(conf, optionalDnsResolver, timer, featureProvider, statsLogger)
                 .withDefaultRack(NetworkTopology.DEFAULT_REGION_AND_RACK);
         myRegion = getLocalRegion(localNode);
         enableValidation = conf.getBoolean(REPP_ENABLE_VALIDATION, true);
@@ -181,28 +175,23 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             // Regions are specified as
             // R1;R2;...
             String[] regions = regionsString.split(";");
-            for (String region : regions) {
+            for (String region: regions) {
                 perRegionPlacement.put(region, new RackawareEnsemblePlacementPolicy(true)
                         .initialize(dnsResolver, timer, this.reorderReadsRandom, this.stabilizePeriodSeconds,
-                                this.reorderThresholdPendingRequests, this.isWeighted, this.maxWeightMultiple,
-                                this.minNumRacksPerWriteQuorum, this.enforceMinNumRacksPerWriteQuorum,
-                                this.ignoreLocalNodeInPlacementPolicy, statsLogger, bookieAddressResolver)
+                                this.isWeighted, this.maxWeightMultiple, statsLogger)
                         .withDefaultRack(NetworkTopology.DEFAULT_REGION_AND_RACK));
             }
-            minRegionsForDurability = conf.getInt(REPP_MINIMUM_REGIONS_FOR_DURABILITY,
-                    MINIMUM_REGIONS_FOR_DURABILITY_DEFAULT);
+            minRegionsForDurability = conf.getInt(REPP_MINIMUM_REGIONS_FOR_DURABILITY, MINIMUM_REGIONS_FOR_DURABILITY_DEFAULT);
             if (minRegionsForDurability > 0) {
                 enforceDurability = true;
                 enforceDurabilityInReplace = conf.getBoolean(REPP_ENABLE_DURABILITY_ENFORCEMENT_IN_REPLACE, true);
             }
             if (regions.length < minRegionsForDurability) {
-                throw new IllegalArgumentException(
-                        "Regions provided are insufficient to meet the durability constraints");
+                throw new IllegalArgumentException("Regions provided are insufficient to meet the durability constraints");
             }
         }
         this.featureProvider = featureProvider;
-        this.disallowBookiePlacementInRegionFeatureName =
-            conf.getString(REPP_DISALLOW_BOOKIE_PLACEMENT_IN_REGION_FEATURE_NAME);
+        this.disallowBookiePlacementInRegionFeatureName = conf.getString(REPP_DISALLOW_BOOKIE_PLACEMENT_IN_REGION_FEATURE_NAME);
         this.disableDurabilityFeature = conf.getFeature(REPP_DISABLE_DURABILITY_ENFORCEMENT_FEATURE, null);
         if (null == disableDurabilityFeature) {
             this.disableDurabilityFeature =
@@ -220,7 +209,7 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                                             Ensemble<BookieNode> ensemble)
         throws BKException.BKNotEnoughBookiesException {
         List<BookieNode> availableBookies = new ArrayList<BookieNode>();
-        for (BookieNode bookieNode: knownBookies.values()) {
+        for(BookieNode bookieNode: knownBookies.values()) {
             if (availableRegions.contains(getLocalRegion(bookieNode))) {
                 availableBookies.add(bookieNode);
             }
@@ -231,22 +220,17 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
 
 
     @Override
-    public PlacementResult<List<BookieId>> newEnsemble(int ensembleSize, int writeQuorumSize,
-            int ackQuorumSize, Map<String, byte[]> customMetadata, Set<BookieId> excludedBookies)
-            throws BKException.BKNotEnoughBookiesException {
+    public ArrayList<BookieSocketAddress> newEnsemble(int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map<String, byte[]> customMetadata, Set<BookieSocketAddress> excludeBookies) throws BKException.BKNotEnoughBookiesException {
 
         int effectiveMinRegionsForDurability = disableDurabilityFeature.isAvailable() ? 1 : minRegionsForDurability;
 
         // All of these conditions indicate bad configuration
         if (ackQuorumSize < effectiveMinRegionsForDurability) {
-            throw new IllegalArgumentException(
-                    "Ack Quorum size provided are insufficient to meet the durability constraints");
+            throw new IllegalArgumentException("Ack Quorum size provided are insufficient to meet the durability constraints");
         } else if (ensembleSize < writeQuorumSize) {
-            throw new IllegalArgumentException(
-                    "write quorum (" + writeQuorumSize + ") cannot exceed ensemble size (" + ensembleSize + ")");
+            throw new IllegalArgumentException("write quorum (" + writeQuorumSize + ") cannot exceed ensemble size (" + ensembleSize + ")");
         } else if (writeQuorumSize < ackQuorumSize) {
-            throw new IllegalArgumentException(
-                    "ack quorum (" + ackQuorumSize + ") cannot exceed write quorum size (" + writeQuorumSize + ")");
+            throw new IllegalArgumentException("ack quorum (" + ackQuorumSize + ") cannot exceed write quorum size (" + writeQuorumSize + ")");
         } else if (effectiveMinRegionsForDurability > 0) {
             // We must survive the failure of numRegions - effectiveMinRegionsForDurability. When these
             // regions have failed we would spread the replicas over the remaining
@@ -254,21 +238,18 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             // enough such that there is a configuration for spreading the replicas across
             // effectiveMinRegionsForDurability - 1 regions
             if (ackQuorumSize <= (writeQuorumSize - (writeQuorumSize / effectiveMinRegionsForDurability))) {
-                throw new IllegalArgumentException("ack quorum (" + ackQuorumSize + ") "
-                    + "violates the requirement to satisfy durability constraints when running in degraded mode");
+                throw new IllegalArgumentException("ack quorum (" + ackQuorumSize + ") " +
+                    "violates the requirement to satisfy durability constraints when running in degraded mode");
             }
         }
 
         rwLock.readLock().lock();
         try {
-            Set<BookieId> comprehensiveExclusionBookiesSet = addDefaultRackBookiesIfMinNumRacksIsEnforced(
-                    excludedBookies);
-            Set<Node> excludeNodes = convertBookiesToNodes(comprehensiveExclusionBookiesSet);
-            List<String> availableRegions = new ArrayList<>();
+            Set<Node> excludeNodes = convertBookiesToNodes(excludeBookies);
+            Set<String> availableRegions = new HashSet<String>();
             for (String region: perRegionPlacement.keySet()) {
-                if ((null == disallowBookiePlacementInRegionFeatureName)
-                        || !featureProvider.scope(region).getFeature(disallowBookiePlacementInRegionFeatureName)
-                            .isAvailable()) {
+                if ((null == disallowBookiePlacementInRegionFeatureName) ||
+                    !featureProvider.scope(region).getFeature(disallowBookiePlacementInRegionFeatureName).isAvailable()) {
                     availableRegions.add(region);
                 }
             }
@@ -281,27 +262,25 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                 if (perRegionPlacement.keySet().size() >= 1) {
                     LOG.error("No regions available, invalid configuration");
                 }
-                List<BookieNode> bns = selectRandom(ensembleSize, excludeNodes, TruePredicate.INSTANCE,
-                    EnsembleForReplacementWithNoConstraints.INSTANCE);
-                ArrayList<BookieId> addrs = new ArrayList<BookieId>(ensembleSize);
+                List<BookieNode> bns = selectRandom(ensembleSize, excludeNodes, TruePredicate.instance,
+                    EnsembleForReplacementWithNoConstraints.instance);
+                ArrayList<BookieSocketAddress> addrs = new ArrayList<BookieSocketAddress>(ensembleSize);
                 for (BookieNode bn : bns) {
                     addrs.add(bn.getAddr());
                 }
-                return PlacementResult.of(addrs,
-                                          isEnsembleAdheringToPlacementPolicy(
-                                                  addrs, writeQuorumSize, ackQuorumSize));
+                return addrs;
             }
 
             // Single region, fall back to RackAwareEnsemblePlacement
             if (numRegionsAvailable < 2) {
                 RRTopologyAwareCoverageEnsemble ensemble = new RRTopologyAwareCoverageEnsemble(ensembleSize,
-                        writeQuorumSize, ackQuorumSize, REGIONID_DISTANCE_FROM_LEAVES,
-                        effectiveMinRegionsForDurability > 0 ? new HashSet<>(perRegionPlacement.keySet()) : null,
-                        effectiveMinRegionsForDurability, minNumRacksPerWriteQuorum);
-                TopologyAwareEnsemblePlacementPolicy nextPolicy = perRegionPlacement.get(
-                        availableRegions.iterator().next());
-                return nextPolicy.newEnsemble(ensembleSize, writeQuorumSize, writeQuorumSize,
-                        comprehensiveExclusionBookiesSet, ensemble, ensemble);
+                                                                    writeQuorumSize,
+                                                                    ackQuorumSize,
+                                                                    REGIONID_DISTANCE_FROM_LEAVES,
+                                                                    effectiveMinRegionsForDurability > 0 ? new HashSet<String>(perRegionPlacement.keySet()) : null,
+                                                                    effectiveMinRegionsForDurability);
+                TopologyAwareEnsemblePlacementPolicy nextPolicy = perRegionPlacement.get(availableRegions.iterator().next());
+                return nextPolicy.newEnsemble(ensembleSize, writeQuorumSize, writeQuorumSize, excludeBookies, ensemble, ensemble);
             }
 
             int remainingEnsemble = ensembleSize;
@@ -312,9 +291,9 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             // Try and place as many nodes in a region as possible, the ones that cannot be
             // accommodated are placed on other regions
             // Within each region try and follow rack aware placement
-            Map<String, Pair<Integer, Integer>> regionsWiseAllocation = new HashMap<>();
+            Map<String, Pair<Integer,Integer>> regionsWiseAllocation = new HashMap<String, Pair<Integer,Integer>>();
             for (String region: availableRegions) {
-                regionsWiseAllocation.put(region, Pair.of(0, 0));
+                regionsWiseAllocation.put(region, Pair.of(0,0));
             }
             int remainingEnsembleBeforeIteration;
             int numRemainingRegions;
@@ -322,20 +301,20 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             RRTopologyAwareCoverageEnsemble ensemble;
             do {
                 numRemainingRegions = numRegionsAvailable - regionsReachedMaxAllocation.size();
-                ensemble = new RRTopologyAwareCoverageEnsemble(ensembleSize, writeQuorumSize, ackQuorumSize,
-                        REGIONID_DISTANCE_FROM_LEAVES,
-                        // We pass all regions we know off to the coverage ensemble as
-                        // regardless of regions that are available; constraints are
-                        // always applied based on all possible regions
-                        effectiveMinRegionsForDurability > 0 ? new HashSet<>(perRegionPlacement.keySet()) : null,
-                        effectiveMinRegionsForDurability, minNumRacksPerWriteQuorum);
+                ensemble = new RRTopologyAwareCoverageEnsemble(ensembleSize,
+                                    writeQuorumSize,
+                                    ackQuorumSize,
+                                    REGIONID_DISTANCE_FROM_LEAVES,
+                                    // We pass all regions we know off to the coverage ensemble as
+                                    // regardless of regions that are available; constraints are
+                                    // always applied based on all possible regions
+                                    effectiveMinRegionsForDurability > 0 ? new HashSet<String>(perRegionPlacement.keySet()) : null,
+                                    effectiveMinRegionsForDurability);
                 remainingEnsembleBeforeIteration = remainingEnsemble;
                 int regionsToAllocate = numRemainingRegions;
-                int startRegionIndex = lastRegionIndex % numRegionsAvailable;
-                for (int i = 0; i < numRegionsAvailable; ++i) {
-                    String region = availableRegions.get(startRegionIndex % numRegionsAvailable);
-                    startRegionIndex++;
-                    final Pair<Integer, Integer> currentAllocation = regionsWiseAllocation.get(region);
+                for (Map.Entry<String, Pair<Integer, Integer>> regionEntry: regionsWiseAllocation.entrySet()) {
+                    String region = regionEntry.getKey();
+                    final Pair<Integer, Integer> currentAllocation = regionEntry.getValue();
                     TopologyAwareEnsemblePlacementPolicy policyWithinRegion = perRegionPlacement.get(region);
                     if (!regionsReachedMaxAllocation.contains(region)) {
                         if (numRemainingRegions <= 0) {
@@ -343,38 +322,30 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                             throw new BKException.BKNotEnoughBookiesException();
                         }
                         // try to place the bookies as balance as possible across all the regions
-                        int addToEnsembleSize = Math.min(remainingEnsemble, remainingEnsemble / regionsToAllocate
-                                + (remainingEnsemble % regionsToAllocate == 0 ? 0 : 1));
+                        int addToEnsembleSize = Math.min(remainingEnsemble, remainingEnsemble / regionsToAllocate + (remainingEnsemble % regionsToAllocate == 0 ? 0 : 1));
                         boolean success = false;
                         while (addToEnsembleSize > 0) {
-                            int addToWriteQuorum = Math.max(1, Math.min(remainingWriteQuorum,
-                                        Math.round(1.0f * writeQuorumSize * addToEnsembleSize / ensembleSize)));
-                            // Temp ensemble will be merged back into the ensemble only if we are able to successfully
-                            // allocate the target number of bookies in this region; if we fail because we dont have
-                            // enough bookies; then we retry the process with a smaller target
-                            RRTopologyAwareCoverageEnsemble tempEnsemble =
-                                new RRTopologyAwareCoverageEnsemble(ensemble);
+                            int addToWriteQuorum = Math.max(1, Math.min(remainingWriteQuorum, Math.round(1.0f * writeQuorumSize * addToEnsembleSize / ensembleSize)));
+                            // Temp ensemble will be merged back into the ensemble only if we are able to successfully allocate
+                            // the target number of bookies in this region; if we fail because we dont have enough bookies; then we
+                            // retry the process with a smaller target
+                            RRTopologyAwareCoverageEnsemble tempEnsemble = new RRTopologyAwareCoverageEnsemble(ensemble);
                             int newEnsembleSize = currentAllocation.getLeft() + addToEnsembleSize;
                             int newWriteQuorumSize = currentAllocation.getRight() + addToWriteQuorum;
                             try {
-                                List<BookieId> allocated = policyWithinRegion
-                                        .newEnsemble(newEnsembleSize, newWriteQuorumSize, newWriteQuorumSize,
-                                                comprehensiveExclusionBookiesSet, tempEnsemble, tempEnsemble)
-                                        .getResult();
+                                List<BookieSocketAddress> allocated = policyWithinRegion.newEnsemble(newEnsembleSize, newWriteQuorumSize, newWriteQuorumSize, excludeBookies, tempEnsemble, tempEnsemble);
                                 ensemble = tempEnsemble;
                                 remainingEnsemble -= addToEnsembleSize;
                                 remainingWriteQuorum -= addToWriteQuorum;
                                 regionsWiseAllocation.put(region, Pair.of(newEnsembleSize, newWriteQuorumSize));
                                 success = true;
                                 regionsToAllocate--;
-                                lastRegionIndex = startRegionIndex;
-                                LOG.info("Region {} allocating bookies with ensemble size {} "
-                                        + "and write quorum size {} : {}",
-                                        region, newEnsembleSize, newWriteQuorumSize, allocated);
+                                LOG.info("Region {} allocating bookies with ensemble size {} and write quorum size {} : {}",
+                                    new Object[]{region, newEnsembleSize, newWriteQuorumSize, allocated});
                                 break;
                             } catch (BKException.BKNotEnoughBookiesException exc) {
                                 LOG.warn("Could not allocate {} bookies in region {}, try allocating {} bookies",
-                                        newEnsembleSize, region, (newEnsembleSize - 1));
+                                         new Object[] {newEnsembleSize, region, (newEnsembleSize - 1) });
                                 addToEnsembleSize--;
                             }
                         }
@@ -389,16 +360,16 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                     if (regionsReachedMaxAllocation.contains(region)) {
                         if (currentAllocation.getLeft() > 0) {
                             LOG.info("Allocating {} bookies in region {} : ensemble {} exclude {}",
-                                    currentAllocation.getLeft(), region, comprehensiveExclusionBookiesSet, ensemble);
+                                new Object[]{currentAllocation.getLeft(), region, excludeBookies, ensemble});
                             policyWithinRegion.newEnsemble(
                                     currentAllocation.getLeft(),
                                     currentAllocation.getRight(),
                                     currentAllocation.getRight(),
-                                    comprehensiveExclusionBookiesSet,
+                                    excludeBookies,
                                     ensemble,
                                     ensemble);
                             LOG.info("Allocated {} bookies in region {} : {}",
-                                    currentAllocation.getLeft(), region, ensemble);
+                                new Object[]{currentAllocation.getLeft(), region, ensemble});
                         }
                     }
                 }
@@ -408,45 +379,38 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                 }
             } while ((remainingEnsemble > 0) && (remainingEnsemble < remainingEnsembleBeforeIteration));
 
-            List<BookieId> bookieList = ensemble.toList();
+            ArrayList<BookieSocketAddress> bookieList = ensemble.toList();
             if (ensembleSize != bookieList.size()) {
                 LOG.error("Not enough {} bookies are available to form an ensemble : {}.",
                           ensembleSize, bookieList);
                 throw new BKException.BKNotEnoughBookiesException();
             }
 
-            if (enableValidation && !ensemble.validate()) {
+            if(enableValidation && !ensemble.validate()) {
                 LOG.error("Not enough {} bookies are available to form a valid ensemble : {}.",
                     ensembleSize, bookieList);
                 throw new BKException.BKNotEnoughBookiesException();
             }
             LOG.info("Bookies allocated successfully {}", ensemble);
-            List<BookieId> ensembleList = ensemble.toList();
-            return PlacementResult.of(ensembleList,
-                    isEnsembleAdheringToPlacementPolicy(ensembleList, writeQuorumSize, ackQuorumSize));
+            return ensemble.toList();
         } finally {
             rwLock.readLock().unlock();
         }
     }
 
     @Override
-    public PlacementResult<BookieId> replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize,
-            Map<String, byte[]> customMetadata, List<BookieId> currentEnsemble,
-            BookieId bookieToReplace, Set<BookieId> excludeBookies)
-            throws BKException.BKNotEnoughBookiesException {
+    public BookieSocketAddress replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map<String, byte[]> customMetadata, Collection<BookieSocketAddress> currentEnsemble, BookieSocketAddress bookieToReplace, Set<BookieSocketAddress> excludeBookies) throws BKException.BKNotEnoughBookiesException {
         rwLock.readLock().lock();
         try {
             boolean enforceDurability = enforceDurabilityInReplace && !disableDurabilityFeature.isAvailable();
             int effectiveMinRegionsForDurability = enforceDurability ? minRegionsForDurability : 1;
-            Set<BookieId> comprehensiveExclusionBookiesSet = addDefaultRackBookiesIfMinNumRacksIsEnforced(
-                    excludeBookies);
-            Set<Node> excludeNodes = convertBookiesToNodes(comprehensiveExclusionBookiesSet);
+            Set<Node> excludeNodes = convertBookiesToNodes(excludeBookies);
             RRTopologyAwareCoverageEnsemble ensemble = new RRTopologyAwareCoverageEnsemble(ensembleSize,
                 writeQuorumSize,
                 ackQuorumSize,
                 REGIONID_DISTANCE_FROM_LEAVES,
                 effectiveMinRegionsForDurability > 0 ? new HashSet<String>(perRegionPlacement.keySet()) : null,
-                effectiveMinRegionsForDurability, minNumRacksPerWriteQuorum);
+                effectiveMinRegionsForDurability);
 
             BookieNode bookieNodeToReplace = knownBookies.get(bookieToReplace);
             if (null == bookieNodeToReplace) {
@@ -454,7 +418,7 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             }
             excludeNodes.add(bookieNodeToReplace);
 
-            for (BookieId bookieAddress: currentEnsemble) {
+            for(BookieSocketAddress bookieAddress: currentEnsemble) {
                 if (bookieAddress.equals(bookieToReplace)) {
                     continue;
                 }
@@ -487,19 +451,7 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Bookie {} is chosen to replace bookie {}.", candidate, bookieNodeToReplace);
             }
-            BookieId candidateAddr = candidate.getAddr();
-            List<BookieId> newEnsemble = new ArrayList<BookieId>(currentEnsemble);
-            if (currentEnsemble.isEmpty()) {
-                /*
-                 * in testing code there are test cases which would pass empty
-                 * currentEnsemble
-                 */
-                newEnsemble.add(candidateAddr);
-            } else {
-                newEnsemble.set(currentEnsemble.indexOf(bookieToReplace), candidateAddr);
-            }
-            return PlacementResult.of(candidateAddr,
-                    isEnsembleAdheringToPlacementPolicy(newEnsemble, writeQuorumSize, ackQuorumSize));
+            return candidate.getAddr();
         } finally {
             rwLock.readLock().unlock();
         }
@@ -513,9 +465,8 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
         throws BKException.BKNotEnoughBookiesException {
         Set<String> availableRegions = new HashSet<String>();
         for (String region: perRegionPlacement.keySet()) {
-            if ((null == disallowBookiePlacementInRegionFeatureName)
-                    || !featureProvider.scope(region).getFeature(disallowBookiePlacementInRegionFeatureName)
-                        .isAvailable()) {
+            if ((null == disallowBookiePlacementInRegionFeatureName) ||
+                !featureProvider.scope(region).getFeature(disallowBookiePlacementInRegionFeatureName).isAvailable()) {
                 availableRegions.add(region);
             }
         }
@@ -531,9 +482,8 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
                     return regionPolicy.selectFromNetworkLocation(
                         bookieNodeToReplace.getNetworkLocation(),
                         excludeBookies,
-                        TruePredicate.INSTANCE,
-                        EnsembleForReplacementWithNoConstraints.INSTANCE,
-                        true);
+                        TruePredicate.instance,
+                        EnsembleForReplacementWithNoConstraints.instance);
                 } catch (BKException.BKNotEnoughBookiesException e) {
                     LOG.warn("Failed to choose a bookie from {} : "
                             + "excluded {}, fallback to choose bookie randomly from the cluster.",
@@ -546,50 +496,135 @@ public class RegionAwareEnsemblePlacementPolicy extends RackawareEnsemblePlaceme
         // enforcing durability.
         return selectRandomFromRegions(availableRegions, 1,
             excludeBookies,
-            enforceDurability ? predicate : TruePredicate.INSTANCE,
-            enforceDurability ? ensemble : EnsembleForReplacementWithNoConstraints.INSTANCE).get(0);
+            enforceDurability ? predicate : TruePredicate.instance,
+            enforceDurability ? ensemble : EnsembleForReplacementWithNoConstraints.instance).get(0);
     }
 
     @Override
     public final DistributionSchedule.WriteSet reorderReadSequence(
-            List<BookieId> ensemble,
-            BookiesHealthInfo bookiesHealthInfo,
+            ArrayList<BookieSocketAddress> ensemble,
+            Map<BookieSocketAddress, Long> bookieFailureHistory,
             DistributionSchedule.WriteSet writeSet) {
         if (UNKNOWN_REGION.equals(myRegion)) {
-            return super.reorderReadSequence(ensemble, bookiesHealthInfo, writeSet);
+            return super.reorderReadSequence(ensemble, bookieFailureHistory,
+                                             writeSet);
         } else {
-            Map<Integer, String> writeSetWithRegion = new HashMap<>();
+            int ensembleSize = ensemble.size();
+
             for (int i = 0; i < writeSet.size(); i++) {
                 int idx = writeSet.get(i);
-                writeSetWithRegion.put(idx, getRegion(ensemble.get(idx)));
+                BookieSocketAddress address = ensemble.get(idx);
+                String region = getRegion(address);
+                Long lastFailedEntryOnBookie = bookieFailureHistory.get(address);
+                if (null == knownBookies.get(address)) {
+                    // there isn't too much differences between readonly bookies
+                    // from unavailable bookies. since there
+                    // is no write requests to them, so we shouldn't try reading
+                    // from readonly bookie in prior to writable bookies.
+                    if ((null == readOnlyBookies)
+                            || !readOnlyBookies.contains(address)) {
+                        writeSet.set(i, idx | UNAVAIL_MASK);
+                    } else {
+                        writeSet.set(i, idx | READ_ONLY_MASK);
+                    }
+                } else if (region.equals(myRegion)) {
+                    if ((lastFailedEntryOnBookie == null)
+                            || (lastFailedEntryOnBookie < 0)) {
+                        writeSet.set(i, idx | LOCAL_MASK);
+                    } else {
+                        long failIdx
+                            = lastFailedEntryOnBookie * ensembleSize + idx;
+                        writeSet.set(i, (int)(failIdx & ~MASK_BITS)
+                                     | LOCAL_FAIL_MASK);
+                    }
+                } else {
+                    if ((lastFailedEntryOnBookie == null)
+                            || (lastFailedEntryOnBookie < 0)) {
+                        writeSet.set(i, idx | REMOTE_MASK);
+                    } else {
+                        long failIdx
+                            = lastFailedEntryOnBookie * ensembleSize + idx;
+                        writeSet.set(i, (int)(failIdx & ~MASK_BITS)
+                                     | REMOTE_FAIL_MASK);
+                    }
+                }
             }
-            return super.reorderReadSequenceWithRegion(ensemble, writeSet, writeSetWithRegion,
-                bookiesHealthInfo, true, myRegion, REMOTE_NODE_IN_REORDER_SEQUENCE);
+
+            // Add a mask to ensure the sort is stable, sort,
+            // and then remove mask. This maintains stability as
+            // long as there are fewer than 16 bookies in the write set.
+            for (int i = 0; i < writeSet.size(); i++) {
+                writeSet.set(i, writeSet.get(i) | ((i & 0xF) << 20));
+            }
+            writeSet.sort();
+            for (int i = 0; i < writeSet.size(); i++) {
+                writeSet.set(i, writeSet.get(i) & ~((0xF) << 20));
+            }
+
+            if (reorderReadsRandom) {
+                shuffleWithMask(writeSet, LOCAL_MASK, MASK_BITS);
+                shuffleWithMask(writeSet, REMOTE_MASK, MASK_BITS);
+                shuffleWithMask(writeSet, READ_ONLY_MASK, MASK_BITS);
+                shuffleWithMask(writeSet, UNAVAIL_MASK, MASK_BITS);
+            }
+
+            // nodes within a region are ordered as follows
+            // (Random?) list of nodes that have no history of failure
+            // Nodes with Failure history are ordered in the reverse
+            // order of the most recent entry that generated an error
+            // The sort will have put them in correct order,
+            // so remove the bits that sort by age.
+            for (int i = 0; i < writeSet.size(); i++) {
+                int mask = writeSet.get(i) & MASK_BITS;
+                int idx = (writeSet.get(i) & ~MASK_BITS) % ensembleSize;
+                if (mask == LOCAL_FAIL_MASK) {
+                    writeSet.set(i, LOCAL_MASK | idx);
+                } else if (mask == REMOTE_FAIL_MASK) {
+                    writeSet.set(i, REMOTE_MASK | idx);
+                }
+            }
+
+            // Insert a node from the remote region at the specified location so
+            // we try more than one region within the max allowed latency
+            int firstRemote = -1;
+            for (int i = 0; i < writeSet.size(); i++) {
+                if ((writeSet.get(i) & MASK_BITS) == REMOTE_MASK) {
+                    firstRemote = i;
+                    break;
+                }
+            }
+            if (firstRemote != -1) {
+                int i = 0;
+                for (;i < REMOTE_NODE_IN_REORDER_SEQUENCE
+                         && i < writeSet.size(); i++) {
+                    if ((writeSet.get(i) & MASK_BITS) != LOCAL_MASK) {
+                        break;
+                    }
+                }
+                writeSet.moveAndShift(firstRemote, i);
+            }
+
+
+            // remove all masks
+            for (int i = 0; i < writeSet.size(); i++) {
+                writeSet.set(i, writeSet.get(i) & ~MASK_BITS);
+            }
+            return writeSet;
         }
     }
 
     @Override
     public final DistributionSchedule.WriteSet reorderReadLACSequence(
-            List<BookieId> ensemble,
-            BookiesHealthInfo bookiesHealthInfo,
+            ArrayList<BookieSocketAddress> ensemble,
+            Map<BookieSocketAddress, Long> bookieFailureHistory,
             DistributionSchedule.WriteSet writeSet) {
         if (UNKNOWN_REGION.equals(myRegion)) {
-            return super.reorderReadLACSequence(ensemble, bookiesHealthInfo, writeSet);
+            return super.reorderReadLACSequence(ensemble, bookieFailureHistory,
+                                                writeSet);
         }
-        DistributionSchedule.WriteSet finalList = reorderReadSequence(ensemble, bookiesHealthInfo, writeSet);
+        DistributionSchedule.WriteSet finalList
+            = reorderReadSequence(ensemble, bookieFailureHistory, writeSet);
         finalList.addMissingIndices(ensemble.size());
         return finalList;
-    }
-
-    @Override
-    public PlacementPolicyAdherence isEnsembleAdheringToPlacementPolicy(List<BookieId> ensembleList,
-            int writeQuorumSize, int ackQuorumSize) {
-        /**
-         * TODO: have to implement actual logic for this method for
-         * RegionAwareEnsemblePlacementPolicy. For now return true value.
-         *
-         * - https://github.com/apache/bookkeeper/issues/1898
-         */
-        return PlacementPolicyAdherence.MEETS_STRICT;
     }
 }

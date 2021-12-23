@@ -17,12 +17,8 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/TriggerAuditService.java
-=======
 
-import static com.google.common.base.Preconditions.checkNotNull;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/TriggerAuditService.java
-
+import com.google.common.base.Preconditions;
 import org.apache.bookkeeper.client.BookKeeperAdmin;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
@@ -44,7 +40,7 @@ public class TriggerAuditService implements HttpEndpointService {
     protected BookKeeperAdmin bka;
 
     public TriggerAuditService(ServerConfiguration conf, BookKeeperAdmin bka) {
-        checkNotNull(conf);
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
         this.bka = bka;
     }

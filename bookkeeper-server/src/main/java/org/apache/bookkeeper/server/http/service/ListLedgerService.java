@@ -18,15 +18,17 @@
  */
 package org.apache.bookkeeper.server.http.service;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.common.base.Charsets.UTF_8;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.AbstractFuture;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.common.util.JsonUtil;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
@@ -34,16 +36,16 @@ import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
-import org.apache.bookkeeper.meta.LedgerMetadataSerDe;
-import org.apache.bookkeeper.proto.BookieServer;
-import org.apache.bookkeeper.versioning.Versioned;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.apache.bookkeeper.util.JsonUtil;
+import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * HttpEndpointService that handle Bookkeeper list ledger related http request.
  *
- * <p>The GET method will list all ledger_ids in this bookkeeper cluster.
+ * The GET method will list all ledger_ids in this bookkeeper cluster.
  * User can choose print metadata of each ledger or not by set parameter "print_metadata"
  */
 public class ListLedgerService implements HttpEndpointService {
@@ -51,29 +53,40 @@ public class ListLedgerService implements HttpEndpointService {
     static final Logger LOG = LoggerFactory.getLogger(ListLedgerService.class);
 
     protected ServerConfiguration conf;
-    protected BookieServer bookieServer;
-    private final LedgerMetadataSerDe serDe;
+    protected ZooKeeper zk;
 
-    public ListLedgerService(ServerConfiguration conf, BookieServer bookieServer) {
-        checkNotNull(conf);
+    public ListLedgerService(ServerConfiguration conf, ZooKeeper zk) {
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
-        this.bookieServer = bookieServer;
-        this.serDe = new LedgerMetadataSerDe();
-
+        this.zk = zk;
     }
 
     // Number of LedgerMetadata contains in each page
     static final int LIST_LEDGER_BATCH_SIZE = 100;
 
-    private void keepLedgerMetadata(long ledgerId, CompletableFuture<Versioned<LedgerMetadata>> future,
-                                    LinkedHashMap<String, Object> output, boolean decodeMeta)
-            throws Exception {
-        LedgerMetadata md = future.get().getValue();
-        if (decodeMeta) {
-            output.put(Long.valueOf(ledgerId).toString(), md);
-        } else {
-            output.put(Long.valueOf(ledgerId).toString(), new String(serDe.serialize(md), UTF_8));
+    public static class ReadLedgerMetadataCallback extends AbstractFuture<LedgerMetadata>
+      implements BookkeeperInternalCallbacks.GenericCallback<LedgerMetadata> {
+        final long ledgerId;
+
+        ReadLedgerMetadataCallback(long ledgerId) {
+            this.ledgerId = ledgerId;
         }
+
+        long getLedgerId() {
+            return ledgerId;
+        }
+
+        public void operationComplete(int rc, LedgerMetadata result) {
+            if (rc != 0) {
+                setException(BKException.create(rc));
+            } else {
+                set(result);
+            }
+        }
+    }
+    static void keepLedgerMetadata(ReadLedgerMetadataCallback cb, LinkedHashMap<String, String> output) throws Exception {
+        LedgerMetadata md = cb.get();
+        output.put(Long.valueOf(cb.getLedgerId()).toString(), new String(md.serialize(), UTF_8));
     }
 
     @Override
@@ -84,27 +97,23 @@ public class ListLedgerService implements HttpEndpointService {
         if (HttpServer.Method.GET == request.getMethod()) {
             Map<String, String> params = request.getParams();
             // default not print metadata
-            boolean printMeta = (params != null)
-              && params.containsKey("print_metadata")
-              && params.get("print_metadata").equals("true");
-
-            // do not decode meta by default for backward compatibility
-            boolean decodeMeta = (params != null)
-                    && params.getOrDefault("decode_meta", "false").equals("true");
+            boolean printMeta = (params != null) &&
+              params.containsKey("print_metadata") &&
+              params.get("print_metadata").equals("true");
 
             // Page index should start from 1;
-            int pageIndex = (printMeta && params.containsKey("page"))
-                ? Integer.parseInt(params.get("page")) : -1;
+            int pageIndex = (printMeta && params.containsKey("page")) ?
+              Integer.parseInt(params.get("page")) :
+              -1;
 
-            LedgerManagerFactory mFactory = bookieServer.getBookie().getLedgerManagerFactory();
+            LedgerManagerFactory mFactory = LedgerManagerFactory.newLedgerManagerFactory(conf, zk);
             LedgerManager manager = mFactory.newLedgerManager();
-            LedgerManager.LedgerRangeIterator iter = manager.getLedgerRanges(0);
+            LedgerManager.LedgerRangeIterator iter = manager.getLedgerRanges();
 
             // output <ledgerId: ledgerMetadata>
-            LinkedHashMap<String, Object> output = Maps.newLinkedHashMap();
+            LinkedHashMap<String, String> output = Maps.newLinkedHashMap();
             // futures for readLedgerMetadata for each page.
-            Map<Long, CompletableFuture<Versioned<LedgerMetadata>>> futures =
-                new LinkedHashMap<>(LIST_LEDGER_BATCH_SIZE);
+            List<ReadLedgerMetadataCallback> futures = Lists.newArrayListWithExpectedSize(LIST_LEDGER_BATCH_SIZE);
 
             if (printMeta) {
                 int ledgerIndex = 0;
@@ -112,7 +121,7 @@ public class ListLedgerService implements HttpEndpointService {
                 // start and end ledger index for wanted page.
                 int startLedgerIndex = 0;
                 int endLedgerIndex = 0;
-                if (pageIndex > 0) {
+                if(pageIndex > 0) {
                     startLedgerIndex = (pageIndex - 1) * LIST_LEDGER_BATCH_SIZE;
                     endLedgerIndex = startLedgerIndex + LIST_LEDGER_BATCH_SIZE - 1;
                 }
@@ -121,23 +130,25 @@ public class ListLedgerService implements HttpEndpointService {
                 while (iter.hasNext()) {
                     LedgerManager.LedgerRange r = iter.next();
                     for (Long lid : r.getLedgers()) {
-                        ledgerIndex++;
-                        if (endLedgerIndex == 0       // no actual page parameter provided
-                                || (ledgerIndex >= startLedgerIndex && ledgerIndex <= endLedgerIndex)) {
-                            futures.put(lid, manager.readLedgerMetadata(lid));
+                        ledgerIndex ++;
+                        if (endLedgerIndex == 0 ||       // no actual page parameter provided
+                          (ledgerIndex >= startLedgerIndex && ledgerIndex <= endLedgerIndex)) {
+                            ReadLedgerMetadataCallback cb = new ReadLedgerMetadataCallback(lid);
+                            manager.readLedgerMetadata(lid, cb);
+                            futures.add(cb);
                         }
                     }
                     if (futures.size() >= LIST_LEDGER_BATCH_SIZE) {
-                        for (Map.Entry<Long, CompletableFuture<Versioned<LedgerMetadata>> > e : futures.entrySet()) {
-                            keepLedgerMetadata(e.getKey(), e.getValue(), output, decodeMeta);
+                        while (futures.size() > 0) {
+                            ReadLedgerMetadataCallback cb = futures.remove(0);
+                            keepLedgerMetadata(cb, output);
                         }
-                        futures.clear();
                     }
                 }
-                for (Map.Entry<Long, CompletableFuture<Versioned<LedgerMetadata>> > e : futures.entrySet()) {
-                    keepLedgerMetadata(e.getKey(), e.getValue(), output, decodeMeta);
+                while (futures.size() > 0) {
+                    ReadLedgerMetadataCallback cb = futures.remove(0);
+                    keepLedgerMetadata(cb, output);
                 }
-                futures.clear();
             } else {
                 while (iter.hasNext()) {
                     LedgerManager.LedgerRange r = iter.next();
@@ -148,6 +159,7 @@ public class ListLedgerService implements HttpEndpointService {
             }
 
             manager.close();
+            mFactory.uninitialize();
 
             String jsonResponse = JsonUtil.toJson(output);
             LOG.debug("output body:" + jsonResponse);

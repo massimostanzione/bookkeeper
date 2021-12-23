@@ -20,63 +20,41 @@
  */
 package org.apache.bookkeeper.client;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import io.netty.buffer.ByteBuf;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.bookie.BookieImpl;
-import org.apache.bookkeeper.bookie.InterleavedLedgerStorage;
-import org.apache.bookkeeper.bookie.LedgerStorage;
-import org.apache.bookkeeper.bookie.SortedLedgerStorage;
-import org.apache.bookkeeper.bookie.storage.ldb.DbLedgerStorage;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.zookeeper.KeeperException;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test reading the last confirmed and entry.
- */
-@RunWith(Parameterized.class)
+import java.io.IOException;
+import java.util.Enumeration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static com.google.common.base.Charsets.UTF_8;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
 public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
 
     private static final Logger logger = LoggerFactory.getLogger(TestReadLastConfirmedAndEntry.class);
 
     final BookKeeper.DigestType digestType;
 
-    public TestReadLastConfirmedAndEntry(Class<? extends LedgerStorage> storageClass) {
+    public TestReadLastConfirmedAndEntry() {
         super(3);
         this.digestType = BookKeeper.DigestType.CRC32;
         this.baseConf.setAllowEphemeralPorts(false);
-        this.baseConf.setLedgerStorageClass(storageClass.getName());
     }
 
-    @Parameters
-    public static Collection<Object[]> configs() {
-        return Arrays.asList(new Object[][] {
-            { InterleavedLedgerStorage.class },
-            { SortedLedgerStorage.class },
-            { DbLedgerStorage.class },
-        });
-    }
-
-    static class FakeBookie extends BookieImpl {
+    static class FakeBookie extends Bookie {
 
         final long expectedEntryToFail;
         final boolean stallOrRespondNull;
@@ -96,7 +74,6 @@ public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
                     try {
                         Thread.sleep(600000);
                     } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
                         // ignore
                     }
                 } else {
@@ -123,7 +100,8 @@ public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
         for (int i = 0; i < numBookies; i++) {
             ServerConfiguration conf = newServerConfiguration();
             Bookie b = new FakeBookie(conf, expectedEntryIdToFail, i != 0);
-            startAndAddBookie(conf, b);
+            bs.add(startBookie(conf, b));
+            bsConfs.add(conf);
         }
 
         // create bookkeeper
@@ -173,7 +151,7 @@ public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
         assertEquals(BKException.Code.OK, rcHolder.get());
     }
 
-    static class SlowReadLacBookie extends BookieImpl {
+    static class SlowReadLacBookie extends Bookie {
 
         private final long lacToSlowRead;
         private final CountDownLatch readLatch;
@@ -195,7 +173,6 @@ public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
                 try {
                     readLatch.await();
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                     // no-op
                 }
             }
@@ -239,7 +216,9 @@ public class TestReadLastConfirmedAndEntry extends BookKeeperClusterTestCase {
         ServerConfiguration bsConf = killBookie(0);
         // start it with a slow bookie
         Bookie b = new SlowReadLacBookie(bsConf, lacToSlowRead, readLatch);
-        startAndAddBookie(bsConf, b);
+        bs.add(startBookie(bsConf, b));
+        bsConfs.add(bsConf);
+
         // create bookkeeper
         BookKeeper newBk = new BookKeeper(newConf);
         // create ledger

@@ -9,7 +9,7 @@
 
 Apache BookKeeper is a scalable, fault tolerant and low latency storage service optimized for append-only workloads.
 
-It is suitable for being used in following scenarios:
+It is suitable for being used in following scenerios:
 
 - WAL (Write-Ahead-Logging), e.g. HDFS NameNode.
 - Message Store, e.g. Apache Pulsar.
@@ -18,14 +18,29 @@ It is suitable for being used in following scenarios:
 
 ## Get Started
 
-* Checkout the project [website](https://bookkeeper.apache.org/).
-* *Concepts*: Start with the [basic concepts](https://bookkeeper.apache.org/docs/latest/getting-started/concepts/) of Apache BookKeeper.
+* *Concepts*: Start with the [basic concepts](http://bookkeeper.apache.org/docs/master/bookkeeperOverview.html) of Apache BookKeeper.
   This will help you to fully understand the other parts of the documentation.
-* Follow the [Install](https://bookkeeper.apache.org/docs/latest/getting-started/installation/) guide to setup BookKeeper.
+* [Getting Started](http://bookkeeper.apache.org/docs/master/bookkeeperStarted.html) to setup BookKeeper to write logs.
 
 ## Documentation
 
-Please visit the [Documentation](https://bookkeeper.apache.org/docs/latest/overview/overview/) from the project website for more information.
+### Developers
+
+* [Programmer Guide](http://bookkeeper.apache.org/docs/master/bookkeeperProgrammer.html)
+* [Tutorial](http://bookkeeper.apache.org/docs/master/bookkeeperTutorial.html)
+* [Java API](http://bookkeeper.apache.org/docs/master/apidocs/)
+
+You can also read [Turning Ledgers into Logs](http://bookkeeper.apache.org/docs/master/bookkeeperLedgers2Logs.html) to learn how to turn **ledgers** into continous **log streams**.
+If you are looking for a high level **log stream** API, you can checkout [DistributedLog](http://distributedlog.io).
+
+### Administrators
+
+* [Admin Guide](http://bookkeeper.apache.org/docs/master/bookkeeperConfig.html)
+* [Configuration Parameters](http://bookkeeper.apache.org/docs/master/bookieConfigParams.html)
+
+### Contributors
+
+* [BookKeeper Internals](http://bookkeeper.apache.org/docs/master/bookkeeperInternals.html)
 
 ## Get In Touch
 
@@ -37,7 +52,7 @@ For filing bugs, suggesting improvements, or requesting new features, help us ou
 
 [Subscribe](mailto:user-subscribe@bookkeeper.apache.org) or [mail](mailto:user@bookkeeper.apache.org) the [user@bookkeeper.apache.org](mailto:user@bookkeeper.apache.org) list - Ask questions, find answers, and also help other users.
 
-[Subscribe](mailto:dev-subscribe@bookkeeper.apache.org) or [mail](mailto:dev@bookkeeper.apache.org) the [dev@bookkeeper.apache.org](mailto:dev@bookkeeper.apache.org) list - Join development discussions, propose new ideas and connect with contributors.
+[Subscribe](mailto:dev-subscribe@bookkeeper.apache.org) or [mail](mailto:dev@bookkeeper.apache.org) the [dev@bookkeeper.apache.org](mailto:dev@bookkeeper.apache.org) list - Join developement discussions, propose new ideas and connect with contributors.
 
 [Join us on Slack](https://apachebookkeeper.herokuapp.com/) - This is the most immediate way to connect with Apache BookKeeper committers and contributors.
 

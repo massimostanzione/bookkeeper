@@ -20,11 +20,9 @@
  */
 package org.apache.bookkeeper.util.collections;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
-import com.google.common.collect.Lists;
+import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,9 +33,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 
-/**
- * Test the growable array blocking queue.
- */
+import com.google.common.collect.Lists;
+
 public class GrowableArrayBlockingQueueTest {
 
     @Test

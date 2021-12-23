@@ -25,12 +25,12 @@ import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 /**
  * An interface to manage channel pooling for bookie client.
  */
-public interface PerChannelBookieClientPool {
+interface PerChannelBookieClientPool {
 
     /**
-     * initialize the pool. the implementation should not be blocked.
+     * intialize the pool. the implementation should not be blocked.
      */
-    void initialize();
+    void intialize();
 
     /**
      * Obtain a channel from channel pool to execute operations.
@@ -41,36 +41,9 @@ public interface PerChannelBookieClientPool {
     void obtain(GenericCallback<PerChannelBookieClient> callback, long key);
 
     /**
-     * Obtain a channel from channel pool by version to execute operations.
-     *
-     * @param callback
-     *          callback to return channel from channel pool
-     * @param forceUseV3
-     *          whether or not use v3 protocol for connection
-     */
-    void obtain(GenericCallback<PerChannelBookieClient> callback, long key, boolean forceUseV3);
-
-    /**
-     * Returns status of a client.
-     * It is suggested to delay/throttle requests to this channel if isWritable is false.
-     *
-     * @param key
-     * @return
-     */
-    default boolean isWritable(long key) {
-        return true;
-    }
-
-    /**
-     * record any read/write error on {@link PerChannelBookieClientPool}.
+     * record any read/write error on {@link PerChannelBookieClientPool}
      */
     void recordError();
-
-    /**
-     * Check if any ops on any channel needs to be timed out.
-     * This is called on all channels, even if the channel is not yet connected.
-     */
-    void checkTimeoutOnPendingOperations();
 
     /**
      * Disconnect the connections in the pool.
@@ -88,8 +61,4 @@ public interface PerChannelBookieClientPool {
      */
     void close(boolean wait);
 
-    /**
-     * Get the number of pending completion requests in the channel.
-     */
-    long getNumPendingCompletionRequests();
 }

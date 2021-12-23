@@ -20,7 +20,6 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -28,12 +27,14 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.bookkeeper.bookie.BookieImpl;
+
+import org.junit.Assert;
+
+import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieShell;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.zookeeper.KeeperException;
@@ -41,23 +42,20 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test an update command on a ledger.
- */
 public class UpdateLedgerCmdTest extends BookKeeperClusterTestCase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(UpdateLedgerCmdTest.class);
+    private final static Logger LOG = LoggerFactory.getLogger(UpdateLedgerCmdTest.class);
     private DigestType digestType = DigestType.CRC32;
     private static final String PASSWORD = "testPasswd";
 
     public UpdateLedgerCmdTest() {
         super(3);
-        useUUIDasBookieId = false;
+        baseConf.setAllowLoopback(true);
         baseConf.setGcWaitTime(100000);
     }
 
     /**
-     * updateledgers to hostname.
+     * updateledgers to hostname
      */
     @Test
     public void testUpdateLedgersToHostname() throws Exception {
@@ -71,41 +69,16 @@ public class UpdateLedgerCmdTest extends BookKeeperClusterTestCase {
         }
 
         String[] argv = new String[] { "updateledgers", "-b", "hostname", "-v", "true", "-p", "2" };
-        final ServerConfiguration conf = confByIndex(0);
+        final ServerConfiguration conf = bsConfs.get(0);
         conf.setUseHostNameAsBookieID(true);
-        BookieSocketAddress toBookieId = BookieImpl.getBookieAddress(conf);
-        BookieId toBookieAddr = new BookieSocketAddress(toBookieId.getHostName() + ":"
-                + conf.getBookiePort()).toBookieId();
+        BookieSocketAddress toBookieId = Bookie.getBookieAddress(conf);
+        BookieSocketAddress toBookieAddr = new BookieSocketAddress(toBookieId.getHostName() + ":"
+                + conf.getBookiePort());
+
         updateLedgerCmd(argv, 0, conf);
 
         int updatedLedgersCount = getUpdatedLedgersCount(bk, ledgers, toBookieAddr);
-        assertEquals("Failed to update the ledger metadata to use bookie host name", 40, updatedLedgersCount);
-    }
-
-    /**
-     * replace bookie address in ledger.
-     */
-    @Test
-    public void testUpdateBookieInLedger() throws Exception {
-        BookKeeper bk = new BookKeeper(baseClientConf, zkc);
-        LOG.info("Create ledger and add entries to it");
-        List<LedgerHandle> ledgers = new ArrayList<LedgerHandle>();
-        LedgerHandle lh1 = createLedgerWithEntries(bk, 0);
-        ledgers.add(lh1);
-        for (int i = 1; i < 40; i++) {
-            ledgers.add(createLedgerWithEntries(bk, 0));
-        }
-        BookieId srcBookie = getBookie(0);
-        BookieId destBookie = new BookieSocketAddress("1.1.1.1", 2181).toBookieId();
-        String[] argv = new String[] { "updateBookieInLedger", "-sb", srcBookie.toString(), "-db",
-                destBookie.toString(), "-v", "true", "-p", "2" };
-        final ServerConfiguration conf = confByIndex(0);
-        serverByIndex(0).shutdown();
-        updateLedgerCmd(argv, 0, conf);
-        int updatedLedgersCount = getUpdatedLedgersCount(bk, ledgers, srcBookie);
-        assertEquals("Failed to update the ledger metadata with new bookie-address", 0, updatedLedgersCount);
-        updatedLedgersCount = getUpdatedLedgersCount(bk, ledgers, destBookie);
-        assertEquals("Failed to update the ledger metadata with new bookie-address", 40, updatedLedgersCount);
+        Assert.assertEquals("Failed to update the ledger metadata to use bookie host name", 40, updatedLedgersCount);
     }
 
     private void updateLedgerCmd(String[] argv, int exitCode, ServerConfiguration conf) throws KeeperException,
@@ -114,17 +87,20 @@ public class UpdateLedgerCmdTest extends BookKeeperClusterTestCase {
         BookieShell bkShell = new BookieShell();
         bkShell.setConf(conf);
 
-        assertEquals("Failed to return exit code!", exitCode, bkShell.run(argv));
+        Assert.assertEquals("Failed to return exit code!", exitCode, bkShell.run(argv));
     }
 
-    private int getUpdatedLedgersCount(BookKeeper bk, List<LedgerHandle> ledgers, BookieId toBookieAddr)
+    private int getUpdatedLedgersCount(BookKeeper bk, List<LedgerHandle> ledgers, BookieSocketAddress toBookieAddr)
             throws InterruptedException, BKException {
-        List<BookieId> ensemble;
+        ArrayList<BookieSocketAddress> ensemble;
         int updatedLedgersCount = 0;
         for (LedgerHandle lh : ledgers) {
+            // ledger#close() would hit BadVersion exception as rename
+            // increments cversion. But LedgerMetadata#isConflictWith()
+            // gracefully handles this conflicts.
             lh.close();
             LedgerHandle openLedger = bk.openLedger(lh.getId(), digestType, PASSWORD.getBytes());
-            ensemble = openLedger.getLedgerMetadata().getEnsembleAt(0);
+            ensemble = openLedger.getLedgerMetadata().getEnsemble(0);
             if (ensemble.contains(toBookieAddr)) {
                 updatedLedgersCount++;
             }

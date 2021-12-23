@@ -21,13 +21,9 @@ package org.apache.bookkeeper.common.conf;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
-import org.apache.bookkeeper.common.util.JsonUtil;
-import org.apache.bookkeeper.common.util.JsonUtil.ParseJsonException;
 import org.apache.commons.configuration.CompositeConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -41,26 +37,25 @@ public abstract class ComponentConfiguration implements Configuration {
     protected static final String DELIMITER = ".";
 
     private final String componentPrefix;
-    private final CompositeConfiguration underlyingConf;
-    private final Configuration conf;
+    private final CompositeConfiguration conf;
 
-    protected ComponentConfiguration(CompositeConfiguration underlyingConf,
+    protected ComponentConfiguration(CompositeConfiguration conf,
                                      String componentPrefix) {
         super();
-        this.underlyingConf = underlyingConf;
-        this.conf = new ConcurrentConfiguration();
+        this.conf = conf;
         this.componentPrefix = componentPrefix;
-
-        // load the component keys
-        loadConf(underlyingConf);
     }
 
     protected String getKeyName(String name) {
-        return name;
+        return this.componentPrefix + name;
+    }
+
+    public String getComponentPrefix() {
+        return componentPrefix;
     }
 
     public CompositeConfiguration getUnderlyingConf() {
-        return underlyingConf;
+        return conf;
     }
 
     /**
@@ -71,16 +66,7 @@ public abstract class ComponentConfiguration implements Configuration {
      */
     public void loadConf(URL confURL) throws ConfigurationException {
         Configuration loadedConf = new PropertiesConfiguration(confURL);
-        loadConf(loadedConf);
-    }
-
-    protected void loadConf(Configuration loadedConf) {
-        loadedConf.getKeys().forEachRemaining(fullKey -> {
-            if (fullKey.startsWith(componentPrefix)) {
-                String componentKey = fullKey.substring(componentPrefix.length());
-                setProperty(componentKey, loadedConf.getProperty(fullKey));
-            }
-        });
+        conf.addConfiguration(loadedConf);
     }
 
     public void validate() throws ConfigurationException {
@@ -94,7 +80,7 @@ public abstract class ComponentConfiguration implements Configuration {
 
     @Override
     public boolean isEmpty() {
-        return conf.isEmpty();
+        return conf.subset(componentPrefix).isEmpty();
     }
 
     @Override
@@ -119,7 +105,12 @@ public abstract class ComponentConfiguration implements Configuration {
 
     @Override
     public void clear() {
-        conf.clear();
+        Iterator<String> keys = conf.getKeys();
+        keys.forEachRemaining(s -> {
+            if (s.startsWith(componentPrefix)) {
+                conf.clearProperty(s);
+            }
+        });
     }
 
     @Override
@@ -134,7 +125,7 @@ public abstract class ComponentConfiguration implements Configuration {
 
     @Override
     public Iterator<String> getKeys() {
-        return conf.getKeys();
+        return conf.getKeys(componentPrefix);
     }
 
     @Override
@@ -290,32 +281,5 @@ public abstract class ComponentConfiguration implements Configuration {
     @Override
     public List<Object> getList(String key, List<?> defaultValue) {
         return conf.getList(getKeyName(key), defaultValue);
-    }
-
-    /**
-     * returns the string representation of json format of this config.
-     *
-     * @return
-     * @throws ParseJsonException
-     */
-    public String asJson() {
-        try {
-            return JsonUtil.toJson(toMap());
-        } catch (ParseJsonException e) {
-            throw new RuntimeException("Failed to serialize the configuration as json", e);
-        }
-    }
-
-    private Map<String, Object> toMap() {
-        Map<String, Object> configMap = new HashMap<>();
-        Iterator<String> iterator = this.getKeys();
-        while (iterator.hasNext()) {
-            String key = iterator.next().toString();
-            Object property = this.getProperty(key);
-            if (property != null) {
-                configMap.put(key, property.toString());
-            }
-        }
-        return configMap;
     }
 }

@@ -17,23 +17,19 @@
  */
 package org.apache.bookkeeper.net;
 
-import java.util.Collection;
 import java.util.Set;
 
 /**
- * Network Topology Interface.
+ * Network Topology Interface
  */
 public interface NetworkTopology {
 
-    String DEFAULT_REGION = "/default-region";
-    String DEFAULT_RACK = "/default-rack";
-    String DEFAULT_ZONE = "/default-zone";
-    String DEFAULT_UPGRADEDOMAIN = "/default-upgradedomain";
-    String DEFAULT_ZONE_AND_UPGRADEDOMAIN = DEFAULT_ZONE + DEFAULT_UPGRADEDOMAIN;
-    String DEFAULT_REGION_AND_RACK = DEFAULT_REGION + DEFAULT_RACK;
+    public final static String DEFAULT_REGION = "/default-region";
+    public final static String DEFAULT_RACK = "/default-rack";
+    public final static String DEFAULT_REGION_AND_RACK = DEFAULT_REGION + DEFAULT_RACK;
 
     /**
-     * Add a node to the network topology.
+     * Add a node to the network topology
      *
      * @param node
      *          add the node to network topology
@@ -41,7 +37,7 @@ public interface NetworkTopology {
     void add(Node node);
 
     /**
-     * Remove a node from nework topology.
+     * Remove a node from nework topology
      *
      * @param node
      *          remove the node from network topology
@@ -58,7 +54,7 @@ public interface NetworkTopology {
     boolean contains(Node node);
 
     /**
-     * Retrieve a node from the network topology.
+     * Retrieve a node from the network topology
      * @param loc
      * @return
      */
@@ -80,14 +76,4 @@ public interface NetworkTopology {
      */
     Set<Node> getLeaves(String loc);
 
-    /**
-     * Return the number of leaves in <i>scope</i> but not in <i>excludedNodes</i>.
-     *
-     * <p>If scope starts with ~, return the number of nodes that are not
-     * in <i>scope</i> and <i>excludedNodes</i>;
-     * @param scope a path string that may start with ~
-     * @param excludedNodes a list of nodes
-     * @return number of available nodes
-     */
-    int countNumOfAvailableNodes(String scope, Collection<Node> excludedNodes);
 }

@@ -27,7 +27,7 @@ public interface CheckpointSource {
     /**
      * A checkpoint presented a time point. All entries added before this checkpoint are already persisted.
      */
-    interface Checkpoint extends Comparable<Checkpoint> {
+    public interface Checkpoint extends Comparable<Checkpoint> {
 
         Checkpoint MAX = new Checkpoint() {
 
@@ -44,11 +44,6 @@ public interface CheckpointSource {
                 return this == o;
             }
 
-            @Override
-            public String toString() {
-                return "MAX";
-            }
-
         };
 
         Checkpoint MIN = new Checkpoint() {
@@ -63,11 +58,6 @@ public interface CheckpointSource {
             @Override
             public boolean equals(Object o) {
                 return this == o;
-            }
-
-            @Override
-            public String toString() {
-                return "MIN";
             }
         };
     }

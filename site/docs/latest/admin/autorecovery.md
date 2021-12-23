@@ -12,21 +12,24 @@ When a {% pop bookie %} crashes, all {% pop ledgers %} on that bookie become und
 You can manually recover failed bookies using the [`bookkeeper`](../../reference/cli) command-line tool. You need to specify:
 
 * the `shell recover` option 
+* an IP and port for your BookKeeper cluster's ZooKeeper ensemble
 * the IP and port for the failed bookie
 
 Here's an example:
 
 ```bash
-$ bin/bookkeeper shell recover \
+$ bookkeeper-server/bin/bookkeeper shell recover \
+  zk1.example.com:2181 \ # IP and port for ZooKeeper
   192.168.1.10:3181      # IP and port for the failed bookie
 ```
 
-If you wish, you can also specify which ledgers you'd like to recover. Here's an example:
+If you wish, you can also specify which bookie you'd like to rereplicate to. Here's an example:
 
 ```bash
-$ bin/bookkeeper shell recover \
+$ bookkeeper-server/bin/bookkeeper shell recover \
+  zk1.example.com:2181 \ # IP and port for ZooKeeper
   192.168.1.10:3181 \    # IP and port for the failed bookie
-  --ledger ledgerID      # ledgerID which you want to recover 
+  192.168.1.11:3181      # IP and port for the bookie to rereplicate to
 ```
 
 ### The manual recovery process
@@ -45,18 +48,17 @@ AutoRecovery is a process that:
 * automatically detects when a {% pop bookie %} in your BookKeeper cluster has become unavailable and then
 * rereplicates all the {% pop ledgers %} that were stored on that bookie.
 
-AutoRecovery can be run in three ways:
+AutoRecovery can be run in two ways:
 
 1. On dedicated nodes in your BookKeeper cluster
 1. On the same machines on which your bookies are running
-1. On a combination of autorecovery nodes and bookie nodes
 
 ## Running AutoRecovery
 
 You can start up AutoRecovery using the [`autorecovery`](../../reference/cli#bookkeeper-autorecovery) command of the [`bookkeeper`](../../reference/cli) CLI tool.
 
 ```bash
-$ bin/bookkeeper autorecovery
+$ bookkeeper-server/bin/bookkeeper autorecovery
 ```
 
 > The most important thing to ensure when starting up AutoRecovery is that the ZooKeeper connection string specified by the [`zkServers`](../../reference/config#zkServers) parameter points to the right ZooKeeper cluster.
@@ -65,27 +67,24 @@ If you start up AutoRecovery on a machine that is already running a bookie, then
 
 You can also start up AutoRecovery on a fresh machine if you'd like to create a dedicated cluster of AutoRecovery nodes.
 
-Note that if you _only_ want the AutoRecovery process to run on your dedicated AutoRecovery nodes, you must set `autoRecoveryDaemonEnabled` to `false` in the `bookkeeper` configuration. Otherwise,
-bookkeeper nodes will also handle rereplication work.
-
 ## Configuration
 
 There are a handful of AutoRecovery-related configs in the [`bk_server.conf`](../../reference/config) configuration file. For a listing of those configs, see [AutoRecovery settings](../../reference/config#autorecovery-settings).
 
 ## Disable AutoRecovery
 
-You can disable AutoRecovery for the whole cluster at any time, for example during maintenance. Disabling AutoRecovery ensures that bookies' data isn't unnecessarily rereplicated when the bookie is only taken down for a short period of time, for example when the bookie is being updated or the configuration if being changed.
+You can disable AutoRecovery at any time, for example during maintenance. Disabling AutoRecovery ensures that bookies' data isn't unnecessarily rereplicated when the bookie is only taken down for a short period of time, for example when the bookie is being updated or the configuration if being changed.
 
-You can disable AutoRecover for the whole cluster using the [`bookkeeper`](../../reference/cli#bookkeeper-shell-autorecovery) CLI tool:
+You can disable AutoRecover using the [`bookkeeper`](../../reference/cli#bookkeeper-shell-autorecovery) CLI tool:
 
 ```bash
-$ bin/bookkeeper shell autorecovery -disable
+$ bookkeeper-server/bin/bookkeeper shell autorecovery -disable
 ```
 
-Once disabled, you can reenable AutoRecovery for the whole cluster using the [`enable`](../../reference/cli#bookkeeper-shell-autorecovery) shell command:
+Once disabled, you can reenable AutoRecovery using the [`enable`](../../reference/cli#bookkeeper-shell-autorecovery) shell command:
 
 ```bash
-$ bin/bookkeeper shell autorecovery -enable
+$ bookkeeper-server/bin/bookkeeper shell autorecovery -enable
 ```
 
 ## AutoRecovery architecture

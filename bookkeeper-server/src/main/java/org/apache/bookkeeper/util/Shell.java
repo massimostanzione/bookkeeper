@@ -17,11 +17,11 @@
  */
 package org.apache.bookkeeper.util;
 
+import com.google.common.base.Charsets;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -36,19 +36,17 @@ import org.apache.commons.logging.LogFactory;
  * <code>df</code>. It also offers facilities to gate commands by
  * time-intervals.
  */
-public abstract class Shell {
+abstract public class Shell {
 
     public static final Log LOG = LogFactory.getLog(Shell.class);
 
     protected long timeOutInterval = 0L;
-    /* If or not script timed out */
+    /** If or not script timed out*/
     private AtomicBoolean timedOut;
 
-    /**
-     * Set to true on Windows platforms.
-     */
-    public static final boolean WINDOWS = /* borrowed from Path.WINDOWS */
-            System.getProperty("os.name").startsWith("Windows");
+    /** Set to true on Windows platforms */
+    public static final boolean WINDOWS /* borrowed from Path.WINDOWS */
+    = System.getProperty("os.name").startsWith("Windows");
 
     private long interval; // refresh interval in msec
     private long lastTime; // last time the command was performed
@@ -57,7 +55,7 @@ public abstract class Shell {
     private Process process; // sub process used to execute the command
     private int exitCode;
 
-    /* If or not script finished executing */
+    /**If or not script finished executing*/
     private volatile AtomicBoolean completed;
 
     public Shell() {
@@ -73,36 +71,29 @@ public abstract class Shell {
         this.lastTime = (interval < 0) ? 0 : -interval;
     }
 
-    /**
-     * Set the environment for the command.
+    /** set the environment for the command
      * @param env Mapping of environment variables
      */
     protected void setEnvironment(Map<String, String> env) {
         this.environment = env;
     }
 
-    /**
-     * Set the working directory.
+    /** set the working directory
      * @param dir The directory where the command would be executed
      */
     protected void setWorkingDirectory(File dir) {
         this.dir = dir;
     }
 
-    /**
-     * Check to see if a command needs to be executed and execute if needed.
-     */
+    /** check to see if a command needs to be executed and execute if needed */
     protected void run() throws IOException {
-        if (lastTime + interval > System.currentTimeMillis()) {
+        if (lastTime + interval > MathUtils.now())
             return;
-        }
         exitCode = 0; // reset for next run
         runCommand();
     }
 
-    /**
-     * Run a command.
-     */
+    /** Run a command */
     private void runCommand() throws IOException {
         ProcessBuilder builder = new ProcessBuilder(getExecString());
         Timer timeOutTimer = null;
@@ -130,9 +121,8 @@ public abstract class Shell {
             timeOutTimer.schedule(timeoutTimerTask, timeOutInterval);
         }
         final BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream(),
-                StandardCharsets.UTF_8));
-        BufferedReader inReader = new BufferedReader(new InputStreamReader(process.getInputStream(),
-                StandardCharsets.UTF_8));
+                Charsets.UTF_8));
+        BufferedReader inReader = new BufferedReader(new InputStreamReader(process.getInputStream(), Charsets.UTF_8));
         final StringBuffer errMsg = new StringBuffer();
 
         // read error and input streams as this would free up the buffers
@@ -169,7 +159,6 @@ public abstract class Shell {
                 // make sure that the error thread exits
                 errThread.join();
             } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
                 LOG.warn("Interrupted while reading the error stream", ie);
             }
             completed.set(true);
@@ -177,14 +166,8 @@ public abstract class Shell {
             //taken care in finally block
             if (exitCode != 0) {
                 throw new ExitCodeException(exitCode, errMsg.toString());
-            } else {
-                String errMsgStr = errMsg.toString();
-                if (!errMsgStr.isEmpty()) {
-                    LOG.error(errMsgStr);
-                }
             }
         } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
             throw new IOException(ie.toString());
         } finally {
             if (timeOutTimer != null) {
@@ -205,30 +188,24 @@ public abstract class Shell {
                 LOG.warn("Error while closing the error stream", ioe);
             }
             process.destroy();
-            lastTime = System.currentTimeMillis();
+            lastTime = MathUtils.now();
         }
     }
 
-    /**
-     * Return an array containing the command name &amp; its parameters.
-     */
+    /** return an array containing the command name & its parameters */
     protected abstract String[] getExecString();
 
-    /**
-     * Parse the execution result.
-     */
+    /** Parse the execution result */
     protected abstract void parseExecResult(BufferedReader lines) throws IOException;
 
-    /**
-     * Get the current sub-process executing the given command.
+    /** get the current sub-process executing the given command
      * @return process executing the command
      */
     public Process getProcess() {
         return process;
     }
 
-    /**
-     * Get the exit code.
+    /** get the exit code
      * @return the exit code of the process
      */
     public int getExitCode() {

@@ -94,15 +94,13 @@ public final class Retries {
                 scheduler,
                 null);
         } else {
-            scheduler.executeOrdered(key, () -> {
-                execute(
-                    future,
-                    backoffs.iterator(),
-                    retryPredicate,
-                    task,
-                    scheduler,
-                    key);
-            });
+            scheduler.submitOrdered(key, () -> execute(
+                future,
+                backoffs.iterator(),
+                retryPredicate,
+                task,
+                scheduler,
+                key));
         }
         return future;
     }

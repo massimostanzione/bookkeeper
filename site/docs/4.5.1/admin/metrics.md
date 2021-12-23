@@ -4,6 +4,8 @@ title: Metric collection
 
 BookKeeper enables metrics collection through a variety of [stats providers](#stats-providers).
 
+> For a full listing of available metrics, see the [Metrics](../../reference/metrics) reference doc.
+
 ## Stats providers
 
 BookKeeper has stats provider implementations for four five sinks:
@@ -20,7 +22,7 @@ Provider | Provider class name
 
 ## Enabling stats providers in bookies
 
-Two stats-related [configuration parameters](../../reference/config/) are available for bookies:
+There are two stats-related [configuration parameters](../../reference/config#statistics) available for bookies:
 
 Parameter | Description | Default
 :---------|:------------|:-------

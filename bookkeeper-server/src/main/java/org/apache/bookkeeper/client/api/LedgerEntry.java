@@ -98,10 +98,6 @@ public interface LedgerEntry extends AutoCloseable {
     /**
      * {@inheritDoc}
      */
-<<<<<<< HEAD
-=======
-    @Override
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     void close();
 
 }

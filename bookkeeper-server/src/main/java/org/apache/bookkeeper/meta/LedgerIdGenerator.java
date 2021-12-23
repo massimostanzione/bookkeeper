@@ -19,15 +19,16 @@ package org.apache.bookkeeper.meta;
 
 import java.io.Closeable;
 
+import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 
 /**
- * The interface for global unique ledger ID generation.
+ * The interface for global unique ledger ID generation
  */
 public interface LedgerIdGenerator extends Closeable {
 
     /**
-     * Generate a global unique ledger id.
+     * generate a global unique ledger id
      *
      * @param cb
      *            Callback when a new ledger id is generated, return code:<ul>
@@ -35,6 +36,6 @@ public interface LedgerIdGenerator extends Closeable {
      *            <li>{@link BKException.Code.ZKException} when can't generate new ledger id</li>
      *            </ul>
      */
-    void generateLedgerId(GenericCallback<Long> cb);
+    public void generateLedgerId(GenericCallback<Long> cb);
 
 }

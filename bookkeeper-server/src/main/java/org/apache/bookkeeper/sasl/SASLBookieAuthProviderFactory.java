@@ -23,7 +23,6 @@ package org.apache.bookkeeper.sasl;
 import java.io.IOException;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
@@ -38,16 +37,15 @@ import javax.security.auth.login.LoginException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.RealmCallback;
 import javax.security.sasl.SaslException;
-
 import org.apache.bookkeeper.auth.AuthCallbacks;
+import org.apache.bookkeeper.proto.BookieConnectionPeer;
 import org.apache.bookkeeper.conf.AbstractConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.proto.BookieConnectionPeer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * BookieAuthProvider which uses JDK-bundled SASL.
+ * BookieAuthProvider which uses JDK-bundled SASL
  */
 public class SASLBookieAuthProviderFactory implements org.apache.bookkeeper.auth.BookieAuthProvider.Factory,
     JAASCredentialsContainer {
@@ -114,7 +112,6 @@ public class SASLBookieAuthProviderFactory implements org.apache.bookkeeper.auth
             try {
                 ticketRefreshThread.join(10000);
             } catch (InterruptedException exit) {
-                Thread.currentThread().interrupt();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("interrupted while waiting for TGT reresh thread to stop", exit);
                 }

@@ -21,13 +21,10 @@
 
 package org.apache.bookkeeper.util;
 
-import com.google.protobuf.ByteString;
-
 import java.io.IOException;
 
-/**
- * A String-based entry formatter.
- */
+import com.google.protobuf.ByteString;
+
 public class StringEntryFormatter extends EntryFormatter {
     @Override
     public void formatEntry(byte[] data) {

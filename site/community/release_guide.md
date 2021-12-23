@@ -51,7 +51,7 @@ In general, the community prefers to have a rotating set of 3-5 Release Managers
 
 Before your first release, you should perform one-time configuration steps. This will set up your security keys for signing the release and access to various release repositories.
 
-To prepare for each release, you should audit the project status in Github issue tracker, and do necessary bookkeeping. Finally, you should create a release branch from which individual release candidates will be built.
+To prepare for each release, you should audit the project status both in the JIRA issue tracker and the Github issue tracker, and do necessary bookkeeping. Finally, you should create a release branch from which individual release candidates will be built.
 
 ### One-time setup instructions
 
@@ -117,7 +117,7 @@ Configure access to the [Apache Nexus repository](http://repository.apache.org/)
 2. Confirm you have appropriate access by finding `org.apache.bookkeeper` under `Staging Profiles`.
 3. Navigate to your `Profile` (top right dropdown menu of the page).
 4. Choose `User Token` from the dropdown, then click `Access User Token`. Copy a snippet of the Maven XML configuration block.
-5. Insert this snippet twice into your global Maven `settings.xml` file (use command `mvn -X | grep settings`, and read out the global Maven setting file), typically `${HOME}/.m2/settings.xml`. The end result should look like this, where `TOKEN_NAME` and `TOKEN_PASSWORD` are your secret tokens:
+5. Insert this snippet twice into your global Maven `settings.xml` file, typically `${HOME}/.m2/settings.xml`. The end result should look like this, where `TOKEN_NAME` and `TOKEN_PASSWORD` are your secret tokens:
 
         <settings>
           <servers>
@@ -134,27 +134,28 @@ Configure access to the [Apache Nexus repository](http://repository.apache.org/)
           </servers>
         </settings>
 
-#### Create an account on PyPi
+### Create a new version in JIRA and Github
 
-Since 4.9.0 we are releasing a python client for table service during release process. In order to publishing
-a python package to PyPi, you need to [create an account](https://pypi.org/account/register/) there. After
-you create the account successfully, you also need to add the account as a maintainer
-for [bookkeeper-client](https://pypi.org/project/apache-bookkeeper-client/) project. You can checkout who
-are the maintainers at the project page and ask them for adding your account as the maintainer.
+When contributors resolve an issue in JIRA, they are tagging it with a release that will contain their changes. With the release currently underway, new issues should be resolved against a subsequent future release. Therefore, you should create a release item for this subsequent release, as follows:
 
-You can also read the instructions on [how to upload packages to PyPi](https://twine.readthedocs.io/en/latest/)
-if you are interested in learning more details.
+1. In JIRA, navigate to the [`BookKeeper > Administration > Versions`](https://issues.apache.org/jira/plugins/servlet/project-config/BOOKKEEPER/versions).
+2. Add a new release: choose the next minor version number compared to the one currently underway, select today’s date as the `Start Date`, and choose `Add`.
+3. In Github, navigate to the [`Issues > Milestones`](https://github.com/apache/bookkeeper/milestones).
+4. Add a new milestone: choose the next minor version number compared to the one currently underway, select a day that is 3-months from now as the `Due Date`, write a description `Release x.y.z` and choose `Create milestone`.
 
-### Create a new version in Github
+### Triage release-blocking issues in JIRA and Github
 
-When contributors resolve an issue in GitHub, they are tagging it with a release that will contain their changes. With the release currently underway, new issues should be resolved against a subsequent future release. Therefore, you should create a release item for this subsequent release, as follows:
+#### JIRA
 
-1. In Github, navigate to the [`Issues > Milestones`](https://github.com/apache/bookkeeper/milestones).
-2. Add a new milestone: choose the next minor version number compared to the one currently underway, select a day that is 3-months from now as the `Due Date`, write a description `Release x.y.z` and choose `Create milestone`.
+There could be outstanding release-blocking issues, which should be triaged before proceeding to build a release candidate. We track them by assigning a specific `Fix version` field even before the issue resolved.
 
-Skip this step in case of a minor release, as milestones are only for major releases.
+The list of release-blocking issues is available at the [version status page](https://issues.apache.org/jira/browse/BOOKKEEPER/?selectedTab=com.atlassian.jira.jira-projects-plugin:versions-panel). Triage each unresolved issue with one of the following resolutions:
 
-### Triage release-blocking issues in Github
+* If the issue has been resolved and JIRA was not updated, resolve it accordingly.
+* If the issue has not been resolved and it is acceptable to defer this until the next release, update the `Fix Version` field to the new version you just created. Please consider discussing this with stakeholders and the dev@ mailing list, as appropriate.
+* If the issue has not been resolved and it is not acceptable to release until it is fixed, the release cannot proceed. Instead, work with the BookKeeper community to resolve the issue.
+
+#### Github
 
 There could be outstanding release-blocking issues, which should be triaged before proceeding to build a release candidate. We track them by assigning a specific `Milestone` field even before the issue resolved.
 
@@ -164,27 +165,37 @@ The list of release-blocking issues is available at the [milestones page](https:
 * If the issue has not been resolved and it is acceptable to defer this until the next release, update the `Milestone` field to the new milestone you just created. Please consider discussing this with stakeholders and the dev@ mailing list, as appropriate.
 * If the issue has not been resolved and it is not acceptable to release until it is fixed, the release cannot proceed. Instead, work with the BookKeeper community to resolve the issue.
 
-### Change Python Client Version
+### Review Release Notes in JIRA and Github
 
-Before cutting a release, you need to update the python client version in
-[setup.py](https://github.com/apache/bookkeeper/blob/master/stream/clients/python/setup.py#L22)
-from `SNAPSHOT` version to a release version and get the change merge to master. For example,
-in release 4.10.0, you need to change the version from `4.10.0-alpha-0` to `4.10.0`.
+#### JIRA
 
-### Review Release Notes in Github
+JIRA automatically generates Release Notes based on the `Fix Version` field applied to issues. Release Notes are intended for BookKeeper users (not BookKeeper committers/contributors). You should ensure that Release Notes are informative and useful.
 
-> Github does not automatically generates Release Notes based on the `Milestone` field applied to issues.
+Open the release notes from the [version status page](https://issues.apache.org/jira/browse/BOOKKEEPER/?selectedTab=com.atlassian.jira.jira-projects-plugin:versions-panel) by choosing the release underway and clicking Release Notes.
+
+You should verify that the issues listed automatically by JIRA are appropriate to appear in the Release Notes. Specifically, issues should:
+
+* Be appropriately classified as `Bug`, `New Feature`, `Improvement`, etc.
+* Represent noteworthy user-facing changes, such as new functionality, backward-incompatible API changes, or performance improvements.
+* Have occurred since the previous release; an issue that was introduced and fixed between releases should not appear in the Release Notes.
+* Have an issue title that makes sense when read on its own.
+
+Adjust any of the above properties to the improve clarity and presentation of the Release Notes.
+
+#### Github
+
+> Unlike JIRA, Github does not automatically generates Release Notes based on the `Milestone` field applied to issues.
 > We can use [github-changelog-generator](https://github.com/skywinder/github-changelog-generator) to generate a ChangeLog for a milestone in future.
 
 For Github, we can use the milestone link in the Release Notes. E.g. [Release 4.5.0 milestone](https://github.com/apache/bookkeeper/milestone/1?closed=1).
 
 #### Prepare Release Notes
 
-After review the release notes on both Github, you should write a `releaseNotes` under `site/docs/${release_version}/overview/releaseNotes.md` and then send out a pull request for review.
+After review the release notes on both JIRA and Github, you should write a `releaseNotes` under `site/docs/${release_version}/overview/releaseNotes.md` and then send out a pull request for review.
 
 [4.5.0 Release Notes](https://github.com/apache/bookkeeper/pull/402) is a good example to follow.
 
-### Prepare release branch
+### Create a release branch
 
 Release candidates are built from a release branch. As a final step in preparation for the release, you should create the release branch, push it to the code repository, and update version information on the original branch.
 
@@ -195,29 +206,15 @@ Check out the version of the codebase from which you start the release. For a ne
 
 Set up a few environment variables to simplify Maven commands that follow. (We use `bash` Unix syntax in this guide.)
 
-For a major release (for instance 4.5.0):
-
     MAJOR_VERSION="4.5"
     VERSION="4.5.0"
     NEXT_VERSION="4.6.0"
     BRANCH_NAME="branch-${MAJOR_VERSION}"
     DEVELOPMENT_VERSION="${NEXT_VERSION}-SNAPSHOT"
 
-For a minor release (for instance 4.5.1):
-
-    MAJOR_VERSION="4.5"
-    VERSION="4.5.1"
-    NEXT_VERSION="4.5.2"
-    BRANCH_NAME="branch-${MAJOR_VERSION}"
-    DEVELOPMENT_VERSION="${NEXT_VERSION}-SNAPSHOT"
-
 Version represents the release currently underway, while next version specifies the anticipated next version to be released from that branch. Normally, 4.5.0 is followed by 4.6.0, while 4.5.0 is followed by 4.5.1.
 
-#### Create branch for major release
-
-If you are cutting a minor release, you can skip this step and go to section [Checkout release branch](#checkout-release-branch).
-
-If you are cutting a major release use Maven release plugin to create the release branch and update the current branch to use the new development version. This command applies for the new major or minor version.
+Use Maven release plugin to create the release branch and update the current branch to use the new development version. This command applies for the new major or minor version.
 
 > This command automatically check in and tag your code in the code repository configured in the SCM.
 > It is recommended to do a "dry run" before executing the command. To "dry run", you can provide "-DdryRun"
@@ -237,15 +234,14 @@ If you are cutting a major release use Maven release plugin to create the releas
 > $ git reset --hard apache/<master branch OR release tag>
 > $ git branch -D ${BRANCH_NAME}
 
-##### Create CI jobs for release branch
+However, if you are doing an incremental/hotfix release, please run the following command after checking out the release tag of the release being patched.
 
-Once the release branch is created, please create corresponding CI jobs for the release branch. These CI jobs includes postcommit jobs for different java versions and
-integration tests.
-
-Example PR: [release-4.7.0](https://github.com/apache/bookkeeper/pull/1328) [integration tests for release-4.7.0](https://github.com/apache/bookkeeper/pull/1353)
-
-#### Checkout release branch
-<a name="checkout-release-branch"></a>
+    mvn release:branch \
+        -DbranchName=${BRANCH_NAME} \
+        -DupdateWorkingCopyVersions=false \
+        -DupdateBranchVersions=true \
+        -DreleaseVersion="${VERSION}-SNAPSHOT" \
+        [-DdryRun]
 
 Check out the release branch.
 
@@ -253,19 +249,20 @@ Check out the release branch.
 
 The rest of this guide assumes that commands are run in the root of a repository on `${BRANCH_NAME}` with the above environment variables set.
 
-Verify that pom.xml contains the correct VERSION, it should still end with the '-SNAPSHOT' suffix.
-
 ### Checklist to proceed to the next step
 
 1. Release Manager’s GPG key is published to `dist.apache.org`
 2. Release Manager’s GPG key is configured in `git` configuration
 3. Release Manager has `org.apache.bookkeeper` listed under `Staging Profiles` in Nexus
 4. Release Manager’s Nexus User Token is configured in `settings.xml`
-5. Github milestone item for the subsequet release has been created
-6. There are no release blocking Github issues
-7. Release Notes for Github Milestone is generated, audited and adjusted
-8. Release branch has been created
-9. Originating branch has the version information updated to the new version
+5. JIRA release item for the subsequent release has been created
+6. Github milestone item for the subsequet release has been created
+7. There are no release blocking JIRA issues
+8. There are no release blocking Github issues
+9. Release Notes in JIRA have been audited and adjusted
+10. Release Notes for Github Milestone is generated, audited and adjusted
+11. Release branch has been created
+12. Originating branch has the version information updated to the new version
 
 **********
 
@@ -273,61 +270,42 @@ Verify that pom.xml contains the correct VERSION, it should still end with the '
 
 The core of the release process is the build-vote-fix cycle. Each cycle produces one release candidate. The Release Manager repeats this cycle until the community approves one release candidate, which is then finalized.
 
-> Since 4.7.0, bookkeeper is releasing a CRC32C module `circe-checksum`. so all the steps on building a release candidate should happen in linux environment.
-> It ensures the release candidate built with right jni library for `circe-checksum`.
+### Build and stage Java artifacts with Maven
+
+
+    TODO: Currently we have to build and stage maven artifacts manually, because it requires pushing the artifacts to apache staging. We should look for a solution to automate that.
+
 
 Set up a few environment variables to simplify Maven commands that follow. This identifies the release candidate being built. Start with `release candidate number` equal to `0` and increment it for each candidate.
 
     RC_NUM="0"
     TAG="release-${VERSION}"
     RC_DIR="bookkeeper-${VERSION}-rc${RC_NUM}"
-    RC_TAG="v${VERSION}-rc${RC_NUM}"
 
 > Please make sure `gpg` command is in your $PATH. The maven release plugin use `gpg` to sign generated jars and packages.
 
-### Run linux docker container to build release candidate
-
-```shell
-./dev/release/000-run-docker.sh ${RC_NUM}
-```
-
-After the docker process is lauched, use `cache` credential helper to cache github credentials during releasing process.
-
-```shell
-$ git config --global credential.helper "cache --timeout=3600"
-```
-
-Then run a dry-run github push to apache github repo. You will be asked for typing your github password, so the password will be cached for the whole releasing process.
-If your account is configured with 2FA, use your personal token as the github password.
-
-The remote `apache` should point to `https://github.com/apache/bookkeeper`.
-
-```shell
-$ git push apache --dry-run
-```
-
-### Build and stage Java artifacts with Maven
-
-
 Use Maven release plugin to build the release artifacts, as follows:
 
-```shell
-./dev/release/002-release-prepare.sh
-```
+    mvn release:prepare \
+        -Dresume=false \
+        -DreleaseVersion=${VERSION} \
+        -Dtag=${TAG} \
+        -DupdateWorkingCopyVersions=false \
+        [-DdryRun] \
+        [-Darguments="-Dmaven.javadoc.skip=true -DskipTests=true"] \ // to skip javadoc and tests
+        [-Dresume=true] // resume prepare if it is interrupted in the middle
 
 Use Maven release plugin to stage these artifacts on the Apache Nexus repository, as follows:
 
-```shell
-./dev/release/003-release-perform.sh
-```
+    mvn release:perform [-DdryRun] [-Darguments="-Dmaven.javadoc.skip=true -DskipTests=true"] [-Dresume=true]
 
 > If `release:perform` failed, 
-> delete the release tag: git tag -d release-${VERSION} && git push apache :refs/tags/release-${VERSION}
+> delete the release tag: git tag -d ${VERSION} && git push apache :refs/tags/${VERSION}
 > 
 > Also, you need to check the git commits on the github and if needed you may have to
 > force push backed out local git branch to github again.
 >
-> After reset, run `./dev/release/002-release-prepare.sh` again.
+> After reset, run `release:prepare` again.
 
 Review all staged artifacts. They should contain all relevant parts for each module, including `pom.xml`, jar, test jar, source, test source, javadoc, etc. Artifact names should follow [the existing format](https://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.apache.bookkeeper%22) in which artifact name mirrors directory structure, e.g., `bookkeeper-server`. Carefully review any new artifacts.
 
@@ -335,9 +313,12 @@ Close the staging repository on Apache Nexus. When prompted for a description, e
 
 ### Stage source release on dist.apache.org
 
-1. Copy the source release to the dev repository of `dist.apache.org`.
+Copy the source release to the dev repository of `dist.apache.org`.
 
-<<<<<<< HEAD
+1. If you have not already, check out the BookKeeper section of the `dev` repository on `dist.apache.org` via Subversion. In a fresh directory:
+
+        svn co https://dist.apache.org/repos/dist/dev/bookkeeper
+
 2. Make a directory for the new release:
 
         mkdir bookkeeper/${RC_DIR}
@@ -366,18 +347,13 @@ Close the staging repository on Apache Nexus. When prompted for a description, e
         cd ..
         svn add ${RC_DIR}
         svn commit
-=======
-```shell
-./dev/release/004-stage-packages.sh
-```
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
-2. Verify that files are [present](https://dist.apache.org/repos/dist/dev/bookkeeper).
+6. Verify that files are [present](https://dist.apache.org/repos/dist/dev/bookkeeper).
 
 ### Checklist to proceed to the next step
 
 1. Maven artifacts deployed to the staging repository of [repository.apache.org](https://repository.apache.org/content/repositories/)
-1. Source and Binary distribution deployed to the dev repository of [dist.apache.org](https://dist.apache.org/repos/dist/dev/bookkeeper/)
+1. Source and Binary distribution deployed to the dev repository of [dist.apache.org](https://dist.apache.org/repos/dist/dev/incubator/bookkeeper/)
 
 **********
 
@@ -400,17 +376,17 @@ Start the review-and-vote thread on the dev@ mailing list. Here’s an email tem
     * Release notes [1]
     * The official Apache source and binary distributions to be deployed to dist.apache.org [2]
     * All artifacts to be deployed to the Maven Central Repository [3]
-    * Source code tag "release-4.5.0" [4] with git sha XXXXXXXXXXXXXXXXXXXX
+    * Source code tag "release-4.5.0" [4]
 
-    BookKeeper's KEYS file contains PGP keys we used to sign this release:
+    BookKeeper's KEY file contains PGP keys we use to sign this release:
     https://dist.apache.org/repos/dist/release/bookkeeper/KEYS
 
-    Please download these packages and review this release candidate:
+    Please down this packages and review this release candidate:
 
     - Review release notes
-    - Download the source package (verify shasum, and asc) and follow the
+    - Download the source package (verify md5, shasum, and asc) and follow the
     instructions to build and run the bookkeeper service.
-    - Download the binary package (verify shasum, and asc) and follow the
+    - Download the binary package (verify md5, shasum, and asc) and follow the
     instructions to run the bookkeeper service.
     - Review maven repo, release tag, licenses, and any other things you think
     it is important to a release.
@@ -431,7 +407,7 @@ If there are any issues found in the release candidate, reply on the vote thread
 If there are no issues, reply on the vote thread to close the voting. Then, tally the votes in a separate email. Here’s an email template; please adjust as you see fit. (NOTE: the approver list are binding approvers.)
 
     From: Release Manager
-    To: dev@bookkeeper.apache.org
+    To: dev@bookkeeper.incubator.apache.org
     Subject: [RESULT] [VOTE] Release 0.4.0, release candidate #0
 
     I'm happy to announce that we have unanimously approved this release.
@@ -484,17 +460,11 @@ Copy the source release from the `dev` repository to the `release` repository at
 ### Update Website
 
 1. Create the documentation for `${VERSION}`. Run the `release.sh` to generate the branch for `${VERSION}` and bump
-    the versions for website documentation; or run the `release_minor.sh` to release documentation when doing a
-    mintor release.
+    the versions for website documentation.
 
     ```shell
     $ cd site
-
-    // use `release.sh` for major releases
-    $ ./scripts/release.sh
-
-    // or `release_minor.sh` for minor releases
-    $ ./scripts/release_minor.sh
+    $ ./site/release.sh
     ```
 
     Once run the `release.sh`, please send a pull request for it and get approval from any committers, then merge it.
@@ -503,183 +473,44 @@ Copy the source release from the `dev` repository to the `release` repository at
 
 2. Merge the Release Notes pull request and make sure the Release Notes is updated.
 
-### Git tag
+### Update Dockerfile
 
-> NOTE: Only create the release tag after the release package is showed up under https://archive.apache.org/dist/bookkeeper/ as creating the tag triggers a docker autobuild which needs the package to exist. If you forget to do so, the build will fail. In this case you can delete the tag from github and push it again.
+1. Update the `BK_VERSION` and `GPG_KEY` in `docker/Dockerfile` (e.g. [Pull Request 436](https://github.com/apache/bookkeeper/pull/436) ),
+    send a pull request for review and get an approval from the community.
 
-Create and push a new signed for the released version by copying the tag for the final release tag, as follows
+2. Once the pull request is approved, merge this pull request into master and make sure it is cherry-picked into corresponding branch.
 
-```shell
-git tag -s "${TAG}" "${RC_TAG}"
-git push apache "${TAG}"
-```
-
-Remove rc tags:
-
-```shell
-for num in $(seq 0 ${RC_NUM}); do
-    git tag -d "v${VERSION}-rc${num}"
-    git push apache :"v${VERSION}-rc${num}"
-done
-```
-
-### Update DC/OS BookKeeper package
-
-> NOTE: Please update DC/OS bookkeeper package only after the release package is showed up under https://archive.apache.org/dist/bookkeeper/
-
-Once we have new version of BookKeeper docker image available at [docker hub](https://hub.docker.com/r/apache/bookkeeper/), We could update DC/OS BookKeeper package in [mesosphere universe](https://github.com/mesosphere/universe). A new pull request is needed in it. 
-
-It is easy if only version need be bump.
-
-1. Clone repo [mesosphere universe](https://github.com/mesosphere/universe).
+3. After this pull request is merged, you need to cherry-pick the change to the release tag.
 
     ```shell
-    $ git clone https://github.com/mesosphere/universe
+    // create a cherry-pick branch
+    $ git checkout ${TAG}
+    $ git checkout -b ${TAG}_cherrypick
+    $ git cherry-pick <GIT SHA>
+    // remove the release tag locally and remotely
+    $ git tag -d ${TAG}
+    $ git push apache :${TAG}
+    // re-tag based on the cherry-pick branch
+    $ git tag ${TAG}
+    $ git push apache ${TAG}
     ```
 
-2. cd into the repo, Checkout a branch for the changes.
+4. Verify the [docker hub](https://hub.docker.com/r/apache/bookkeeper/) to see if a new build for the given tag is build.
 
-    ```shell
-    $ cd universe
-    $ git checkout -b bookkeeper_new_version
-    ```
+### Mark the version as released in JIRA and Github
 
-3. Make a copy of latest code of BookKeeper package.
-
-    ```shell
-    $ cp -rf repo/packages/B/bookkeeper/1 repo/packages/B/bookkeeper/2
-    $ git add repo/packages/B/bookkeeper/2
-    $ git commit -m "copy old version"
-    ```
-
-4. Bump the version of BookKeeper docker image in file [resource.json](https://github.com/mesosphere/universe/blob/version-3.x/repo/packages/B/bookkeeper/1/resource.json#L5) and [package.json](https://github.com/mesosphere/universe/blob/version-3.x/repo/packages/B/bookkeeper/1/package.json#L4).
-
-    ```
-    diff --git repo/packages/B/bookkeeper/2/package.json repo/packages/B/bookkeeper/2/package.json
-    index 07199d56..75f4aa81 100644
-    --- repo/packages/B/bookkeeper/2/package.json
-    +++ repo/packages/B/bookkeeper/2/package.json
-    @@ -1,7 +1,7 @@
-     {
-       "packagingVersion": "3.0",
-       "name": "bookkeeper",
-    -  "version": "4.5.1",
-    +  "version": "4.7.0",
-       "scm": "https://github.com/apache/bookkeeper",
-       "maintainer": "zhaijia@apache.org",
-       "description": "BookKeeper is A scalable, fault-tolerant, and low-latency storage service optimized for real-time workloads.Further information can be found here: http://bookkeeper.apache.org/",
-    diff --git repo/packages/B/bookkeeper/2/resource.json repo/packages/B/bookkeeper/2/resource.json
-    index 3801750e..72690ea0 100644
-    --- repo/packages/B/bookkeeper/2/resource.json
-    +++ repo/packages/B/bookkeeper/2/resource.json
-    @@ -2,7 +2,7 @@
-       "assets": {
-         "container": {
-           "docker": {
-    -        "bookkeeper": "apache/bookkeeper:4.5.1"
-    +        "bookkeeper": "apache/bookkeeper:4.7.0"
-           }
-         }
-       },
-    ```
-
-5. Commit the change, create a pull request and wait for it to be approved and merged.
-
-    ```shell
-    $ git add repo/packages/B/bookkeeper/2
-    $ git commit -m "new bookkeeper version"
-    ```
-
-### Verify Docker Image
-
-> After release tag is created, it will automatically trigger docker auto build. 
-
-1. Verify the [docker hub](https://hub.docker.com/r/apache/bookkeeper/) to see if a new build for the given tag is build.
-
-2. Once the new docker image is built, update BC tests to include new docker image. Example: [release-4.7.0](https://github.com/apache/bookkeeper/pull/1352)
-
-### Release Python Client
-
-Make sure you have installed [`pip`](https://pypi.org/project/pip/) and
-[`twine`](https://twine.readthedocs.io/en/latest/).
-
-- Install Pip
-  ```bash
-  brew install pip
-  ```
-
-- Install Twine
-  ```bash
-  pip install twine
-  ```
-
-After install `twine`, make sure `twine` exist in your PATH before releasing python client.
-
-```bash
-twine --version
-```
-
-Now, you are ready to publish the python client.
-
-```bash
-cd stream/clients/python
-./publish.sh
-```
-
-Check the PyPi project package to make sure the python client is uploaded to  https://pypi.org/project/apache-bookkeeper-client/ .
-
-### Advance version on release branch
-
-> only do this for minor release
-
-Use the Maven Release plugin in order to advance the version in all poms.
-
-> This command will upgrade the <version> tag on every pom.xml locally to your workspace.
-
-    mvn release:update-versions
-        -DdevelopmentVersion=${DEVELOPMENT_VERSION}
-        -Dstream
-
-For instance if you have released 4.5.1, you have to change version to 4.5.2-SNAPSHOT.
-Then you have to create a PR and submit it for review.
-
-Example PR: [release-4.7.0](https://github.com/apache/bookkeeper/pull/1350)
-
-### Advance python client version
-
-If you are doing a major release, you need to update the python client version to next major development version in master
-and next minor development version in the branch. For example, if you are doing 4.9.0 release, you need to bump the version
-in master to `4.10.0-alpha-0` (NOTE: we are using `alpha-0` as `SNAPSHOT`, otherwise pypi doesn't work), and the version in
-`branch-4.9` to `4.9.1-alpha-0`.
-
-If you are only doing a minor release, you just need to update the version in release branch. For example, if you are doing
-4.9.1 release, you need to bump the version in `branch-4.9` to `4.9.2-alpha-0`.
-
-### Mark the version as released in Github
-
-> only do this for feature release
+In JIRA, inside [version management](https://issues.apache.org/jira/plugins/servlet/project-config/BOOKKEEPER/versions), hover over the current release and a settings menu will appear. Click `Release`, and select today’s date.
 
 In Github, inside [milestones](https://github.com/apache/bookkeeper/milestones), hover over the current milestone and click `close` button to close a milestone and set today's date as due-date.
-
-### Update Release Schedule
-
-> only do this for feature release
-
-Update the [release schedule](../releases) page:
-
-- Bump the next feature release version and update its release window.
-- Update the release schedule to remove released version and add a new release.
 
 ### Checklist to proceed to the next step
 
 * Maven artifacts released and indexed in the [Maven Central Repository](https://search.maven.org/#search%7Cga%7C1%7Cg%3A%22org.apache.bookkeeper%22)
-* Source and Binary distribution available in the release repository of [dist.apache.org](https://dist.apache.org/repos/dist/release/bookkeeper/)
+* Source and Binary distribution available in the release repository of [dist.apache.org](https://dist.apache.org/repos/dist/release/incubator/bookkeeper/)
 * Website is updated with new release
 * Docker image is built with new release
 * Release tagged in the source code repository
-* Release version finalized in Github
-* Release section with release summary is added in [releases.md](https://github.com/apache/bookkeeper/blob/master/site/releases.md)
-* Release schedule page is updated
+* Release version finalized in JIRA and Github
 
 **********
 
@@ -691,15 +522,13 @@ Once the release has been finalized, the last step of the process is to promote 
 
 - Announce on the dev@ mailing list that the release has been finished.
 - Announce on the release on the user@ mailing list, listing major improvements and contributions.
-- Announce the release on the announce@apache.org mailing list
-
-Use the template below for all the messages.
+- Announce the release on the announce@apache.org mailing list.
 
 > NOTE: Make sure sending the announce email using apache email, otherwise announce@apache.org will reject your email.
 
 
     From: xxx@apache.org
-    To: dev@bookkeeper.apache.org, user@bookkeeper.apache.org, announce@apache.org
+    To: dev@bookkeeper.apache.org, dev@bookkeeper.apache.org, announce@apache.org
     Subject: [ANNOUNCE] Apache BookKeeper x.y.z released
      
     The Apache BookKeeper team is proud to announce Apache BookKeeper version
@@ -732,25 +561,9 @@ Use the template below for all the messages.
 
 Use reporter.apache.org to seed the information about the release into future project reports.
 
-This step can be done only by PMC.
-
 ### Social media
 
 Tweet, post on Facebook, LinkedIn, and other platforms. Ask other contributors to do the same.
-
-This step can be done only by PMC.
-
-### Cleanup old releases
-
-According to [ASF policy](http://www.apache.org/legal/release-policy.html#when-to-archive), `/www.apache.org/dist` should contain the latest release in each branch that
-is currently under development. We need to remove the old releases from `release` repository.
-
-For example, if 4.6.1 is a newer release, we need to remove releases older than 4.6.1.
-
-
-    ```shell
-    $ svn del https://dist.apache.org/repos/dist/release/bookkeeper/bookkeeper-${old-release} -m "remove bookkeeper release <old-release>"
-    ```
 
 ### Checklist to declare the process completed
 

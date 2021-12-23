@@ -17,18 +17,14 @@
  * under the License.
  */
 package org.apache.bookkeeper.server.http.service;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/WhoIsAuditorService.java
-=======
 
-import static com.google.common.base.Preconditions.checkNotNull;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/WhoIsAuditorService.java
-
+import com.google.common.base.Preconditions;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.replication.AuditorElector;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
@@ -37,7 +33,7 @@ import org.slf4j.LoggerFactory;
 /**
  * HttpEndpointService that handle Bookkeeper who is auditor related http request.
  *
- * <p>The GET method will get the auditor bookie address
+ * The GET method will get the auditor bookie address
  */
 public class WhoIsAuditorService implements HttpEndpointService {
 
@@ -47,7 +43,7 @@ public class WhoIsAuditorService implements HttpEndpointService {
     protected ZooKeeper zk;
 
     public WhoIsAuditorService(ServerConfiguration conf, ZooKeeper zk) {
-        checkNotNull(conf);
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
         this.zk = zk;
     }
@@ -60,7 +56,7 @@ public class WhoIsAuditorService implements HttpEndpointService {
         HttpServiceResponse response = new HttpServiceResponse();
 
         if (HttpServer.Method.GET == request.getMethod()) {
-            BookieId bookieId = null;
+            BookieSocketAddress bookieId = null;
             try {
                 bookieId = AuditorElector.getCurrentAuditor(conf, zk);
 
@@ -77,7 +73,10 @@ public class WhoIsAuditorService implements HttpEndpointService {
             }
 
             response.setCode(HttpServer.StatusCode.OK);
-            response.setBody("Auditor: " + bookieId);
+            response.setBody("Auditor: "
+                + bookieId.getSocketAddress().getAddress().getCanonicalHostName() + "/"
+                + bookieId.getSocketAddress().getAddress().getHostAddress() + ":"
+                + bookieId.getSocketAddress().getPort());
             LOG.debug("response body:" + response.getBody());
             return response;
         } else {

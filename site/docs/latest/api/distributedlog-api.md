@@ -81,7 +81,7 @@ The DistributedLog API for BookKeeper provides a number of guarantees for applic
 
 ## API
 
-Documentation for the DistributedLog API can be found [here](https://bookkeeper.apache.org/distributedlog/docs/latest/user_guide/api/core).
+Documentation for the DistributedLog API can be found [here](https://distributedlog.incubator.apache.org/docs/latest/user_guide/api/core).
 
 > At a later date, the DistributedLog API docs will be added here.
 
@@ -222,7 +222,7 @@ logConf.setRetentionPeriodHours(12);
 DistributedLogManager logManager = namespace.openLog(
         "test-log",
         Optional.of(logConf),
-        Optional.empty()
+        Optional.absent()
 );
 ```
 

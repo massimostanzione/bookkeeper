@@ -31,21 +31,13 @@
           {% for version in site.versions %}
           <a class="navbar-item" href="{{ site.baseurl }}docs/{{version}}/overview/overview">
             Release {{version}}
-            {% if site.stable_release == version %}
-              <span class="tag is-success">Stable</span>
-            {% elsif site.eol_releases contains version %}
-              <span class="tag is-warning">EOL</span>
-            {% endif %}
+            {% if version == site.stable_release %}<span class="tag is-success">Stable</span>{% endif %}
           </a>
           {% endfor %}
           {% for version in site.archived_versions %}
           <a class="navbar-item" href="{{ site.baseurl }}archives/docs/r{{version}}">
             Release {{version}}
-            {% if site.stable_release == version %}
-              <span class="tag is-success">Stable</span>
-            {% elsif site.eol_releases contains version %}
-              <span class="tag is-warning">EOL</span>
-            {% endif %}
+            {% if version == site.stable_release %}<span class="tag is-success">Stable</span>{% endif %}
           </a>
           {% endfor %}
         </div>
@@ -62,12 +54,11 @@
           <hr class="dropdown-divider">
           <a class="navbar-item" href="{{ site.baseurl }}community/contributing">Contribution Guide</a>
           <a class="navbar-item" href="{{ site.baseurl }}community/coding_guide">Coding Guide</a>
-          <a class="navbar-item" href="{{ site.baseurl }}community/testing">Testing Guide</a>
           <a class="navbar-item" href="{{ site.baseurl }}community/issue-report">Issue Report Guide</a>
           <a class="navbar-item" href="{{ site.baseurl }}community/release_guide">Release Guide</a>
           <hr class="dropdown-divider">
           <a class="navbar-item" href="{{ site.baseurl }}community/presentations">Presentations</a>
-          <a class="navbar-item" href="{{ site.baseurl }}community/bookkeeper_proposals">BookKeeper Proposals</a>
+          <a class="navbar-item" href="https://cwiki.apache.org/confluence/display/BOOKKEEPER/BookKeeper+Proposals">BookKeeper Proposals</a>
         </div>
       </div>
 

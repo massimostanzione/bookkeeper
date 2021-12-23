@@ -18,30 +18,22 @@
  */
 package org.apache.bookkeeper.server.http.service;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/ExpandStorageService.java
-=======
-import java.net.URI;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/ExpandStorageService.java
 import java.util.Arrays;
 import java.util.List;
+import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.bookie.BookieImpl;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-<<<<<<< HEAD:bookkeeper-server/src/main/java/org/apache/bookkeeper/server/http/service/ExpandStorageService.java
 import org.apache.bookkeeper.discover.RegistrationManager;
 import org.apache.bookkeeper.discover.ZKRegistrationManager;
-=======
->>>>>>> 2346686c3b8621a585ad678926adf60206227367:bookkeeper-server/src/main/java/org/apache/bookkeeper/http/ExpandStorageService.java
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
 import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
-import org.apache.bookkeeper.meta.MetadataBookieDriver;
-import org.apache.bookkeeper.meta.MetadataDrivers;
 import org.apache.bookkeeper.stats.NullStatsLogger;
+import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +48,12 @@ public class ExpandStorageService implements HttpEndpointService {
     static final Logger LOG = LoggerFactory.getLogger(ExpandStorageService.class);
 
     protected ServerConfiguration conf;
+    private ZooKeeper zk;
 
-    public ExpandStorageService(ServerConfiguration conf) {
-        checkNotNull(conf);
+    public ExpandStorageService(ServerConfiguration conf, ZooKeeper zk) {
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
+        this.zk = zk;
     }
 
     /*
@@ -71,13 +65,13 @@ public class ExpandStorageService implements HttpEndpointService {
         HttpServiceResponse response = new HttpServiceResponse();
 
         if (HttpServer.Method.PUT == request.getMethod()) {
-            File[] ledgerDirectories = BookieImpl.getCurrentDirectories(conf.getLedgerDirs());
-            File[] journalDirectories = BookieImpl.getCurrentDirectories(conf.getJournalDirs());
+            File[] ledgerDirectories = Bookie.getCurrentDirectories(conf.getLedgerDirs());
+            File[] journalDirectories = Bookie.getCurrentDirectories(conf.getJournalDirs());
             File[] indexDirectories;
             if (null == conf.getIndexDirs()) {
                 indexDirectories = ledgerDirectories;
             } else {
-                indexDirectories = BookieImpl.getCurrentDirectories(conf.getIndexDirs());
+                indexDirectories = Bookie.getCurrentDirectories(conf.getIndexDirs());
             }
 
             List<File> allLedgerDirs = Lists.newArrayList();
@@ -86,11 +80,10 @@ public class ExpandStorageService implements HttpEndpointService {
                 allLedgerDirs.addAll(Arrays.asList(indexDirectories));
             }
 
-            try (MetadataBookieDriver driver = MetadataDrivers.getBookieDriver(
-                URI.create(conf.getMetadataServiceUri())
-            )) {
-                driver.initialize(conf, () -> { }, NullStatsLogger.INSTANCE);
-                BookieImpl.checkEnvironmentWithStorageExpansion(conf, driver,
+            try {
+                RegistrationManager rm = new ZKRegistrationManager();
+                rm.initialize(conf, () -> { }, NullStatsLogger.INSTANCE);
+                Bookie.checkEnvironmentWithStorageExpansion(conf, rm,
                   Lists.newArrayList(journalDirectories), allLedgerDirs);
             } catch (BookieException e) {
                 LOG.error("Exception occurred while updating cookie for storage expansion", e);

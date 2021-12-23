@@ -30,12 +30,7 @@ import java.io.IOException;
 class ReadOnlyFileInfo extends FileInfo {
 
     public ReadOnlyFileInfo(File lf, byte[] masterKey) throws IOException {
-        /*
-         * For ReadOnlyFile it is okay to initialize FileInfo with
-         * CURRENT_HEADER_VERSION, when fileinfo.readHeader is called it would
-         * read actual header version.
-         */
-        super(lf, masterKey, FileInfo.CURRENT_HEADER_VERSION);
+        super(lf, masterKey);
         mode = "r";
     }
 

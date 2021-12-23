@@ -18,7 +18,6 @@
 package org.apache.bookkeeper.net;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -42,13 +41,9 @@ import org.slf4j.LoggerFactory;
  */
 public class NetworkTopologyImpl implements NetworkTopology {
 
-    public static final int DEFAULT_HOST_LEVEL = 2;
+    public final static int DEFAULT_HOST_LEVEL = 2;
     public static final Logger LOG = LoggerFactory.getLogger(NetworkTopologyImpl.class);
-    public static final String NODE_SEPARATOR = ",";
 
-    /**
-     * A marker for an InvalidTopology Exception.
-     */
     public static class InvalidTopologyException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
@@ -64,43 +59,33 @@ public class NetworkTopologyImpl implements NetworkTopology {
         protected List<Node> children = new ArrayList<Node>();
         private int numOfLeaves;
 
-        /**
-         * Construct an InnerNode from a path-like string.
-         */
+        /** Construct an InnerNode from a path-like string */
         InnerNode(String path) {
             super(path);
         }
 
-        /**
-         * Construct an InnerNode from its name and its network location.
-         */
+        /** Construct an InnerNode from its name and its network location */
         InnerNode(String name, String location) {
             super(name, location);
         }
 
-        /**
-         * Construct an InnerNode from its name, its network location, its parent, and its level.
-         */
+        /** Construct an InnerNode
+         * from its name, its network location, its parent, and its level */
         InnerNode(String name, String location, InnerNode parent, int level) {
             super(name, location, parent, level);
         }
 
-        /**
-         * @return its children
-         */
+        /** @return its children */
         List<Node> getChildren() {
             return children;
         }
 
-        /**
-         * @return the number of children this node has
-         */
+        /** @return the number of children this node has */
         int getNumOfChildren() {
             return children.size();
         }
 
-        /**
-         * Judge if this node represents a rack.
+        /** Judge if this node represents a rack
          * @return true if it has no child or its children are not InnerNodes
          */
         boolean isRack() {
@@ -109,11 +94,14 @@ public class NetworkTopologyImpl implements NetworkTopology {
             }
 
             Node firstChild = children.get(0);
-            return !(firstChild instanceof InnerNode);
+            if (firstChild instanceof InnerNode) {
+                return false;
+            }
+
+            return true;
         }
 
-        /**
-         * Judge if this node is an ancestor of node <i>n</i>.
+        /** Judge if this node is an ancestor of node <i>n</i>
          *
          * @param n a node
          * @return true if this node is an ancestor of <i>n</i>
@@ -124,8 +112,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
                             + NodeBase.PATH_SEPARATOR_STR);
         }
 
-        /**
-         * Judge if this node is the parent of node <i>n</i>.
+        /** Judge if this node is the parent of node <i>n</i>
          *
          * @param n a node
          * @return true if this node is the parent of <i>n</i>
@@ -134,9 +121,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
             return n.getNetworkLocation().equals(getPath(this));
         }
 
-        /**
-         * Return a child name of this node who is an ancestor of node <i>n</i>.
-         */
+        /* Return a child name of this node who is an ancestor of node <i>n</i> */
         private String getNextAncestorName(Node n) {
             if (!isAncestor(n)) {
                 throw new IllegalArgumentException(this + "is not an ancestor of " + n);
@@ -146,22 +131,19 @@ public class NetworkTopologyImpl implements NetworkTopology {
                 name = name.substring(1);
             }
             int index = name.indexOf(PATH_SEPARATOR);
-            if (index != -1) {
+            if (index != -1)
                 name = name.substring(0, index);
-            }
             return name;
         }
 
-        /**
-         * Add node <i>n</i> to the subtree of this node.
+        /** Add node <i>n</i> to the subtree of this node
          * @param n node to be added
          * @return true if the node is added; false otherwise
          */
         boolean add(Node n) {
-            if (!isAncestor(n)) {
+            if (!isAncestor(n))
                 throw new IllegalArgumentException(n.getName() + ", which is located at " + n.getNetworkLocation()
                         + ", is not a decendent of " + getPath(this));
-            }
             if (isParent(n)) {
                 // this node is the parent of n; add n directly
                 n.setParent(this);
@@ -216,18 +198,16 @@ public class NetworkTopologyImpl implements NetworkTopology {
             return new InnerNode(parentName, getPath(this), this, this.getLevel() + 1);
         }
 
-        /**
-         * Remove node <i>n</i> from the subtree of this node.
+        /** Remove node <i>n</i> from the subtree of this node
          * @param n node to be deleted
          * @return true if the node is deleted; false otherwise
          */
         boolean remove(Node n) {
             String parent = n.getNetworkLocation();
             String currentPath = getPath(this);
-            if (!isAncestor(n)) {
+            if (!isAncestor(n))
                 throw new IllegalArgumentException(n.getName() + ", which is located at " + parent
                         + ", is not a descendent of " + currentPath);
-            }
             if (isParent(n)) {
                 // this node is the parent of n; remove n directly
                 for (int i = 0; i < children.size(); i++) {
@@ -266,16 +246,14 @@ public class NetworkTopologyImpl implements NetworkTopology {
             }
         } // end of remove
 
-        /**
-         * Given a node's string representation, return a reference to the node.
+        /** Given a node's string representation, return a reference to the node
          * @param loc string location of the form /rack/node
          * @return null if the node is not found or the childnode is there but
          * not an instance of {@link InnerNode}
          */
         private Node getLoc(String loc) {
-            if (loc == null || loc.length() == 0) {
+            if (loc == null || loc.length() == 0)
                 return this;
-            }
 
             String[] path = loc.split(PATH_SEPARATOR_STR, 2);
             Node childnode = null;
@@ -284,20 +262,19 @@ public class NetworkTopologyImpl implements NetworkTopology {
                     childnode = children.get(i);
                 }
             }
-            if (childnode == null) {
+            if (childnode == null)
                 return null; // non-existing node
-            } else if (path.length == 1) {
+            if (path.length == 1)
                 return childnode;
-            } else if (childnode instanceof InnerNode) {
+            if (childnode instanceof InnerNode) {
                 return ((InnerNode) childnode).getLoc(path[1]);
             } else {
                 return null;
             }
         }
 
-        /**
-         * Get <i>leafIndex</i> leaf of this subtree
-         * if it is not in the <i>excludedNode</i>.
+        /** get <i>leafIndex</i> leaf of this subtree
+         * if it is not in the <i>excludedNode</i>
          *
          * @param leafIndex an indexed leaf of the node
          * @param excludedNode an excluded node (can be null)
@@ -352,8 +329,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
 
         /**
-          * Determine if children a leaves, default implementation calls {@link #isRack()}.
-          *
+          * Determine if children a leaves, default implementation calls {@link #isRack()}
           * <p>To be overridden in subclasses for specific InnerNode implementations,
           * as alternative to overriding the full {@link #getLeaf(int, Node)} method.
           *
@@ -372,38 +348,29 @@ public class NetworkTopologyImpl implements NetworkTopology {
     } // end of InnerNode
 
     /**
-     * The root cluster map.
+     * the root cluster map
      */
     InnerNode clusterMap;
-    /**
-     * Depth of all leaf nodes.
-     */
+    /** Depth of all leaf nodes */
     private int depthOfAllLeaves = -1;
-    /**
-     * Rack counter.
-     */
+    /** rack counter */
     protected int numOfRacks = 0;
-    /**
-     * The lock used to manage access.
-     */
+    /** the lock used to manage access */
     protected ReadWriteLock netlock = new ReentrantReadWriteLock();
 
     public NetworkTopologyImpl() {
         clusterMap = new InnerNode(InnerNode.ROOT);
     }
 
-    /**
-     * Add a leaf node.
-     * Update node counter and rack counter if necessary
+    /** Add a leaf node
+     * Update node counter & rack counter if necessary
      * @param node node to be added; can be null
      * @exception IllegalArgumentException if add a node to a leave
                                            or node to be added is not a leaf
      */
-    @Override
     public void add(Node node) {
-        if (node == null) {
+        if (node == null)
             return;
-        }
         String oldTopoStr = this.toString();
         if (node instanceof InnerNode) {
             throw new IllegalArgumentException("Not allow to add an inner node: " + NodeBase.getPath(node));
@@ -461,7 +428,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
 
     /**
-     * Given a string representation of a rack, return its children.
+     * Given a string representation of a rack, return its children
      * @param loc a path-like string representation of a rack
      * @return a newly allocated list with all the node's children
      */
@@ -482,17 +449,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
     }
 
-    /**
-     * Remove a node.
-     * Update node counter and rack counter if necessary.
-     *
+    /** Remove a node
+     * Update node counter and rack counter if necessary
      * @param node node to be removed; can be null
      */
     @Override
     public void remove(Node node) {
-        if (node == null) {
+        if (node == null)
             return;
-        } else if (node instanceof InnerNode) {
+        if (node instanceof InnerNode) {
             throw new IllegalArgumentException("Not allow to remove an inner node: " + NodeBase.getPath(node));
         }
         LOG.info("Removing a node: " + NodeBase.getPath(node));
@@ -512,17 +477,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
     }
 
-    /**
-     * Check if the tree contains node <i>node</i>.
+    /** Check if the tree contains node <i>node</i>
      *
      * @param node a node
      * @return true if <i>node</i> is already in the tree; false otherwise
      */
     @Override
     public boolean contains(Node node) {
-        if (node == null) {
+        if (node == null)
             return false;
-        }
         netlock.readLock().lock();
         try {
             Node parent = node.getParent();
@@ -537,8 +500,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         return false;
     }
 
-    /**
-     * Given a string representation of a node, return its reference.
+    /** Given a string representation of a node, return its reference
      *
      * @param loc
      *          a path-like string representation of a node
@@ -549,19 +511,18 @@ public class NetworkTopologyImpl implements NetworkTopology {
         netlock.readLock().lock();
         try {
             loc = NodeBase.normalize(loc);
-            if (!NodeBase.ROOT.equals(loc)) {
+            if (!NodeBase.ROOT.equals(loc))
                 loc = loc.substring(1);
-            }
             return clusterMap.getLoc(loc);
         } finally {
             netlock.readLock().unlock();
         }
     }
 
-    /**
-     * Given a string representation of a rack for a specific network location.
+    /** Given a string representation of a rack for a specific network
+     *  location
      *
-     * <p>To be overridden in subclasses for specific NetworkTopology
+     * To be overridden in subclasses for specific NetworkTopology
      * implementations, as alternative to overriding the full
      * {@link #getRack(String)} method.
      * @param loc
@@ -593,10 +554,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
     }
 
-    /**
-     * Return the distance between two nodes.
-     *
-     * <p>It is assumed that the distance from one node to its parent is 1
+    /** Return the distance between two nodes
+     * It is assumed that the distance from one node to its parent is 1
      * The distance between two nodes is calculated by summing up their distances
      * to their closest common ancestor.
      * @param node1 one node
@@ -642,8 +601,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         return dis + 2;
     }
 
-    /**
-     * Check if two nodes are on the same rack.
+    /** Check if two nodes are on the same rack
      * @param node1 one node (can be null)
      * @param node2 another node (can be null)
      * @return true if node1 and node2 are on the same rack; false otherwise
@@ -664,21 +622,21 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
 
     /**
-     * Check if network topology is aware of NodeGroup.
+     * Check if network topology is aware of NodeGroup
      */
     public boolean isNodeGroupAware() {
         return false;
     }
 
     /**
-     * Return false directly as not aware of NodeGroup, to be override in sub-class.
+     * Return false directly as not aware of NodeGroup, to be override in sub-class
      */
     public boolean isOnSameNodeGroup(Node node1, Node node2) {
         return false;
     }
 
     /**
-     * Compare the parents of each node for equality.
+     * Compare the parents of each node for equality
      *
      * <p>To be overridden in subclasses for specific NetworkTopology
      * implementations, as alternative to overriding the full
@@ -694,13 +652,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
         return node1.getParent() == node2.getParent();
     }
 
-    private static final Random r = new Random();
+    final protected static Random r = new Random();
 
-    /**
-     * Randomly choose one node from <i>scope</i>.
-     *
-     * <p>If scope starts with ~, choose one from the all nodes except for the
-     * ones in <i>scope</i>; otherwise, choose one from <i>scope</i>.
+    /** randomly choose one node from <i>scope</i>
+     * if scope starts with ~, choose one from the all nodes except for the
+     * ones in <i>scope</i>; otherwise, choose one from <i>scope</i>
      * @param scope range of nodes from which a node will be chosen
      * @return the chosen node
      */
@@ -746,18 +702,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
         return innerNode.getLeaf(leaveIndex, node);
     }
 
-    /**
-     * Return leaves in <i>scope</i>.
+    /** return leaves in <i>scope</i>
      * @param scope a path string
      * @return leaves nodes under specific scope
      */
     private Set<Node> doGetLeaves(String scope) {
         Node node = getNode(scope);
         Set<Node> leafNodes = new HashSet<Node>();
-        if (node == null) {
-            return leafNodes;
-        }
-
         if (!(node instanceof InnerNode)) {
             leafNodes.add(node);
         } else {
@@ -775,11 +726,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         try {
             if (scope.startsWith("~")) {
                 Set<Node> allNodes = doGetLeaves(NodeBase.ROOT);
-                String[] excludeScopes = scope.substring(1).split(NODE_SEPARATOR);
-                Set<Node> excludeNodes = new HashSet<Node>();
-                Arrays.stream(excludeScopes).forEach((excludeScope) -> {
-                    excludeNodes.addAll(doGetLeaves(excludeScope));
-                });
+                Set<Node> excludeNodes = doGetLeaves(scope.substring(1));
                 allNodes.removeAll(excludeNodes);
                 return allNodes;
             } else {
@@ -790,7 +737,13 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
     }
 
-    @Override
+    /** return the number of leaves in <i>scope</i> but not in <i>excludedNodes</i>
+     * if scope starts with ~, return the number of nodes that are not
+     * in <i>scope</i> and <i>excludedNodes</i>;
+     * @param scope a path string that may start with ~
+     * @param excludedNodes a list of nodes
+     * @return number of available nodes
+     */
     public int countNumOfAvailableNodes(String scope, Collection<Node> excludedNodes) {
         boolean isExcluded = false;
         if (scope.startsWith("~")) {
@@ -808,7 +761,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
                 }
             }
             Node n = getNode(scope);
-            int scopeNodeCount = 0;
+            int scopeNodeCount = 1;
             if (n instanceof InnerNode) {
                 scopeNodeCount = ((InnerNode) n).getNumOfLeaves();
             }
@@ -822,9 +775,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
     }
 
-    /**
-     * Convert a network tree to a string.
-     */
+    /** convert a network tree to a string */
     @Override
     public String toString() {
         // print the number of racks
@@ -869,10 +820,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
         return networkLocation.substring(index);
     }
 
-    /**
-     * Swap two array items.
-     */
-    protected static void swap(Node[] nodes, int i, int j) {
+    /** swap two array items */
+    static protected void swap(Node[] nodes, int i, int j) {
         Node tempNode;
         tempNode = nodes[j];
         nodes[j] = nodes[i];
@@ -911,9 +860,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
                 } else if (localRackNode == -1 && isOnSameRack(reader, nodes[i])) {
                     //local rack
                     localRackNode = i;
-                    if (tempIndex != 0) {
+                    if (tempIndex != 0)
                         break;
-                    }
                 }
             }
 

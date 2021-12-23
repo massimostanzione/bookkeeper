@@ -18,20 +18,23 @@
 
 package org.apache.bookkeeper.discover;
 
-import java.net.UnknownHostException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience.LimitedPrivate;
 import org.apache.bookkeeper.common.annotation.InterfaceStability.Evolving;
-import org.apache.bookkeeper.common.concurrent.FutureUtils;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.versioning.LongVersion;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.versioning.Versioned;
+import org.apache.zookeeper.ZooKeeper;
+
 
 /**
  * A registration client, which the bookkeeper client will use to interact with registration service.
  */
-
 @LimitedPrivate
 @Evolving
 public interface RegistrationClient extends AutoCloseable {
@@ -41,9 +44,25 @@ public interface RegistrationClient extends AutoCloseable {
      */
     interface RegistrationListener {
 
-        void onBookiesChanged(Versioned<Set<BookieId>> bookies);
+        void onBookiesChanged(Versioned<Set<BookieSocketAddress>> bookies);
 
     }
+
+    /**
+     * Initialize the registration client with provided resources.
+     *
+     * <p>The existence of <i>zkSupplier</i> is for backward compatability.
+     *
+     * @param conf client configuration
+     * @param statsLogger stats logger
+     * @param zkOptional a supplier to supply zookeeper client.
+     * @return
+     */
+    RegistrationClient initialize(ClientConfiguration conf,
+                                  ScheduledExecutorService scheduler,
+                                  StatsLogger statsLogger,
+                                  Optional<ZooKeeper> zkOptional)
+        throws BKException;
 
     @Override
     void close();
@@ -53,40 +72,14 @@ public interface RegistrationClient extends AutoCloseable {
      *
      * @return a future represents the list of writable bookies.
      */
-    CompletableFuture<Versioned<Set<BookieId>>> getWritableBookies();
-
-    /**
-     * Get the list of all bookies identifiers.
-     *
-     * @return a future represents the list of all bookies.
-     */
-    CompletableFuture<Versioned<Set<BookieId>>> getAllBookies();
+    CompletableFuture<Versioned<Set<BookieSocketAddress>>> getWritableBookies();
 
     /**
      * Get the list of readonly bookie identifiers.
      *
      * @return a future represents the list of readonly bookies.
      */
-    CompletableFuture<Versioned<Set<BookieId>>> getReadOnlyBookies();
-
-    /**
-     * Get detailed information about the services exposed by a Bookie.
-     * For old bookies it is expected to return an empty BookieServiceInfo structure.
-     *
-     * @param bookieId this is the id of the bookie, it can be computed from a {@link BookieId}
-     * @return a future represents the available information.
-     *
-     * @since 4.11
-     */
-    default CompletableFuture<Versioned<BookieServiceInfo>> getBookieServiceInfo(BookieId bookieId) {
-        try {
-            BookieServiceInfo bookieServiceInfo = BookieServiceInfoUtils
-                    .buildLegacyBookieServiceInfo(bookieId.toString());
-            return FutureUtils.value(new Versioned<>(bookieServiceInfo, new LongVersion(-1)));
-        } catch (UnknownHostException e) {
-            return FutureUtils.exception(e);
-        }
-    }
+    CompletableFuture<Versioned<Set<BookieSocketAddress>>> getReadOnlyBookies();
 
     /**
      * Watch the changes of bookies.
@@ -123,5 +116,4 @@ public interface RegistrationClient extends AutoCloseable {
      * @param listener listener to receive the topology changes of bookies.
      */
     void unwatchReadOnlyBookies(RegistrationListener listener);
-
 }

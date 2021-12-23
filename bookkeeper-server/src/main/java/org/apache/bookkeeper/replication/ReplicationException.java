@@ -18,21 +18,10 @@
 
 package org.apache.bookkeeper.replication;
 
-import java.util.function.Function;
-
 /**
- * Exceptions for use within the replication service.
+ * Exceptions for use within the replication service
  */
 public abstract class ReplicationException extends Exception {
-
-    public static final Function<Throwable, ReplicationException> EXCEPTION_HANDLER = cause -> {
-        if (cause instanceof ReplicationException) {
-            return (ReplicationException) cause;
-        } else {
-            return new UnavailableException(cause.getMessage(), cause);
-        }
-    };
-
     protected ReplicationException(String message, Throwable cause) {
         super(message, cause);
     }
@@ -42,7 +31,7 @@ public abstract class ReplicationException extends Exception {
     }
 
     /**
-     * The replication service has become unavailable.
+     * The replication service has become unavailable
      */
     public static class UnavailableException extends ReplicationException {
         private static final long serialVersionUID = 31872209L;
@@ -73,7 +62,7 @@ public abstract class ReplicationException extends Exception {
     }
 
     /**
-     * Exception while auditing bookie-ledgers.
+     * Exception while auditing bookie-ledgers
     */
     public static class BKAuditException extends ReplicationException {
         private static final long serialVersionUID = 95551905L;

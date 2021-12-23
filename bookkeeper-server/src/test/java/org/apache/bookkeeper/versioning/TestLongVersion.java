@@ -18,12 +18,9 @@
 package org.apache.bookkeeper.versioning;
 
 import org.apache.bookkeeper.versioning.Version.Occurred;
-import org.junit.Assert;
 import org.junit.Test;
+import org.junit.Assert;
 
-/**
- * Test long version.
- */
 public class TestLongVersion {
 
     @Test

@@ -18,17 +18,18 @@
 package org.apache.bookkeeper.proto;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.common.concurrent.FutureEventListener;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.ReadRequest;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.ReadResponse;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.Request;
@@ -41,17 +42,17 @@ import org.slf4j.LoggerFactory;
 
 class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ReadEntryProcessorV3.class);
+    private final static Logger LOG = LoggerFactory.getLogger(ReadEntryProcessorV3.class);
 
     protected Stopwatch lastPhaseStartTime;
     private final ExecutorService fenceThreadPool;
 
-    private CompletableFuture<Boolean> fenceResult = null;
-
+    private SettableFuture<Boolean> fenceResult = null;
+    
     protected final ReadRequest readRequest;
     protected final long ledgerId;
     protected final long entryId;
-
+    
     // Stats
     protected final OpStatsLogger readStats;
     protected final OpStatsLogger reqStats;
@@ -61,22 +62,20 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
                                 BookieRequestProcessor requestProcessor,
                                 ExecutorService fenceThreadPool) {
         super(request, channel, requestProcessor);
-        requestProcessor.onReadRequestStart(channel);
-
         this.readRequest = request.getReadRequest();
         this.ledgerId = readRequest.getLedgerId();
         this.entryId = readRequest.getEntryId();
         if (RequestUtils.isFenceRequest(this.readRequest)) {
-            this.readStats = requestProcessor.getRequestStats().getFenceReadEntryStats();
-            this.reqStats = requestProcessor.getRequestStats().getFenceReadRequestStats();
+            this.readStats = requestProcessor.fenceReadEntryStats;
+            this.reqStats = requestProcessor.fenceReadRequestStats;
         } else if (readRequest.hasPreviousLAC()) {
-            this.readStats = requestProcessor.getRequestStats().getLongPollReadStats();
-            this.reqStats = requestProcessor.getRequestStats().getLongPollReadRequestStats();
+            this.readStats = requestProcessor.longPollReadStats;
+            this.reqStats = requestProcessor.longPollReadRequestStats;
         } else {
-            this.readStats = requestProcessor.getRequestStats().getReadEntryStats();
-            this.reqStats = requestProcessor.getRequestStats().getReadRequestStats();
+            this.readStats = requestProcessor.readEntryStats;
+            this.reqStats = requestProcessor.readRequestStats;
         }
-
+        
         this.fenceThreadPool = fenceThreadPool;
         lastPhaseStartTime = Stopwatch.createStarted();
     }
@@ -109,7 +108,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         // reset last phase start time to measure fence result waiting time
         lastPhaseStartTime.reset().start();
         if (null != fenceThreadPool) {
-            fenceResult.whenCompleteAsync(new FutureEventListener<Boolean>() {
+            Futures.addCallback(fenceResult, new FutureCallback<Boolean>() {
                 @Override
                 public void onSuccess(Boolean result) {
                     sendFenceResponse(readResponseBuilder, entryBody, result, startTimeSw);
@@ -118,7 +117,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
                 @Override
                 public void onFailure(Throwable t) {
                     LOG.error("Fence request for ledgerId {} entryId {} encountered exception",
-                            ledgerId, entryId, t);
+                        new Object[] { ledgerId, entryId, t });
                     sendFenceResponse(readResponseBuilder, entryBody, false, startTimeSw);
                 }
             }, fenceThreadPool);
@@ -128,7 +127,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
                 success = fenceResult.get(1000, TimeUnit.MILLISECONDS);
             } catch (Throwable t) {
                 LOG.error("Fence request for ledgerId {} entryId {} encountered exception : ",
-                        readRequest.getLedgerId(), readRequest.getEntryId(), t);
+                    new Object[]{ readRequest.getLedgerId(), readRequest.getEntryId(), t });
             }
             sendFenceResponse(readResponseBuilder, entryBody, success, startTimeSw);
         }
@@ -170,7 +169,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
                                      boolean readLACPiggyBack,
                                      Stopwatch startTimeSw)
         throws IOException {
-        ByteBuf entryBody = requestProcessor.getBookie().readEntry(ledgerId, entryId);
+        ByteBuf entryBody = requestProcessor.bookie.readEntry(ledgerId, entryId);
         if (null != fenceResult) {
             handleReadResultForFenceRead(entryBody, readResponseBuilder, entryId, startTimeSw);
             return null;
@@ -180,7 +179,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
                 if (readLACPiggyBack) {
                     readResponseBuilder.setEntryId(entryId);
                 } else {
-                    long knownLAC = requestProcessor.getBookie().readLastAddConfirmed(ledgerId);
+                    long knownLAC = requestProcessor.bookie.readLastAddConfirmed(ledgerId);
                     readResponseBuilder.setMaxLAC(knownLAC);
                 }
                 registerSuccessfulEvent(readStats, startTimeSw);
@@ -217,11 +216,8 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         } catch (Bookie.NoLedgerException e) {
             if (RequestUtils.isFenceRequest(readRequest)) {
                 LOG.info("No ledger found reading entry {} when fencing ledger {}", entryId, ledgerId);
-            } else if (entryId != BookieProtocol.LAST_ADD_CONFIRMED) {
+            } else {
                 LOG.info("No ledger found while reading entry: {} from ledger: {}", entryId, ledgerId);
-            } else if (LOG.isDebugEnabled()) {
-                // this is the case of a reader which is calling readLastAddConfirmed and the ledger is empty
-                LOG.debug("No ledger found while reading entry: {} from ledger: {}", entryId, ledgerId);
             }
             return buildResponse(readResponse, StatusCode.ENOLEDGER, startTimeSw);
         } catch (Bookie.NoEntryException e) {
@@ -230,19 +226,19 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
             }
             return buildResponse(readResponse, StatusCode.ENOENTRY, startTimeSw);
         } catch (IOException e) {
-            LOG.error("IOException while reading entry: {} from ledger {} ", entryId, ledgerId, e);
+            LOG.error("IOException while reading entry: {} from ledger {} ", new Object[] { entryId, ledgerId, e });
             return buildResponse(readResponse, StatusCode.EIO, startTimeSw);
         } catch (BookieException e) {
             LOG.error(
                 "Unauthorized access to ledger:{} while reading entry:{} in request from address: {}",
-                    ledgerId, entryId, channel.remoteAddress());
+                new Object[] { ledgerId, entryId, channel.remoteAddress() });
             return buildResponse(readResponse, StatusCode.EUA, startTimeSw);
         }
     }
 
     @Override
     public void safeRun() {
-        requestProcessor.getRequestStats().getReadEntrySchedulingDelayStats().registerSuccessfulEvent(
+        requestProcessor.readEntrySchedulingDelayStats.registerSuccessfulEvent(
             MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
 
         if (!isVersionCompatible()) {
@@ -271,11 +267,11 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         StatusCode status;
         if (!fenceResult) {
             status = StatusCode.EIO;
-            registerFailedEvent(requestProcessor.getRequestStats().getFenceReadWaitStats(), lastPhaseStartTime);
+            registerFailedEvent(requestProcessor.fenceReadWaitStats, lastPhaseStartTime);
         } else {
             status = StatusCode.EOK;
             readResponse.setBody(ByteString.copyFrom(entryBody.nioBuffer()));
-            registerSuccessfulEvent(requestProcessor.getRequestStats().getFenceReadWaitStats(), lastPhaseStartTime);
+            registerSuccessfulEvent(requestProcessor.fenceReadWaitStats, lastPhaseStartTime);
         }
 
         if (null != entryBody) {
@@ -292,7 +288,7 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         // build the fence read response
         getFenceResponse(readResponse, entryBody, fenceResult);
         // register fence read stat
-        registerEvent(!fenceResult, requestProcessor.getRequestStats().getFenceReadEntryStats(), startTimeSw);
+        registerEvent(!fenceResult, requestProcessor.fenceReadEntryStats, startTimeSw);
         // send the fence read response
         sendResponse(readResponse.build());
     }
@@ -314,7 +310,6 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         sendResponse(response.getStatus(),
                      response.build(),
                      reqStats);
-        requestProcessor.onReadRequestFinish();
     }
 
     //
@@ -335,15 +330,6 @@ class ReadEntryProcessorV3 extends PacketProcessorBaseV3 {
         } else {
             statsLogger.registerSuccessfulEvent(startTime.elapsed(TimeUnit.NANOSECONDS), TimeUnit.NANOSECONDS);
         }
-    }
-
-    /**
-     * this toString method filters out masterKey from the output. masterKey
-     * contains the password of the ledger.
-     */
-    @Override
-    public String toString() {
-        return RequestUtils.toSafeString(request);
     }
 }
 

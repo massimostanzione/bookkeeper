@@ -20,42 +20,34 @@
  */
 package org.apache.bookkeeper.test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Random;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
-import org.apache.bookkeeper.client.AsyncCallback.CloseCallback;
 import org.apache.bookkeeper.client.AsyncCallback.ReadCallback;
 import org.apache.bookkeeper.client.AsyncCallback.ReadLastConfirmedCallback;
 import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.client.BKException.BKIllegalOpException;
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.streaming.LedgerInputStream;
 import org.apache.bookkeeper.streaming.LedgerOutputStream;
-import org.apache.zookeeper.KeeperException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.junit.Assert.*;
 
 /**
  * This test tests read and write, synchronous and asynchronous, strings and
@@ -68,8 +60,8 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
 
     // Depending on the taste, select the amount of logging
     // by decommenting one of the two lines below
-    // private static final Logger LOG = Logger.getRootLogger();
-    private static final Logger LOG = LoggerFactory.getLogger(BookieReadWriteTest.class);
+    // private final static Logger LOG = Logger.getRootLogger();
+    private final static Logger LOG = LoggerFactory.getLogger(BookieReadWriteTest.class);
 
     byte[] ledgerPassword = "aaa".getBytes();
     LedgerHandle lh, lh2;
@@ -134,9 +126,9 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
     }
 
     /**
-     * test the streaming api for reading and writing.
+     * test the streaming api for reading and writing
      *
-     * @throws IOException
+     * @throws {@link IOException}
      */
     @Test
     public void testStreamingClients() throws IOException, BKException, InterruptedException {
@@ -261,7 +253,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -286,12 +277,12 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             // bkc.initMessageDigest("SHA1");
             ledgerId = lh.getId();
             LOG.info("Ledger ID: " + lh.getId());
-            byte[] bytes = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'};
+            byte bytes[] = {'a','b','c','d','e','f','g','h','i'};
 
             lh.asyncAddEntry(bytes, 0, bytes.length, this, sync);
             lh.asyncAddEntry(bytes, 0, 4, this, sync); // abcd
             lh.asyncAddEntry(bytes, 3, 4, this, sync); // defg
-            lh.asyncAddEntry(bytes, 3, (bytes.length - 3), this, sync); // defghi
+            lh.asyncAddEntry(bytes, 3, (bytes.length-3), this, sync); // defghi
             int numEntries = 4;
 
             // wait for all entries to be acknowledged
@@ -310,13 +301,13 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
                 // expected
             }
             try {
-                lh.asyncAddEntry(bytes, 0, bytes.length + 1, this, sync);
+                lh.asyncAddEntry(bytes, 0, bytes.length+1, this, sync);
                 fail("Shouldn't be able to use that much length");
             } catch (ArrayIndexOutOfBoundsException aiob) {
                 // expected
             }
             try {
-                lh.asyncAddEntry(bytes, -1, bytes.length + 2, this, sync);
+                lh.asyncAddEntry(bytes, -1, bytes.length+2, this, sync);
                 fail("Shouldn't be able to use negative offset "
                      + "with that much length");
             } catch (ArrayIndexOutOfBoundsException aiob) {
@@ -376,10 +367,10 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
                     expected = Arrays.copyOfRange(bytes, 0, 4);
                     break;
                 case 2:
-                    expected = Arrays.copyOfRange(bytes, 3, 3 + 4);
+                    expected = Arrays.copyOfRange(bytes, 3, 3+4);
                     break;
                 case 3:
-                    expected = Arrays.copyOfRange(bytes, 3, 3 + (bytes.length - 3));
+                    expected = Arrays.copyOfRange(bytes, 3, 3+(bytes.length-3));
                     break;
                 }
                 assertNotNull("There are more checks than writes", expected);
@@ -398,7 +389,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -413,10 +403,10 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
 
         @Override
         public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
-            SyncObj sync = (SyncObj) ctx;
+            SyncObj sync = (SyncObj)ctx;
             sync.setLedgerEntries(seq);
             sync.setReturnCode(rc);
-            synchronized (sync) {
+            synchronized(sync) {
                 sync.counter += throttle;
                 sync.notify();
             }
@@ -493,7 +483,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -538,7 +527,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -595,7 +583,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -611,7 +598,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             long ledgerId = lh.getId();
             long ledgerId2 = lh2.getId();
 
-            final CountDownLatch completeLatch = new CountDownLatch(numEntriesToWrite * 2);
+            final CountDownLatch completeLatch = new CountDownLatch(numEntriesToWrite*2);
             final AtomicInteger rc = new AtomicInteger(BKException.Code.OK);
 
             // bkc.initMessageDigest("SHA1");
@@ -669,7 +656,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -721,7 +707,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -781,7 +766,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             assertTrue("Enumeration of ledger entries has no element", readEntry.hasMoreElements());
             LedgerEntry e = readEntry.nextElement();
             assertEquals(toRead, e.getEntryId());
-            assertArrayEquals(entries.get((int) toRead), e.getEntry());
+            Assert.assertArrayEquals(entries.get((int)toRead), e.getEntry());
             // should not written to a read only ledger
             try {
                 ByteBuffer entry = ByteBuffer.allocate(4);
@@ -836,7 +821,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -851,7 +835,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             ledgerId = lh.getId();
             LOG.info("Ledger ID: " + lh.getId());
             LedgerHandle lhOpen = bkc.openLedgerNoRecovery(ledgerId, digestType, ledgerPassword);
-            writeNEntriesLastWriteSync(lh, numEntriesToWrite / 2);
+            writeNEntriesLastWriteSync(lh, numEntriesToWrite/2);
 
             ByteBuffer entry = ByteBuffer.allocate(4);
             entry.putInt(rng.nextInt(maxInt));
@@ -860,7 +844,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             // no recovery opened ledger 's last confirmed entry id is
             // less than written
             // and it just can read until (i-1)
-            int toRead = numEntriesToWrite / 2 - 2;
+            int toRead = numEntriesToWrite/2 - 2;
 
             long readLastConfirmed = lhOpen.readLastConfirmed();
             assertTrue(readLastConfirmed != 0);
@@ -868,7 +852,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             assertTrue("Enumeration of ledger entries has no element", readEntry.hasMoreElements());
             LedgerEntry e = readEntry.nextElement();
             assertEquals(toRead, e.getEntryId());
-            assertArrayEquals(entries.get(toRead), e.getEntry());
+            Assert.assertArrayEquals(entries.get(toRead), e.getEntry());
             // should not written to a read only ledger
             try {
                 lhOpen.addEntry(entry.array());
@@ -879,7 +863,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
                 LOG.error("Unexpected exception", ex);
                 fail("Unexpected exception");
             }
-            writeNEntriesLastWriteSync(lh, numEntriesToWrite / 2);
+            writeNEntriesLastWriteSync(lh, numEntriesToWrite/2);
 
             long last = lh.readLastConfirmed();
             assertTrue("Last confirmed add: " + last, last == (numEntriesToWrite - 2));
@@ -893,7 +877,6 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
@@ -961,145 +944,18 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
     }
 
-    @Test
-    public void testWriteUsingReadOnlyHandle() throws Exception {
-        // Create a ledger
-        lh = bkc.createLedger(digestType, ledgerPassword);
-        ledgerId = lh.getId();
-        LOG.info("Ledger ID: " + lh.getId());
-
-        long lac = writeNEntriesLastWriteSync(lh, numEntriesToWrite);
-        LedgerHandle lhOpen = bkc.openLedgerNoRecovery(ledgerId, digestType, ledgerPassword);
-
-        // addEntry on ReadOnlyHandle should fail
-        CountDownLatch latch = new CountDownLatch(1);
-        final int[] rcArray = { 0 };
-        lhOpen.asyncAddEntry("".getBytes(), new AddCallback() {
-            @Override
-            public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        if (rcArray[0] != BKException.Code.IllegalOpException) {
-            Assert.fail("Test1 - asyncAddOperation is supposed to be failed, but it got following rc - "
-                    + KeeperException.Code.get(rcArray[0]));
-        }
-
-        // addEntry on ReadOnlyHandle should fail
-        latch = new CountDownLatch(1);
-        rcArray[0] = 0;
-        lhOpen.asyncAddEntry("".getBytes(), 0, 0, new AddCallback() {
-            @Override
-            public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        if (rcArray[0] != BKException.Code.IllegalOpException) {
-            Assert.fail(
-                    "Test2 - asyncAddOperation is supposed to fail with IllegalOpException, but it got following rc - "
-                            + KeeperException.Code.get(rcArray[0]));
-        }
-
-        // close readonlyhandle
-        latch = new CountDownLatch(1);
-        rcArray[0] = 0;
-        lhOpen.asyncClose(new CloseCallback() {
-            @Override
-            public void closeComplete(int rc, LedgerHandle lh, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        if (rcArray[0] != KeeperException.Code.OK.intValue()) {
-            Assert.fail("Test3 - asyncClose failed because of exception - " + KeeperException.Code.get(rcArray[0]));
-        }
-
-        // close of readonlyhandle should not affect the writehandle
-        writeNEntriesLastWriteSync(lh, 5);
-        lh.close();
-    }
-
-    @Test
-    public void testLedgerHandle() throws Exception {
-        // Create a ledger
-        lh = bkc.createLedger(digestType, ledgerPassword);
-        ledgerId = lh.getId();
-        LOG.info("Ledger ID: " + lh.getId());
-
-        long lac = writeNEntriesLastWriteSync(lh, 5);
-
-        // doing addEntry with entryid using regular Ledgerhandle should fail
-        CountDownLatch latch = new CountDownLatch(1);
-        final int[] rcArray = { 0 };
-        lh.asyncAddEntry(lac + 1, "".getBytes(), new AddCallback() {
-            @Override
-            public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        if (rcArray[0] != BKException.Code.IllegalOpException) {
-            Assert.fail(
-                    "Test1 - addEntry with EntryID is expected to fail with IllegalOpException, "
-                    + "but it got following rc - " + KeeperException.Code.get(rcArray[0]));
-        }
-
-        // doing addEntry with entryid using regular Ledgerhandle should fail
-        latch = new CountDownLatch(1);
-        rcArray[0] = 0;
-        lh.asyncAddEntry(lac + 1, "".getBytes(), 0, 0, new AddCallback() {
-            @Override
-            public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        if (rcArray[0] != BKException.Code.IllegalOpException) {
-            Assert.fail(
-                    "Test2 - addEntry with EntryID is expected to fail with IllegalOpException,"
-                    + "but it got following rc - " + KeeperException.Code.get(rcArray[0]));
-        }
-
-        // doing addEntry with entryid using regular Ledgerhandle should fail
-        try {
-            lh.addEntry(lac + 1, "".getBytes());
-            Assert.fail("Test3 - addEntry with EntryID is expected to fail");
-        } catch (BKIllegalOpException E) {
-        }
-
-        // doing addEntry with entryid using regular Ledgerhandle should fail
-        try {
-            lh.addEntry(lac + 1, "".getBytes(), 0, 0);
-            Assert.fail("Test4 - addEntry with EntryID is expected to fail");
-        } catch (BKIllegalOpException E) {
-        }
-
-        lh.close();
-    }
 
     @Test
     public void testLastConfirmedAdd() throws Exception {
         try {
             // Create a ledger
             lh = bkc.createLedger(digestType, ledgerPassword);
+            // bkc.initMessageDigest("SHA1");
             ledgerId = lh.getId();
             LOG.info("Ledger ID: " + lh.getId());
 
@@ -1140,72 +996,11 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             LOG.error("Test failed", e);
             fail("Test failed due to BookKeeper exception");
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Test failed", e);
             fail("Test failed due to interruption");
         }
     }
 
-    @Test
-    public void testReadLastConfirmed() throws Exception {
-        // Create a ledger and add entries
-        lh = bkc.createLedger(digestType, ledgerPassword);
-        // bkc.initMessageDigest("SHA1");
-        ledgerId = lh.getId();
-        LOG.info("Ledger ID: " + lh.getId());
-        long previousLAC = writeNEntriesLastWriteSync(lh, 5);
-
-        // add more entries after opening ReadonlyLedgerHandle
-        LedgerHandle lhOpen = bkc.openLedgerNoRecovery(ledgerId, digestType, ledgerPassword);
-        long currentLAC = writeNEntriesLastWriteSync(lh, 5);
-
-        // get LAC instance variable of ReadHandle and verify if it is equal to (previousLAC - 1)
-        long readLAC = lhOpen.getLastAddConfirmed();
-        Assert.assertEquals("Test1 - For ReadHandle LAC", (previousLAC - 1), readLAC);
-
-        // close the write LedgerHandle and sleep for 500 msec to make sure all close watchers are called
-        lh.close();
-        Thread.sleep(500);
-
-        // now call asyncReadLastConfirmed and verify if it is equal to currentLAC
-        CountDownLatch latch = new CountDownLatch(1);
-        final int[] rcArray = { 0 };
-        final long[] lastConfirmedArray = { 0 };
-        lhOpen.asyncReadLastConfirmed(new ReadLastConfirmedCallback() {
-            @Override
-            public void readLastConfirmedComplete(int rc, long lastConfirmed, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                lastConfirmedArray[0] = lastConfirmed;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        Assert.assertEquals("Test3 - asyncReadLastConfirmed response", KeeperException.Code.OK.intValue(), rcArray[0]);
-        Assert.assertEquals("Test3 - ReadLAC", currentLAC, lastConfirmedArray[0]);
-
-        // similarly try calling asyncTryReadLastConfirmed and verify if it is equal to currentLAC
-        latch = new CountDownLatch(1);
-        rcArray[0] = 0;
-        lastConfirmedArray[0] = 0;
-        lhOpen.asyncTryReadLastConfirmed(new ReadLastConfirmedCallback() {
-            @Override
-            public void readLastConfirmedComplete(int rc, long lastConfirmed, Object ctx) {
-                CountDownLatch latch = (CountDownLatch) ctx;
-                rcArray[0] = rc;
-                lastConfirmedArray[0] = lastConfirmed;
-                latch.countDown();
-            }
-        }, latch);
-        latch.await();
-        Assert.assertEquals("Test4 - asyncTryReadLastConfirmed response", KeeperException.Code.OK.intValue(),
-                rcArray[0]);
-        Assert.assertEquals("Test4 - ReadLAC", currentLAC, lastConfirmedArray[0]);
-
-        // similarly try calling tryReadLastConfirmed and verify if it is equal to currentLAC
-        long tryReadLAC = lhOpen.tryReadLastConfirmed();
-        Assert.assertEquals("Test5 - ReadLAC", currentLAC, tryReadLAC);
-    }
 
     @Override
     public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
@@ -1232,7 +1027,7 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
     public void readLastConfirmedComplete(int rc, long lastConfirmed, Object ctx) {
         SyncObj sync = (SyncObj) ctx;
         sync.setReturnCode(rc);
-        synchronized (sync) {
+        synchronized(sync) {
             sync.lastConfirmed = lastConfirmed;
             sync.notify();
         }
@@ -1255,19 +1050,16 @@ public class BookieReadWriteTest extends BookKeeperClusterTestCase
             String[] children = dir.list();
             for (String string : children) {
                 boolean success = cleanUpDir(new File(dir, string));
-                if (!success) {
+                if (!success)
                     return false;
-                }
             }
         }
         // The directory is now empty so delete it
         return dir.delete();
     }
 
-    /**
-     * Used for testing purposes, void.
-     */
-    class EmptyWatcher implements Watcher {
+    /* User for testing purposes, void */
+    class emptyWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
         }

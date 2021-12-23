@@ -21,12 +21,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 
-/**
- * A Metastore Cursor.
- */
 public interface MetastoreCursor extends Closeable {
 
-    MetastoreCursor EMPTY_CURSOR = new MetastoreCursor() {
+    public static MetastoreCursor EMPTY_CURSOR = new MetastoreCursor() {
         @Override
         public boolean hasMoreEntries() {
             return false;
@@ -49,10 +46,7 @@ public interface MetastoreCursor extends Closeable {
         }
     };
 
-    /**
-     * A callback for reading entries.
-     */
-    interface ReadEntriesCallback extends
+    public static interface ReadEntriesCallback extends
         MetastoreCallback<Iterator<MetastoreTableItem>> {
     }
 
@@ -61,7 +55,7 @@ public interface MetastoreCursor extends Closeable {
      *
      * @return true if there is entries left, false otherwise.
      */
-    boolean hasMoreEntries();
+    public boolean hasMoreEntries();
 
     /**
      * Read entries from the cursor, up to the specified <code>numEntries</code>.
@@ -72,7 +66,8 @@ public interface MetastoreCursor extends Closeable {
      * @return the iterator of returned entries.
      * @throws MSException when failed to read entries from the cursor.
      */
-    Iterator<MetastoreTableItem> readEntries(int numEntries) throws MSException;
+    public Iterator<MetastoreTableItem> readEntries(int numEntries)
+    throws MSException;
 
     /**
      * Asynchronously read entries from the cursor, up to the specified <code>numEntries</code>.
@@ -85,5 +80,5 @@ public interface MetastoreCursor extends Closeable {
      * @param ctx
      *            opaque context
      */
-    void asyncReadEntries(int numEntries, ReadEntriesCallback callback, Object ctx);
+    public void asyncReadEntries(int numEntries, ReadEntriesCallback callback, Object ctx);
 }

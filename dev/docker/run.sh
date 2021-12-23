@@ -31,7 +31,7 @@ if [ "$(uname -s)" == "Linux" ]; then
   USER_NAME=${SUDO_USER:=$USER}
   USER_ID=$(id -u "${USER_NAME}")
   GROUP_ID=$(id -g "${USER_NAME}")
-  LOCAL_HOME=$(realpath ~)
+  LOCAL_HOME="/home/${USER_NAME}"
 else # boot2docker uid and gid
   USER_NAME=$USER
   USER_ID=1000
@@ -63,7 +63,7 @@ docker run -i -t \
   --rm=true \
   -w ${BOOKKEEPER_ROOT} \
   -u "${USER}" \
-  -v "$(realpath $BOOKKEEPER_ROOT):${BOOKKEEPER_ROOT}" \
+  -v "${BOOKKEEPER_ROOT}:${BOOKKEEPER_ROOT}" \
   -v "${LOCAL_HOME}:/home/${USER_NAME}" \
   ${IMAGE_NAME}-${USER_NAME} \
   bash -c "${CMD}"

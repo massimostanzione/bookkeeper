@@ -23,8 +23,6 @@ package org.apache.bookkeeper.util.collections;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.Lists;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.StampedLock;
@@ -32,11 +30,13 @@ import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
+import com.google.common.collect.Lists;
+
 /**
- * Concurrent hash map.
+ * Concurrent hash map
  *
- * <p>Provides similar methods as a {@code ConcurrentMap<K,V>} but since it's an open hash map with linear probing,
- * no node allocations are required to store the values
+ * Provides similar methods as a ConcurrentMap<K,V> but since it's an open hash map with linear probing, no node
+ * allocations are required to store the values
  *
  * @param <V>
  */
@@ -168,7 +168,7 @@ public class ConcurrentOpenHashMap<K, V> {
         checkNotNull(filter);
 
         int removedCount = 0;
-        for (Section<K, V> s : sections) {
+        for (Section<K,V> s : sections) {
             removedCount += s.removeIf(filter);
         }
 
@@ -194,9 +194,9 @@ public class ConcurrentOpenHashMap<K, V> {
     @SuppressWarnings("serial")
     private static final class Section<K, V> extends StampedLock {
         // Keys and values are stored interleaved in the table array
-        private volatile Object[] table;
+        private Object[] table;
 
-        private volatile int capacity;
+        private int capacity;
         private volatile int size;
         private int usedBuckets;
         private int resizeThreshold;
@@ -423,7 +423,7 @@ public class ConcurrentOpenHashMap<K, V> {
             }
         }
 
-        private void cleanBucket(int bucket) {
+        private final void cleanBucket(int bucket) {
             int nextInArray = (bucket + 2) & (table.length - 1);
             if (table[nextInArray] == EmptyKey) {
                 table[bucket] = EmptyKey;
@@ -449,11 +449,9 @@ public class ConcurrentOpenHashMap<K, V> {
                 }
             }
 
+            capacity = newCapacity;
             table = newTable;
             usedBuckets = size;
-            // Capacity needs to be updated after the values, so that we won't see
-            // a capacity value bigger than the actual array size
-            capacity = newCapacity;
             resizeThreshold = (int) (capacity * MapFillFactor);
         }
 
@@ -478,18 +476,18 @@ public class ConcurrentOpenHashMap<K, V> {
     private static final long HashMixer = 0xc6a4a7935bd1e995L;
     private static final int R = 47;
 
-    static final <K> long hash(K key) {
+    final static <K> long hash(K key) {
         long hash = key.hashCode() * HashMixer;
         hash ^= hash >>> R;
         hash *= HashMixer;
         return hash;
     }
 
-    static final int signSafeMod(long n, int max) {
-        return (int) (n & (max - 1)) << 1;
+    static final int signSafeMod(long n, int Max) {
+        return (int) (n & (Max - 1)) << 1;
     }
 
-    private static int alignToPowerOfTwo(int n) {
+    private static final int alignToPowerOfTwo(int n) {
         return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
     }
 }

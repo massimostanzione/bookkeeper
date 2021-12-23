@@ -25,9 +25,7 @@ import static org.junit.Assert.assertEquals;
 import org.apache.bookkeeper.proto.BKStats.OpStats;
 import org.junit.Test;
 
-/**
- * Tests that Statistics updation in Bookie Server.
- */
+/** Tests that Statistics updation in Bookie Server */
 public class TestBKStats {
 
     /**

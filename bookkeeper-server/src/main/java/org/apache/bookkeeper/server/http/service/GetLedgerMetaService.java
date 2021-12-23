@@ -18,12 +18,12 @@
  */
 package org.apache.bookkeeper.server.http.service;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Charsets.UTF_8;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.common.util.JsonUtil;
+import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.service.HttpEndpointService;
@@ -31,8 +31,8 @@ import org.apache.bookkeeper.http.service.HttpServiceRequest;
 import org.apache.bookkeeper.http.service.HttpServiceResponse;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
-import org.apache.bookkeeper.meta.LedgerMetadataSerDe;
-import org.apache.bookkeeper.proto.BookieServer;
+import org.apache.bookkeeper.util.JsonUtil;
+import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,14 +45,12 @@ public class GetLedgerMetaService implements HttpEndpointService {
     static final Logger LOG = LoggerFactory.getLogger(GetLedgerMetaService.class);
 
     protected ServerConfiguration conf;
-    protected BookieServer bookieServer;
-    private final LedgerMetadataSerDe serDe;
+    protected ZooKeeper zk;
 
-    public GetLedgerMetaService(ServerConfiguration conf, BookieServer bookieServer) {
-        checkNotNull(conf);
+    public GetLedgerMetaService(ServerConfiguration conf, ZooKeeper zk) {
+        Preconditions.checkNotNull(conf);
         this.conf = conf;
-        this.bookieServer = bookieServer;
-        this.serDe = new LedgerMetadataSerDe();
+        this.zk = zk;
     }
 
     @Override
@@ -63,15 +61,19 @@ public class GetLedgerMetaService implements HttpEndpointService {
         if (HttpServer.Method.GET == request.getMethod() && (params != null) && params.containsKey("ledger_id")) {
             Long ledgerId = Long.parseLong(params.get("ledger_id"));
 
-            LedgerManagerFactory mFactory = bookieServer.getBookie().getLedgerManagerFactory();
+            LedgerManagerFactory mFactory = LedgerManagerFactory.newLedgerManagerFactory(conf, zk);
             LedgerManager manager = mFactory.newLedgerManager();
 
             // output <ledgerId: ledgerMetadata>
-            Map<String, Object> output = Maps.newHashMap();
-            LedgerMetadata md = manager.readLedgerMetadata(ledgerId).get().getValue();
-            output.put(ledgerId.toString(), md);
+            Map<String, String> output = Maps.newHashMap();
+            ListLedgerService.ReadLedgerMetadataCallback cb =
+              new ListLedgerService.ReadLedgerMetadataCallback(ledgerId);
+            manager.readLedgerMetadata(ledgerId, cb);
+            LedgerMetadata md = cb.get();
+            output.put(ledgerId.toString(), new String(md.serialize(), UTF_8));
 
             manager.close();
+            mFactory.uninitialize();
 
             String jsonResponse = JsonUtil.toJson(output);
             LOG.debug("output body:" + jsonResponse);

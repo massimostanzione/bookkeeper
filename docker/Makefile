@@ -72,7 +72,7 @@ run-bk:
 			$(BK_LOCAL_CONTAINER_DATA_DIR)/journal \
 			$(BK_LOCAL_CONTAINER_DATA_DIR)/ledger \
 			$(BK_LOCAL_CONTAINER_DATA_DIR)/index
-
+	
 	-docker rm -f $(CONTAINER_NAME)
 	docker run -it\
 		--network $(DOCKER_NETWORK) \
@@ -88,28 +88,15 @@ run-bk:
 
 # -------------------------------- #
 
-# Create run and destroy a container that will
-# intializes new bookkeeper cluster by creating required znodes for the cluster
-#   make run-init
+# Create run and destroy a container that will format zookeeper metadata
+#   make run-format
 
-run-init:
+run-format:
 	docker run -it --rm \
 		--network $(DOCKER_NETWORK) \
 		--env BK_zkServers=$(ZK_CONTAINER_NAME):2181 \
 		$(IMAGE) \
-		bookkeeper shell initnewcluster
-
-# -------------------------------- #
-
-# Create run and destroy a container that will nuke bookkeeper metadata of existing cluster in zookeeper
-#   make run-nuke
-
-run-nuke:
-	docker run -it --rm \
-		--network $(DOCKER_NETWORK) \
-		--env BK_zkServers=$(ZK_CONTAINER_NAME):2181 \
-		$(IMAGE) \
-		bookkeeper shell nukeexistingcluster -zkledgersrootpath $(BK_zkLedgersRootPath) -f
+		bookkeeper shell metaformat $(FORMAT_OPTS)
 
 # -------------------------------- #
 
@@ -189,7 +176,7 @@ root-shell root-exec:
 # -------------------------------- #
 
 info ip:
-	@echo
+	@echo 
 	@echo "Image: $(IMAGE)"
 	@echo "Container name: $(CONTAINER_NAME)"
 	@echo

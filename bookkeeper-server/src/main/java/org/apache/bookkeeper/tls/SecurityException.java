@@ -17,9 +17,6 @@
  */
 package org.apache.bookkeeper.tls;
 
-/**
- * Signals that a security-related exception has occurred.
- */
 public class SecurityException extends Exception {
     public SecurityException() {}
 

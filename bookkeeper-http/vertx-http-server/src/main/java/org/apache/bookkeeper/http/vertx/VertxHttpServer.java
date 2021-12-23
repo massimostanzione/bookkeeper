@@ -24,7 +24,6 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -47,14 +46,9 @@ public class VertxHttpServer implements HttpServer {
     private Vertx vertx;
     private boolean isRunning;
     private HttpServiceProvider httpServiceProvider;
-    private int listeningPort = -1;
 
     public VertxHttpServer() {
         this.vertx = Vertx.vertx();
-    }
-
-    int getListeningPort() {
-        return listeningPort;
     }
 
     @Override
@@ -64,17 +58,13 @@ public class VertxHttpServer implements HttpServer {
 
     @Override
     public boolean startServer(int port) {
-        CompletableFuture<AsyncResult<io.vertx.core.http.HttpServer>> future = new CompletableFuture<>();
+        CompletableFuture<AsyncResult> future = new CompletableFuture<>();
         VertxHttpHandlerFactory handlerFactory = new VertxHttpHandlerFactory(httpServiceProvider);
         Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
         HttpRouter<VertxAbstractHandler> requestRouter = new HttpRouter<VertxAbstractHandler>(handlerFactory) {
             @Override
             public void bindHandler(String endpoint, VertxAbstractHandler handler) {
                 router.get(endpoint).handler(handler);
-                router.put(endpoint).handler(handler);
-                router.post(endpoint).handler(handler);
-                router.delete(endpoint).handler(handler);
             }
         };
         requestRouter.bindAll();
@@ -82,23 +72,19 @@ public class VertxHttpServer implements HttpServer {
             @Override
             public void start() throws Exception {
                 LOG.info("Starting Vertx HTTP server on port {}", port);
-                vertx.createHttpServer().requestHandler(router).listen(port, future::complete);
+                vertx.createHttpServer().requestHandler(router::accept).listen(port, future::complete);
             }
         });
         try {
-            AsyncResult<io.vertx.core.http.HttpServer> asyncResult = future.get();
+            AsyncResult asyncResult = future.get();
             if (asyncResult.succeeded()) {
                 LOG.info("Vertx Http server started successfully");
-                listeningPort = asyncResult.result().actualPort();
                 isRunning = true;
                 return true;
             } else {
                 LOG.error("Failed to start org.apache.bookkeeper.http server on port {}", port, asyncResult.cause());
             }
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            LOG.error("Failed to start org.apache.bookkeeper.http server on port {}", port, ie);
-        } catch (ExecutionException e) {
+        } catch (InterruptedException | ExecutionException e) {
             LOG.error("Failed to start org.apache.bookkeeper.http server on port {}", port, e);
         }
         return false;
@@ -120,7 +106,6 @@ public class VertxHttpServer implements HttpServer {
         try {
             shutdownLatch.await();
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Interrupted while shutting down org.apache.bookkeeper.http server");
         }
     }

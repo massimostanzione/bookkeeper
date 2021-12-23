@@ -19,7 +19,6 @@ package org.apache.bookkeeper.bookie;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -108,13 +107,6 @@ public class CheckpointSourceList implements CheckpointSource {
             }
 
             return 0;
-        }
-
-        @Override
-        public String toString() {
-            return MoreObjects.toStringHelper(CheckpointList.class)
-                .add("checkpoints", checkpoints)
-                .toString();
         }
 
     }

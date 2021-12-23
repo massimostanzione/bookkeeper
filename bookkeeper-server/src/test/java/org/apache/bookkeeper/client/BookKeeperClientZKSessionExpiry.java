@@ -21,18 +21,15 @@
 package org.apache.bookkeeper.client;
 
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.apache.bookkeeper.test.TestCallbacks.AddCallbackFuture;
 import org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.bookkeeper.test.TestCallbacks.AddCallbackFuture;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test the bookkeeper client while losing a ZK session.
- */
 public class BookKeeperClientZKSessionExpiry extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(BookKeeperClientZKSessionExpiry.class);
+    static Logger LOG = LoggerFactory.getLogger(BookKeeperClientZKSessionExpiry.class);
 
     public BookKeeperClientZKSessionExpiry() {
         super(4);
@@ -60,7 +57,6 @@ public class BookKeeperClientZKSessionExpiry extends BookKeeperClusterTestCase {
                             }
                         }
                     } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
                         return;
                     }
                 }

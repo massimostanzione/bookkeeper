@@ -19,11 +19,7 @@
 
 package org.apache.bookkeeper.client.impl;
 
-<<<<<<< HEAD
 import static com.google.common.base.Charsets.UTF_8;
-=======
-import static java.nio.charset.StandardCharsets.UTF_8;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 

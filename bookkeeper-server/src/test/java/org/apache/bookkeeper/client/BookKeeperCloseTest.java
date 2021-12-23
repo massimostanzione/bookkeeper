@@ -20,25 +20,16 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import com.google.common.util.concurrent.SettableFuture;
-
 import io.netty.buffer.ByteBuf;
-
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
-
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.bookie.BookieImpl;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.AsyncCallback.CloseCallback;
 import org.apache.bookkeeper.client.AsyncCallback.CreateCallback;
@@ -46,7 +37,7 @@ import org.apache.bookkeeper.client.AsyncCallback.ReadCallback;
 import org.apache.bookkeeper.client.BKException.BKClientClosedException;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
@@ -54,9 +45,11 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.junit.Assert.*;
+
 /**
  * This unit test verifies the behavior of bookkeeper apis, where the operations
- * are being executed through a closed bookkeeper client.
+ * are being executed through a closed bookkeeper client
  */
 public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
@@ -67,7 +60,6 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
             .getLogger(BookKeeperCloseTest.class);
     private DigestType digestType = DigestType.CRC32;
     private static final String PASSWORD = "testPasswd";
-    private static final BiConsumer<Long, Long> NOOP_BICONSUMER = (l, e) -> { };
 
     public BookKeeperCloseTest() {
         super(3);
@@ -76,11 +68,11 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
     private void restartBookieSlow() throws Exception{
         ServerConfiguration conf = killBookie(0);
 
-        Bookie delayBookie = new BookieImpl(conf) {
+        Bookie delayBookie = new Bookie(conf) {
                 @Override
                 public void recoveryAddEntry(ByteBuf entry, WriteCallback cb,
                                              Object ctx, byte[] masterKey)
-                        throws IOException, BookieException, InterruptedException {
+                        throws IOException, BookieException {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException ie) {
@@ -92,9 +84,9 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
                 }
 
                 @Override
-                public void addEntry(ByteBuf entry, boolean ackBeforeSync, WriteCallback cb,
+                public void addEntry(ByteBuf entry, WriteCallback cb,
                                      Object ctx, byte[] masterKey)
-                        throws IOException, BookieException, InterruptedException {
+                        throws IOException, BookieException {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException ie) {
@@ -102,7 +94,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
                         // and an exception would spam the logs
                         Thread.currentThread().interrupt();
                     }
-                    super.addEntry(entry, ackBeforeSync, cb, ctx, masterKey);
+                    super.addEntry(entry, cb, ctx, masterKey);
                 }
 
                 @Override
@@ -118,12 +110,13 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
                     return super.readEntry(ledgerId, entryId);
                 }
             };
-        startAndAddBookie(conf, delayBookie);
+        bsConfs.add(conf);
+        bs.add(startBookie(conf, delayBookie));
     }
 
     /**
      * Test that createledger using bookkeeper client which is closed should
-     * throw ClientClosedException.
+     * throw ClientClosedException
      */
     @Test
     public void testCreateLedger() throws Exception {
@@ -160,7 +153,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that opening a ledger using bookkeeper client which is closed should
-     * throw ClientClosedException.
+     * throw ClientClosedException
      */
     @Test
     public void testFenceLedger() throws Exception {
@@ -207,7 +200,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that deleting a ledger using bookkeeper client which is closed
-     * should throw ClientClosedException.
+     * should throw ClientClosedException
      */
     @Test
     public void testDeleteLedger() throws Exception {
@@ -243,7 +236,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that adding entry to a ledger using bookkeeper client which is
-     * closed should throw ClientClosedException.
+     * closed should throw ClientClosedException
      */
     @Test
     public void testAddLedgerEntry() throws Exception {
@@ -283,7 +276,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that closing a ledger using bookkeeper client which is closed should
-     * throw ClientClosedException.
+     * throw ClientClosedException
      */
     @Test
     public void testCloseLedger() throws Exception {
@@ -321,7 +314,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that reading entry from a ledger using bookkeeper client which is
-     * closed should throw ClientClosedException.
+     * closed should throw ClientClosedException
      */
     @Test
     public void testReadLedgerEntry() throws Exception {
@@ -364,7 +357,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that readlastconfirmed entry from a ledger using bookkeeper client
-     * which is closed should throw ClientClosedException.
+     * which is closed should throw ClientClosedException
      */
     @Test
     public void testReadLastConfirmed() throws Exception {
@@ -410,7 +403,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
     /**
      * Test that checking a ledger using a closed BK client will
-     * throw a ClientClosedException.
+     * throw a ClientClosedException
      */
     @Test
     public void testLedgerCheck() throws Exception {
@@ -467,7 +460,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
     }
     /**
      * Test that BookKeeperAdmin operationg using a closed BK client will
-     * throw a ClientClosedException.
+     * throw a ClientClosedException
      */
     @Test
     public void testBookKeeperAdmin() throws Exception {
@@ -480,7 +473,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
             LedgerHandle lh3 = createLedgerWithEntries(bk, 100);
             lh3.close();
 
-            BookieId bookieToKill = getBookie(0);
+            BookieSocketAddress bookieToKill = getBookie(0);
             killBookie(bookieToKill);
             startNewBookie();
 
@@ -521,7 +514,7 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
 
             try {
                 bkadmin.replicateLedgerFragment(lh3,
-                        checkercb.getResult(10, TimeUnit.SECONDS).iterator().next(), NOOP_BICONSUMER);
+                        checkercb.getResult(10, TimeUnit.SECONDS).iterator().next());
                 fail("Shouldn't be able to replicate with a closed client");
             } catch (BKException.BKClientClosedException cce) {
                 // correct behaviour

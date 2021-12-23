@@ -26,8 +26,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.common.collect.Lists;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,9 +42,8 @@ import java.util.function.Function;
 
 import org.junit.Test;
 
-/**
- * Test the concurrent open HashMap class.
- */
+import com.google.common.collect.Lists;
+
 public class ConcurrentOpenHashMapTest {
 
     @Test
@@ -161,7 +158,7 @@ public class ConcurrentOpenHashMapTest {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         final int nThreads = 16;
-        final int n = 100_000;
+        final int N = 100_000;
         String value = "value";
 
         List<Future<?>> futures = new ArrayList<>();
@@ -171,7 +168,7 @@ public class ConcurrentOpenHashMapTest {
             futures.add(executor.submit(() -> {
                 Random random = new Random();
 
-                for (int j = 0; j < n; j++) {
+                for (int j = 0; j < N; j++) {
                     long key = random.nextLong();
                     // Ensure keys are uniques
                     key -= key % (threadIdx + 1);
@@ -185,7 +182,7 @@ public class ConcurrentOpenHashMapTest {
             future.get();
         }
 
-        assertEquals(map.size(), n * nThreads);
+        assertEquals(map.size(), N * nThreads);
 
         executor.shutdown();
     }
@@ -196,7 +193,7 @@ public class ConcurrentOpenHashMapTest {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         final int nThreads = 16;
-        final int n = 100_000;
+        final int N = 100_000;
         String value = "value";
 
         List<Future<?>> futures = new ArrayList<>();
@@ -206,7 +203,7 @@ public class ConcurrentOpenHashMapTest {
             futures.add(executor.submit(() -> {
                 Random random = new Random();
 
-                for (int j = 0; j < n; j++) {
+                for (int j = 0; j < N; j++) {
                     long key = random.nextLong();
                     // Ensure keys are uniques
                     key -= key % (threadIdx + 1);
@@ -220,7 +217,7 @@ public class ConcurrentOpenHashMapTest {
             future.get();
         }
 
-        assertEquals(map.size(), n * nThreads);
+        assertEquals(map.size(), N * nThreads);
 
         executor.shutdown();
     }
@@ -270,15 +267,15 @@ public class ConcurrentOpenHashMapTest {
 
     @Test
     public void testHashConflictWithDeletion() {
-        final int buckets = 16;
-        ConcurrentOpenHashMap<Long, String> map = new ConcurrentOpenHashMap<>(buckets, 1);
+        final int Buckets = 16;
+        ConcurrentOpenHashMap<Long, String> map = new ConcurrentOpenHashMap<>(Buckets, 1);
 
         // Pick 2 keys that fall into the same bucket
         long key1 = 1;
         long key2 = 27;
 
-        int bucket1 = ConcurrentOpenHashMap.signSafeMod(ConcurrentOpenHashMap.hash(key1), buckets);
-        int bucket2 = ConcurrentOpenHashMap.signSafeMod(ConcurrentOpenHashMap.hash(key2), buckets);
+        int bucket1 = ConcurrentOpenHashMap.signSafeMod(ConcurrentOpenHashMap.hash(key1), Buckets);
+        int bucket2 = ConcurrentOpenHashMap.signSafeMod(ConcurrentOpenHashMap.hash(key2), Buckets);
         assertEquals(bucket1, bucket2);
 
         assertEquals(map.put(key1, "value-1"), null);
@@ -384,26 +381,26 @@ public class ConcurrentOpenHashMapTest {
         ConcurrentOpenHashMap<T, String> map = new ConcurrentOpenHashMap<>();
 
         T t1 = new T(1);
-        T t1B = new T(1);
+        T t1_b = new T(1);
         T t2 = new T(2);
 
-        assertEquals(t1, t1B);
+        assertEquals(t1, t1_b);
         assertFalse(t1.equals(t2));
-        assertFalse(t1B.equals(t2));
+        assertFalse(t1_b.equals(t2));
 
         assertNull(map.put(t1, "t1"));
         assertEquals(map.get(t1), "t1");
-        assertEquals(map.get(t1B), "t1");
+        assertEquals(map.get(t1_b), "t1");
         assertNull(map.get(t2));
 
-        assertEquals(map.remove(t1B), "t1");
+        assertEquals(map.remove(t1_b), "t1");
         assertNull(map.get(t1));
-        assertNull(map.get(t1B));
+        assertNull(map.get(t1_b));
     }
 
-    static final int Iterations = 1;
-    static final int ReadIterations = 100;
-    static final int N = 1_000_000;
+    final static int Iterations = 1;
+    final static int ReadIterations = 100;
+    final static int N = 1_000_000;
 
     public void benchConcurrentOpenHashMap() throws Exception {
         // public static void main(String args[]) {

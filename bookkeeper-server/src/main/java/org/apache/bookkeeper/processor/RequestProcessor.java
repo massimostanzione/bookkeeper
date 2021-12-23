@@ -25,12 +25,11 @@ import io.netty.channel.Channel;
 /**
  * A request processor that is used for processing requests at bookie side.
  */
-public interface RequestProcessor extends AutoCloseable {
+public interface RequestProcessor {
 
     /**
      * Close the request processor.
      */
-    @Override
     void close();
 
     /**
@@ -42,4 +41,5 @@ public interface RequestProcessor extends AutoCloseable {
      *          channel received the given request <i>r</i>
      */
     void processRequest(Object r, Channel channel);
+
 }

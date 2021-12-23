@@ -22,22 +22,19 @@ import java.util.Set;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.bookkeeper.versioning.Versioned;
 
-/**
- * Metastore Table interface.
- */
 public interface MetastoreTable {
 
     // select all fields when reading or scanning entries
-    Set<String> ALL_FIELDS = null;
+    public static final Set<String> ALL_FIELDS = null;
     // select non fields to return when reading/scanning entries
-    Set<String> NON_FIELDS = Collections.emptySet();
+    public static final Set<String> NON_FIELDS = Collections.emptySet();
 
     /**
      * Get table name.
      *
      * @return table name
      */
-    String getName();
+    public String getName();
 
     /**
      * Get all fields of a key.
@@ -56,7 +53,7 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void get(String key, MetastoreCallback<Versioned<Value>> cb, Object ctx);
+    public void get(String key, MetastoreCallback<Versioned<Value>> cb, Object ctx);
 
     /**
      * Get all fields of a key.
@@ -77,8 +74,8 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void get(String key, MetastoreWatcher watcher, MetastoreCallback<Versioned<Value>> cb, Object ctx);
-
+    public void get(String key, MetastoreWatcher watcher, MetastoreCallback<Versioned<Value>> cb, Object ctx);
+    
     /**
      * Get specified fields of a key.
      *
@@ -98,7 +95,8 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void get(String key, Set<String> fields, MetastoreCallback<Versioned<Value>> cb, Object ctx);
+    public void get(String key, Set<String> fields,
+                    MetastoreCallback<Versioned<Value>> cb, Object ctx);
 
     /**
      * Update a key according to its version.
@@ -112,7 +110,7 @@ public interface MetastoreTable {
      * <li>{@link MSException.Code.IllegalOp}/{@link MSException.Code.ServiceDown}: other issues</li>
      * </ul></p>
      *
-     * <p>The key is updated only when the version matches its current version.
+     * The key is updated only when the version matches its current version.
      * In particular, if the provided version is:<ul>
      * <li>{@link Version.ANY}: update the data without comparing its version.
      *      <b>Note this usage is not encouraged since it may mess up data consistency.</b></li>
@@ -131,12 +129,12 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void put(String key, Value value, Version version, MetastoreCallback<Version> cb, Object ctx);
+    public void put(String key, Value value, Version version, MetastoreCallback<Version> cb, Object ctx);
 
     /**
      * Remove a key by its version.
      *
-     * <p>The key is removed only when the version matches its current version.
+     * The key is removed only when the version matches its current version.
      * If <code>version</code> is {@link Version.ANY}, the key would be removed directly.
      *
      * <p>
@@ -156,7 +154,8 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void remove(String key, Version version, MetastoreCallback<Void> cb, Object ctx);
+    public void remove(String key, Version version,
+                       MetastoreCallback<Void> cb, Object ctx);
 
     /**
      * Open a cursor to loop over all the entries of the table,
@@ -169,7 +168,7 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void openCursor(MetastoreCallback<MetastoreCursor> cb, Object ctx);
+    public void openCursor(MetastoreCallback<MetastoreCursor> cb, Object ctx);
 
     /**
      * Open a cursor to loop over all the entries of the table,
@@ -184,10 +183,11 @@ public interface MetastoreTable {
      * @param ctx
      *          Callback context
      */
-    void openCursor(Set<String> fields, MetastoreCallback<MetastoreCursor> cb, Object ctx);
+    public void openCursor(Set<String> fields,
+                           MetastoreCallback<MetastoreCursor> cb, Object ctx);
 
     /**
      * Close the table.
      */
-    void close();
+    public void close();
 }

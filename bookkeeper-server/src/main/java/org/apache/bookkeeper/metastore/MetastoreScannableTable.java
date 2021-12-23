@@ -19,19 +19,14 @@ package org.apache.bookkeeper.metastore;
 
 import java.util.Set;
 
-/**
- * Metastore Scannable Table.
- */
 public interface MetastoreScannableTable extends MetastoreTable {
 
     // Used by cursor, etc when they want to start at the beginning of a table
-    String EMPTY_START_KEY = null;
+    public static final String EMPTY_START_KEY = null;
     // Last row in a table.
-    String EMPTY_END_KEY = null;
-    /**
-     * The order to loop over a table.
-     */
-    enum Order {
+    public static final String EMPTY_END_KEY = null;
+    // the order to loop over a table
+    public static enum Order {
         ASC,
         DESC
     }
@@ -40,10 +35,12 @@ public interface MetastoreScannableTable extends MetastoreTable {
      * Open a cursor to loop over the entries belonging to a key range,
      * which returns all fields for each entry.
      *
-     * <p>Return Code:<br/>
+     * <p>
+     * Return Code:<br/>
      * {@link MSException.Code.OK}: an opened cursor<br/>
      * {@link MSException.Code.IllegalOp}/{@link MSException.Code.ServiceDown}:
      * other issues
+     * </p>
      *
      * @param firstKey
      *            Key to start scanning. If it is {@link EMPTY_START_KEY}, it starts
@@ -62,7 +59,7 @@ public interface MetastoreScannableTable extends MetastoreTable {
      * @param ctx
      *            Callback context
      */
-    void openCursor(String firstKey, boolean firstInclusive,
+    public void openCursor(String firstKey, boolean firstInclusive,
                            String lastKey, boolean lastInclusive,
                            Order order,
                            MetastoreCallback<MetastoreCursor> cb,
@@ -72,10 +69,12 @@ public interface MetastoreScannableTable extends MetastoreTable {
      * Open a cursor to loop over the entries belonging to a key range,
      * which returns the specified <code>fields</code> for each entry.
      *
-     * <p>Return Code:<br/>
+     * <p>
+     * Return Code:<br/>
      * {@link MSException.Code.OK}: an opened cursor<br/>
      * {@link MSException.Code.IllegalOp}/{@link MSException.Code.ServiceDown}:
      * other issues
+     * </p>
      *
      * @param firstKey
      *            Key to start scanning. If it is {@link EMPTY_START_KEY}, it starts
@@ -96,7 +95,7 @@ public interface MetastoreScannableTable extends MetastoreTable {
      * @param ctx
      *            Callback context
      */
-    void openCursor(String firstKey, boolean firstInclusive,
+    public void openCursor(String firstKey, boolean firstInclusive,
                            String lastKey, boolean lastInclusive,
                            Order order, Set<String> fields,
                            MetastoreCallback<MetastoreCursor> cb,

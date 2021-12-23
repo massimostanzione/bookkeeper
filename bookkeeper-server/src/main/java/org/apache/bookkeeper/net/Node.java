@@ -31,37 +31,34 @@ import com.google.common.annotations.Beta;
 @Beta
 public interface Node {
     /** @return the string representation of this node's network location at the specified level in the hierarchy*/
-    String getNetworkLocation(int level);
+    public String getNetworkLocation(int level);
 
     /** @return the string representation of this node's network location */
-    String getNetworkLocation();
+    public String getNetworkLocation();
 
-    /**
-     * Set this node's network location.
+    /** Set this node's network location
      * @param location the location
      */
-    void setNetworkLocation(String location);
+    public void setNetworkLocation(String location);
 
     /** @return this node's name */
-    String getName();
+    public String getName();
 
     /** @return this node's parent */
-    Node getParent();
+    public Node getParent();
 
-    /**
-     * Set this node's parent.
+    /** Set this node's parent
      * @param parent the parent
      */
-    void setParent(Node parent);
+    public void setParent(Node parent);
 
     /** @return this node's level in the tree.
      * E.g. the root of a tree returns 0 and its children return 1
      */
-    int getLevel();
+    public int getLevel();
 
-    /**
-     * Set this node's level in the tree.
+    /** Set this node's level in the tree
      * @param i the level
      */
-    void setLevel(int i);
+    public void setLevel(int i);
 }

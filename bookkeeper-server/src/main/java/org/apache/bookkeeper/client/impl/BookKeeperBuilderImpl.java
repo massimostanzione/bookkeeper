@@ -20,7 +20,6 @@
  */
 package org.apache.bookkeeper.client.impl;
 
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import java.io.IOException;
@@ -31,6 +30,7 @@ import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.feature.FeatureProvider;
 import org.apache.bookkeeper.net.DNSToSwitchMapping;
 import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.zookeeper.ZooKeeper;
 
 /**
  * Internal builder for {@link org.apache.bookkeeper.client.api.BookKeeper} client.
@@ -52,8 +52,8 @@ public class BookKeeperBuilderImpl implements BookKeeperBuilder {
     }
 
     @Override
-    public BookKeeperBuilder allocator(ByteBufAllocator allocator) {
-        builder.allocator(allocator);
+    public BookKeeperBuilder zk(ZooKeeper zk) {
+        builder.zk(zk);
         return this;
     }
 

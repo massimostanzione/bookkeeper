@@ -28,12 +28,12 @@ import java.util.Set;
 import java.util.concurrent.locks.StampedLock;
 
 /**
- * Concurrent hash set for primitive longs.
+ * Concurrent hash set for primitive longs
  *
- * <p>Provides similar methods as a ConcurrentSet&lt;Long&gt; but since it's an open hash map with linear probing,
- * no node allocations are required to store the values.
- *
- * <p>Items <strong>MUST</strong> be &gt;= 0.
+ * Provides similar methods as a ConcurrentSet&lt;Long&gt; but since it's an open hash map with linear probing, no node
+ * allocations are required to store the values.
+ * <p>
+ * Items <strong>MUST</strong> be >= 0.
  */
 public class ConcurrentLongHashSet {
 
@@ -47,10 +47,7 @@ public class ConcurrentLongHashSet {
 
     private final Section[] sections;
 
-    /**
-     * A consumer of long values.
-     */
-    public interface ConsumerLong {
+    public static interface ConsumerLong {
         void accept(long item);
     }
 
@@ -124,7 +121,7 @@ public class ConcurrentLongHashSet {
     }
 
     /**
-     * Remove an existing entry if found.
+     * Remove an existing entry if found
      *
      * @param item
      * @return true if removed or false if item was not present
@@ -135,7 +132,7 @@ public class ConcurrentLongHashSet {
         return getSection(h).remove(item, (int) h);
     }
 
-    private Section getSection(long hash) {
+    private final Section getSection(long hash) {
         // Use 32 msb out of long to get the section
         final int sectionIdx = (int) (hash >>> 32) & (sections.length - 1);
         return sections[sectionIdx];
@@ -166,9 +163,9 @@ public class ConcurrentLongHashSet {
     @SuppressWarnings("serial")
     private static final class Section extends StampedLock {
         // Keys and values are stored interleaved in the table array
-        private volatile long[] table;
+        private long[] table;
 
-        private volatile int capacity;
+        private int capacity;
         private volatile int size;
         private int usedBuckets;
         private int resizeThreshold;
@@ -375,11 +372,9 @@ public class ConcurrentLongHashSet {
                 }
             }
 
+            capacity = newCapacity;
             table = newTable;
             usedBuckets = size;
-            // Capacity needs to be updated after the values, so that we won't see
-            // a capacity value bigger than the actual array size
-            capacity = newCapacity;
             resizeThreshold = (int) (capacity * SetFillFactor);
         }
 
@@ -403,22 +398,22 @@ public class ConcurrentLongHashSet {
     private static final long HashMixer = 0xc6a4a7935bd1e995L;
     private static final int R = 47;
 
-    static final long hash(long key) {
+    final static long hash(long key) {
         long hash = key * HashMixer;
         hash ^= hash >>> R;
         hash *= HashMixer;
         return hash;
     }
 
-    static final int signSafeMod(long n, int max) {
-        return (int) (n & (max - 1));
+    static final int signSafeMod(long n, int Max) {
+        return (int) (n & (Max - 1));
     }
 
-    private static int alignToPowerOfTwo(int n) {
+    private static final int alignToPowerOfTwo(int n) {
         return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
     }
 
-    private static void checkBiggerEqualZero(long n) {
+    private static final void checkBiggerEqualZero(long n) {
         if (n < 0L) {
             throw new IllegalArgumentException("Keys and values must be >= 0");
         }

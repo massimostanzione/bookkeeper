@@ -21,23 +21,21 @@
 
 package org.apache.bookkeeper.proto;
 
-import static org.junit.Assert.fail;
-
 import io.netty.channel.Channel;
 import io.netty.channel.local.LocalChannel;
-
 import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerHandle;
-import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Tests of the main BookKeeper client using networkless comunication.
+ * Tests of the main BookKeeper client using networkless comunication
  */
 public class NetworkLessBookieTest extends BookKeeperClusterTestCase {
-
+    
     public NetworkLessBookieTest() {
         super(1);
         baseConf.setDisableServerSocketBind(true);
@@ -46,20 +44,20 @@ public class NetworkLessBookieTest extends BookKeeperClusterTestCase {
 
     @Test
     public void testUseLocalBookie() throws Exception {
-        ClientConfiguration conf = new ClientConfiguration();
-        conf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
-        conf.setZkTimeout(20000);
+        ClientConfiguration conf = new ClientConfiguration()
+                .setZkServers(zkUtil.getZooKeeperConnectString())
+                .setZkTimeout(20000);
 
         try (BookKeeper bkc = new BookKeeper(conf)) {
-            try (LedgerHandle h = bkc.createLedger(1, 1, DigestType.CRC32, "testPasswd".getBytes())) {
+            try (LedgerHandle h = bkc.createLedger(1,1, DigestType.CRC32, "testPasswd".getBytes())) {
                 h.addEntry("test".getBytes());
             }
         }
 
-        for (int i = 0; i < bookieCount(); i++) {
-            for (Channel channel : serverByIndex(i).nettyServer.allChannels) {
+        for (BookieServer bk : bs) {
+            for (Channel channel : bk.nettyServer.allChannels) {
                 if (!(channel instanceof LocalChannel)) {
-                    fail();
+                    Assert.fail();
                 }
             }
         }

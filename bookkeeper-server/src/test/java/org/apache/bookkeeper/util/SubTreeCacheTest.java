@@ -21,14 +21,6 @@
 
 package org.apache.bookkeeper.util;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
-
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.WatchedEvent;
@@ -37,9 +29,14 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-/**
- * Test the subtree cache.
- */
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
 public class SubTreeCacheTest {
     class TestTreeProvider implements SubTreeCache.TreeProvider {
         class Node {
@@ -53,9 +50,8 @@ public class SubTreeCacheTest {
             String[] pathSegments = path.split("/");
             Node cur = root;
             for (String segment : pathSegments) {
-                if (segment.length() == 0) {
+                if (segment.length() == 0)
                     continue; // ignore leading empty one for leading /
-                }
                 if (cur.children.containsKey(segment)) {
                     cur = cur.children.get(segment);
                 } else {

@@ -20,28 +20,25 @@
  */
 package org.apache.bookkeeper.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Random;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
-import org.apache.bookkeeper.client.AsyncCallback.ReadCallback;
 import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.BookKeeperTestClient;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.AsyncCallback.ReadCallback;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.proto.BookieServer;
-import org.junit.Before;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  * This test tests read and write, synchronous and asynchronous, strings and
@@ -55,8 +52,8 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
 
     // Depending on the taste, select the amount of logging
     // by decommenting one of the two lines below
-    // private static final Logger LOG = Logger.getRootLogger();
-    private static final Logger LOG = LoggerFactory.getLogger(BookieFailureTest.class);
+    // private final static Logger LOG = Logger.getRootLogger();
+    private final static Logger LOG = LoggerFactory.getLogger(BookieFailureTest.class);
 
     byte[] ledgerPassword = "aaa".getBytes();
     LedgerHandle lh, lh2;
@@ -96,58 +93,59 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
     /**
      * Tests writes and reads when a bookie fails.
      *
-     * @throws IOException
+     * @throws {@link IOException}
      */
     @Test
-    public void testAsyncBK1() throws Exception {
+    public void testAsyncBK1() throws IOException {
         LOG.info("#### BK1 ####");
-        auxTestReadWriteAsyncSingleClient(serverByIndex(0));
+        auxTestReadWriteAsyncSingleClient(bs.get(0));
     }
 
     @Test
-    public void testAsyncBK2() throws Exception {
+    public void testAsyncBK2() throws IOException {
         LOG.info("#### BK2 ####");
-        auxTestReadWriteAsyncSingleClient(serverByIndex(1));
+        auxTestReadWriteAsyncSingleClient(bs.get(1));
     }
 
     @Test
-    public void testAsyncBK3() throws Exception {
+    public void testAsyncBK3() throws IOException {
         LOG.info("#### BK3 ####");
-        auxTestReadWriteAsyncSingleClient(serverByIndex(2));
+        auxTestReadWriteAsyncSingleClient(bs.get(2));
     }
 
     @Test
-    public void testAsyncBK4() throws Exception {
+    public void testAsyncBK4() throws IOException {
         LOG.info("#### BK4 ####");
-        auxTestReadWriteAsyncSingleClient(serverByIndex(3));
+        auxTestReadWriteAsyncSingleClient(bs.get(3));
     }
 
     @Test
     public void testBookieRecovery() throws Exception {
-        //Shutdown all but 1 bookie (should be in it's own test case with 1 bookie)
-        assertEquals(4, bookieCount());
-        killBookie(0);
-        killBookie(0);
-        killBookie(0);
+        //Shutdown all but 1 bookie
+        bs.get(0).shutdown();
+        bs.get(1).shutdown();
+        bs.get(2).shutdown();
 
         byte[] passwd = "blah".getBytes();
-        LedgerHandle lh = bkc.createLedger(1, 1, digestType, passwd);
+        LedgerHandle lh = bkc.createLedger(1, 1,digestType, passwd);
 
         int numEntries = 100;
-        for (int i = 0; i < numEntries; i++) {
-            byte[] data = ("" + i).getBytes();
+        for (int i=0; i< numEntries; i++) {
+            byte[] data = (""+i).getBytes();
             lh.addEntry(data);
         }
 
-        assertEquals(1, bookieCount());
-        restartBookies();
+        bs.get(3).shutdown();
+        BookieServer server = new BookieServer(bsConfs.get(3));
+        server.start();
+        bs.set(3, server);
 
         assertEquals(numEntries - 1 , lh.getLastAddConfirmed());
         Enumeration<LedgerEntry> entries = lh.readEntries(0, lh.getLastAddConfirmed());
 
         int numScanned = 0;
         while (entries.hasMoreElements()) {
-            assertEquals(("" + numScanned), new String(entries.nextElement().getEntry()));
+            assertEquals((""+numScanned), new String(entries.nextElement().getEntry()));
             numScanned++;
         }
         assertEquals(numEntries, numScanned);
@@ -235,7 +233,6 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
             LOG.error("Caught BKException", e);
             fail(e.toString());
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.error("Caught InterruptedException", e);
             fail(e.toString());
         }
@@ -289,7 +286,7 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
 
         int numEntries = 10;
         String tmp = "BookKeeper is cool!";
-        for (int i = 0; i < numEntries; i++) {
+        for (int i=0; i<numEntries; i++) {
             beforelh.addEntry(tmp.getBytes());
         }
 
@@ -300,6 +297,24 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
         LedgerHandle afterlh = bkc.openLedgerNoRecovery(beforelh.getId(), digestType, "".getBytes());
 
         assertEquals(numEntries - 2, afterlh.getLastAddConfirmed());
+
+        startNewBookie();
+        LedgerHandle beforelh2 = bkc.createLedger(numBookies, 1, digestType, "".getBytes());
+
+        for (int i=0; i<numEntries; i++) {
+            beforelh2.addEntry(tmp.getBytes());
+        }
+
+        // shutdown first bookie server
+        killBookie(0);
+
+        // try to open ledger no recovery
+        try {
+            bkc.openLedgerNoRecovery(beforelh2.getId(), digestType, "".getBytes());
+            fail("Should have thrown exception");
+        } catch (BKException.BKReadException e) {
+            // correct behaviour
+        }
     }
 
     @Test
@@ -309,7 +324,7 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
 
         int numEntries = 10;
         String tmp = "BookKeeper is cool!";
-        for (int i = 0; i < numEntries; i++) {
+        for (int i=0; i<numEntries; i++) {
             beforelh.addEntry(tmp.getBytes());
         }
 
@@ -317,22 +332,27 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
         killBookie(0);
         startNewBookie();
 
-        // try to open ledger with recovery
+        // try to open ledger no recovery
         LedgerHandle afterlh = bkc.openLedger(beforelh.getId(), digestType, "".getBytes());
+
         assertEquals(beforelh.getLastAddPushed(), afterlh.getLastAddConfirmed());
 
-        // try to open ledger no recovery
-        // bookies: 4, ensSize: 3, ackQuorumSize: 2
-        LedgerHandle beforelhWithNoRecovery = bkc.createLedger(numBookies - 1 , 2, digestType, "".getBytes());
-        for (int i = 0; i < numEntries; i++) {
-            beforelhWithNoRecovery.addEntry(tmp.getBytes());
+        LedgerHandle beforelh2 = bkc.createLedger(numBookies, 1, digestType, "".getBytes());
+
+        for (int i=0; i<numEntries; i++) {
+            beforelh2.addEntry(tmp.getBytes());
         }
 
         // shutdown first bookie server
         killBookie(0);
 
-        // try to open ledger no recovery, should be able to open ledger
-        bkc.openLedger(beforelhWithNoRecovery.getId(), digestType, "".getBytes());
+        // try to open ledger no recovery
+        try {
+            bkc.openLedger(beforelh2.getId(), digestType, "".getBytes());
+            fail("Should have thrown exception");
+        } catch (BKException.BKLedgerRecoveryException e) {
+            // correct behaviour
+        }
     }
 
     /**
@@ -343,7 +363,7 @@ public class BookieFailureTest extends BookKeeperClusterTestCase
      * establishment. Now the future.addlistener() will notify back in the same
      * thread and simultaneously invoke the pendingOp.operationComplete() event.
      *
-     * <p>BOOKKEEPER-326
+     * BOOKKEEPER-326
      */
     @Test
     public void testReadLastConfirmedOp() throws Exception {

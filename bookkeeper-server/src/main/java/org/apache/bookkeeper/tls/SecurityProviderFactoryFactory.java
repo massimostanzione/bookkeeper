@@ -17,15 +17,11 @@
  */
 package org.apache.bookkeeper.tls;
 
-import org.apache.bookkeeper.common.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * A factory to manage security provider factories.
- */
 public abstract class SecurityProviderFactoryFactory {
-    private static final Logger LOG = LoggerFactory.getLogger(SecurityProviderFactoryFactory.class);
+    private final static Logger LOG = LoggerFactory.getLogger(SecurityProviderFactoryFactory.class);
 
     public static SecurityHandlerFactory getSecurityProviderFactory(String securityHandler)
             throws SecurityException {
@@ -33,15 +29,15 @@ public abstract class SecurityProviderFactoryFactory {
             return null;
         }
 
-        SecurityHandlerFactory shFactory;
+        ClassLoader classLoader = SecurityProviderFactoryFactory.class.getClassLoader();
+        SecurityHandlerFactory shFactory = null;
         try {
-            Class<? extends SecurityHandlerFactory> shFactoryClass =
-                ReflectionUtils.forName(securityHandler, SecurityHandlerFactory.class);
-            shFactory = ReflectionUtils.newInstance(shFactoryClass);
+            Class<?> shFactoryClass = classLoader.loadClass(securityHandler);
+            shFactory = (SecurityHandlerFactory) shFactoryClass.newInstance();
             LOG.info("Loaded security handler for {}", securityHandler);
-        } catch (RuntimeException re) {
-            LOG.error("Unable to load security handler for {}: ", securityHandler, re.getCause());
-            throw new SecurityException(re.getCause());
+        } catch (Exception e) {
+            LOG.error("Unable to load security handler for {}: ", securityHandler, e);
+            throw new SecurityException(e);
         }
         return shFactory;
     }

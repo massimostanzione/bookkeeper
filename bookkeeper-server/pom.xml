@@ -20,14 +20,14 @@
   <parent>
     <artifactId>bookkeeper</artifactId>
     <groupId>org.apache.bookkeeper</groupId>
-<<<<<<< HEAD
     <version>4.6.0</version>
-=======
-    <version>4.15.0-SNAPSHOT</version>
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
   </parent>
   <artifactId>bookkeeper-server</artifactId>
   <name>Apache BookKeeper :: Server</name>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.libdir>${basedir}/lib</project.libdir>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>org.apache.bookkeeper</groupId>
@@ -35,158 +35,153 @@
       <version>${project.parent.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>bookkeeper-common-allocator</artifactId>
-      <version>${project.parent.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>bookkeeper-proto</artifactId>
-      <version>${project.parent.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>bookkeeper-tools-framework</artifactId>
-      <version>${project.parent.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <version>${protobuf.version}</version>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
+      <version>${slf4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
+      <version>${zookeeper.version}</version>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>net.java.dev.javacc</groupId>
+          <artifactId>javacc</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+		</exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>${zookeeper.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>commons-cli</groupId>
+      <artifactId>commons-cli</artifactId>
+      <version>1.2</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>1.6</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${commons-lang3.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>4.1</version>
+    </dependency>
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+      <version>3.2.7</version>
+    </dependency>
+    <!--
+        Annoying dependency we need to include because
+        zookeeper uses log4j and so we transatively do, but
+        log4j has some dependencies which aren't in the
+        default maven repositories
+    //-->
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>1.2.15</version>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.mail</groupId>
+          <artifactId>mail</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.jms</groupId>
+          <artifactId>jms</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jdmk</groupId>
+          <artifactId>jmxtools</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jmx</groupId>
+          <artifactId>jmxri</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
-      <artifactId>netty-handler</artifactId>
+      <artifactId>netty-all</artifactId>
+      <version>${netty.version}</version>
     </dependency>
     <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-transport-native-epoll</artifactId>
-        <classifier>linux-x86_64</classifier>
-      </dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-minikdc</artifactId>
+      <version>2.7.3</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-tcnative-boringssl-static</artifactId>
+      <version>${netty-boringssl.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.bookkeeper.http</groupId>
       <artifactId>http-server</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>circe-checksum</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>commons-cli</groupId>
-      <artifactId>commons-cli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-collections4</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bc-fips</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.beust</groupId>
-      <artifactId>jcommander</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>net.java.dev.jna</groupId>
-      <artifactId>jna</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-    </dependency>
-    <!-- testing dependencies -->
-    <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
-      <artifactId>bookkeeper-common</artifactId>
-      <version>${project.parent.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.kerby</groupId>
-        <artifactId>kerby-config</artifactId>
-        <version>${kerby.version}</version>
-        <scope>test</scope>
-        <exclusions>
-            <exclusion>
-                <groupId>org.slf4j</groupId>
-                <artifactId>*</artifactId>
-            </exclusion>
-        </exclusions>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.kerby</groupId>
-        <artifactId>kerb-simplekdc</artifactId>
-        <version>${kerby.version}</version>
-        <scope>test</scope>
-        <exclusions>
-            <exclusion>
-                <groupId>org.slf4j</groupId>
-                <artifactId>*</artifactId>
-            </exclusion>
-        </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-       <!-- needed by ZooKeeper server -->
-       <groupId>org.xerial.snappy</groupId>
-       <artifactId>snappy-java</artifactId>
-       <scope>test</scope>
-    </dependency>
-    <dependency>
-        <!-- needed by ZooKeeper server -->
-       <groupId>io.dropwizard.metrics</groupId>
-       <artifactId>metrics-core</artifactId>
-       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.bookkeeper.stats</groupId>
-      <artifactId>prometheus-metrics-provider</artifactId>
-      <version>${project.parent.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.bookkeeper.http</groupId>
-      <artifactId>vertx-http-server</artifactId>
-      <version>${project.parent.version}</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
       <plugin>
-<<<<<<< HEAD
         <!-- for mini-kdc -->
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
@@ -260,8 +255,6 @@
         </executions>
       </plugin>
       <plugin>
-=======
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>${maven-jar-plugin.version}</version>
@@ -279,42 +272,59 @@
         <configuration>
           <excludes>
             <!-- exclude generated file //-->
+            <exclude>**/DataFormats.java</exclude>
+            <exclude>**/BookkeeperProtocol.java</exclude>
             <exclude>**/target/**/*</exclude>
             <exclude>**/.classpath</exclude>
             <exclude>**/.gitignore</exclude>
             <exclude>**/.project</exclude>
-            <exclude>**/.checkstyle</exclude>
             <exclude>**/.settings/*</exclude>
-            <exclude>src/test/resources/server-key.pem</exclude>
-            <exclude>src/test/resources/server-key.p12</exclude>
-            <exclude>src/test/resources/server-key.jks</exclude>
-            <exclude>src/test/resources/server-cert.pem</exclude>
-            <exclude>src/test/resources/client-key.pem</exclude>
-            <exclude>src/test/resources/client-key.p12</exclude>
-            <exclude>src/test/resources/client-key.jks</exclude>
-            <exclude>src/test/resources/client-cert.pem</exclude>
+            <exclude>certs/keyStoreClientPassword.txt</exclude>
+            <exclude>certs/keyStoreServerPassword.txt</exclude>
+            <exclude>certs/trustStorePassword.txt</exclude>
+            <exclude>src/test/resources/cacerts</exclude>
             <exclude>src/test/resources/keyStoreClientPassword.txt</exclude>
             <exclude>src/test/resources/keyStoreServerPassword.txt</exclude>
+            <exclude>src/test/resources/trustStorePassword.txt</exclude>
           </excludes>
         </configuration>
       </plugin>
       <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven-surefire-plugin.version}</version>
-        <configuration>
-          <trimStackTrace>false</trimStackTrace>
-          <properties>
-            <property>
-              <name>listener</name>
-              <value>org.apache.bookkeeper.common.testing.util.TimedOutTestsListener</value>
-            </property>
-          </properties>
-        </configuration>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.libdir}</outputDirectory>
+	      <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>2.5</version>
+	<configuration>
+	  <filesets>
+            <fileset>
+              <directory>${project.libdir}</directory>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+            <fileset>
+              <directory>${project.basedir}</directory>
+              <includes>
+                <include>dependency-reduced-pom.xml</include>
+              </includes>
+            </fileset>
+          </filesets>
+	</configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -322,8 +332,8 @@
         <version>${maven-javadoc-plugin.version}</version>
         <configuration>
           <!-- Avoid for missing javadoc comments to be marked as errors -->
-          <doclint>none</doclint>
-          <subpackages>org.apache.bookkeeper.client:org.apache.bookkeeper.conf:org.apache.bookkeeper.feature</subpackages>
+          <additionalparam>-Xdoclint:none</additionalparam>
+          <subpackages>org.apache.bookkeeper.client:org.apache.bookkeeper.common.annotation:org.apache.bookkeeper.conf:org.apache.bookkeeper.feature:org.apache.bookkeeper.stats</subpackages>
           <groups>
             <group>
               <title>Bookkeeper</title>
@@ -340,9 +350,141 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <version>0.5.0</version>
+        <configuration>
+          <protocArtifact>com.google.protobuf:protoc:3.4.0:exe:${os.detected.classifier}</protocArtifact>
+          <checkStaleness>true</checkStaleness>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven-checkstyle-plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${puppycrawl.checkstyle.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.bookkeeper</groupId>
+            <artifactId>buildtools</artifactId>
+            <version>${project.parent.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <configLocation>bookkeeper/checkstyle.xml</configLocation>
+          <suppressionsLocation>bookkeeper/server-suppressions.xml</suppressionsLocation>
+          <consoleOutput>true</consoleOutput>
+          <failOnViolation>true</failOnViolation>
+          <includeResources>false</includeResources>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+        </configuration>
+        <executions>
+          <execution>
+            <id>checkstyle</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>
+    <profile>
+      <id>twitter-science-provider</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.bookkeeper.stats</groupId>
+          <artifactId>twitter-science-provider</artifactId>
+          <version>${project.parent.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>dev</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <configuration>
+              <skip>true</skip>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${maven-surefire-plugin.version}</version>
+            <configuration>
+              <argLine>-Xmx2G -Djava.net.preferIPv4Stack=true</argLine>
+              <redirectTestOutputToFile>false</redirectTestOutputToFile>
+              <reuseForks>false</reuseForks>
+              <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
+              <trimStackTrace>false</trimStackTrace>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>dev-debug</id>
+      <build>
+          <plugins>
+          <plugin>
+               <groupId>org.apache.maven.plugins</groupId>
+               <artifactId>maven-checkstyle-plugin</artifactId>
+               <configuration>
+                   <skip>true</skip>
+               </configuration>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <version>${maven-surefire-plugin.version}</version>
+              <configuration>
+                <argLine>-Xmx2G -Djava.net.preferIPv4Stack=true -Dbookkeeper.root.logger=DEBUG,CONSOLE</argLine>
+                <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                <reuseForks>false</reuseForks>
+                <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
+                <trimStackTrace>false</trimStackTrace>
+              </configuration>
+            </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>codahale-metrics-provider</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.bookkeeper.stats</groupId>
+          <artifactId>codahale-metrics-provider</artifactId>
+          <version>${project.parent.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>twitter-http-server</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.bookkeeper.http</groupId>
+          <artifactId>twitter-http-server</artifactId>
+          <version>${project.parent.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
     <profile>
       <id>vertx-http-server</id>
       <dependencies>
@@ -352,51 +494,6 @@
           <version>${project.parent.version}</version>
         </dependency>
       </dependencies>
-    </profile>
-    <profile>
-      <id>tls-certs</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <version>1.6.0</version>
-            <executions>
-              <execution>
-                <id>Generate Self-Signed Certificates</id>
-                <phase>generate-test-resources</phase>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <configuration>
-                  <workingDirectory>${basedir}/src/test/resources</workingDirectory>
-                  <executable>${basedir}/src/test/resources/generateKeysAndCerts.sh</executable>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <!-- test profiles -->
-    <profile>
-      <id>skipBookKeeperServerTests</id>
-      <activation>
-        <property>
-          <name>skipBookKeeperServerTests</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
     </profile>
   </profiles>
 </project>

@@ -21,21 +21,18 @@
 
 package org.apache.bookkeeper.bookie;
 
-import static org.apache.bookkeeper.tools.cli.commands.bookie.FormatUtil.bytes2Hex;
-
 import io.netty.buffer.ByteBuf;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.PrimitiveIterator.OfLong;
-
-import org.apache.bookkeeper.common.util.Watcher;
+import java.util.Observable;
+import java.util.Observer;
 
 /**
  * This class maps a ledger entry number into a location (entrylogid, offset) in
  * an entry log file. It does user level caching to more efficiently manage disk
  * head scheduling.
  */
-public interface LedgerCache extends Closeable {
+interface LedgerCache extends Closeable {
 
     boolean setFenced(long ledgerId) throws IOException;
     boolean isFenced(long ledgerId) throws IOException;
@@ -52,66 +49,10 @@ public interface LedgerCache extends Closeable {
 
     Long getLastAddConfirmed(long ledgerId) throws IOException;
     long updateLastAddConfirmed(long ledgerId, long lac) throws IOException;
-    boolean waitForLastAddConfirmedUpdate(long ledgerId,
-                                          long previousLAC,
-                                          Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException;
-    void cancelWaitForLastAddConfirmedUpdate(long ledgerId,
-                                             Watcher<LastAddConfirmedUpdateNotification> watcher) throws IOException;
+    Observable waitForLastAddConfirmedUpdate(long ledgerId, long previoisLAC, Observer observer) throws IOException;
 
     void deleteLedger(long ledgerId) throws IOException;
 
     void setExplicitLac(long ledgerId, ByteBuf lac) throws IOException;
     ByteBuf getExplicitLac(long ledgerId);
-
-    /**
-     * Specific exception to encode the case where the index is not present.
-     */
-    class NoIndexForLedgerException extends IOException {
-        NoIndexForLedgerException(String reason, Exception cause) {
-            super(reason, cause);
-        }
-    }
-
-    /**
-     * Represents a page of the index.
-     */
-    interface PageEntries {
-        LedgerEntryPage getLEP() throws IOException;
-        long getFirstEntry();
-        long getLastEntry();
-    }
-
-    /**
-     * Iterable over index pages -- returns PageEntries rather than individual
-     * entries because getEntries() above needs to be able to throw an IOException.
-     */
-    interface PageEntriesIterable extends AutoCloseable, Iterable<PageEntries> {}
-
-    PageEntriesIterable listEntries(long ledgerId) throws IOException;
-
-    OfLong getEntriesIterator(long ledgerId) throws IOException;
-
-    /**
-     * Represents summary of ledger metadata.
-     */
-    class LedgerIndexMetadata {
-        public final byte[] masterKey;
-        public final long size;
-        public final boolean fenced;
-        LedgerIndexMetadata(byte[] masterKey, long size, boolean fenced) {
-            this.masterKey = masterKey;
-            this.size = size;
-            this.fenced = fenced;
-        }
-
-        public String getMasterKeyHex() {
-            if (null == masterKey) {
-                return "NULL";
-            } else {
-                return bytes2Hex(masterKey);
-            }
-        }
-    }
-
-    LedgerIndexMetadata readLedgerIndexMetadata(long ledgerId) throws IOException;
 }

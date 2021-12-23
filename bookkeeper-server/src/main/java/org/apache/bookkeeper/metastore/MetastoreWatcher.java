@@ -17,9 +17,6 @@
  */
 package org.apache.bookkeeper.metastore;
 
-/**
- * Metastore watcher.
- */
 public interface MetastoreWatcher {
-    void process(MSWatchedEvent e);
+    public void process(MSWatchedEvent e);
 }

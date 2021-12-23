@@ -23,22 +23,22 @@ package org.apache.bookkeeper.util.collections;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.LongPredicate;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 /**
- * Concurrent hash map from primitive long to long.
+ * Concurrent hash map from primitive long to long
  *
- * <p>Provides similar methods as a {@code ConcurrentMap<K,V>} but since it's an open hash map with linear probing,
- * no node allocations are required to store the values.
- *
- * <p>Keys <strong>MUST</strong> be >= 0.
+ * Provides similar methods as a ConcurrentMap<K,V> but since it's an open hash map with linear probing, no node
+ * allocations are required to store the values.
+ * <p>
+ * Keys <strong>MUST</strong> be >= 0.
  */
 public class ConcurrentLongLongHashMap {
 
@@ -54,24 +54,15 @@ public class ConcurrentLongLongHashMap {
 
     private final Section[] sections;
 
-    /**
-     * A Long-Long BiConsumer.
-     */
-    public interface BiConsumerLong {
+    public static interface BiConsumerLong {
         void accept(long key, long value);
     }
 
-    /**
-     * A Long-Long function.
-     */
-    public interface LongLongFunction {
+    public static interface LongLongFunction {
         long apply(long key);
     }
 
-    /**
-     * A Long-Long predicate.
-     */
-    public interface LongLongPredicate {
+    public static interface LongLongPredicate {
         boolean test(long key, long value);
     }
 
@@ -202,7 +193,7 @@ public class ConcurrentLongLongHashMap {
     }
 
     /**
-     * Remove an existing entry if found.
+     * Remove an existing entry if found
      *
      * @param key
      * @return the value associated with the key or -1 if key was not present
@@ -242,7 +233,7 @@ public class ConcurrentLongLongHashMap {
         return removedCount;
     }
 
-    private Section getSection(long hash) {
+    private final Section getSection(long hash) {
         // Use 32 msb out of long to get the section
         final int sectionIdx = (int) (hash >>> 32) & (sections.length - 1);
         return sections[sectionIdx];
@@ -285,9 +276,9 @@ public class ConcurrentLongLongHashMap {
     @SuppressWarnings("serial")
     private static final class Section extends StampedLock {
         // Keys and values are stored interleaved in the table array
-        private volatile long[] table;
+        private long[] table;
 
-        private volatile int capacity;
+        private int capacity;
         private volatile int size;
         private int usedBuckets;
         private int resizeThreshold;
@@ -682,11 +673,9 @@ public class ConcurrentLongLongHashMap {
                 }
             }
 
+            capacity = newCapacity;
             table = newTable;
             usedBuckets = size;
-            // Capacity needs to be updated after the values, so that we won't see
-            // a capacity value bigger than the actual array size
-            capacity = newCapacity;
             resizeThreshold = (int) (capacity * MapFillFactor);
         }
 
@@ -711,22 +700,22 @@ public class ConcurrentLongLongHashMap {
     private static final long HashMixer = 0xc6a4a7935bd1e995L;
     private static final int R = 47;
 
-    static final long hash(long key) {
+    final static long hash(long key) {
         long hash = key * HashMixer;
         hash ^= hash >>> R;
         hash *= HashMixer;
         return hash;
     }
 
-    static final int signSafeMod(long n, int max) {
-        return (int) (n & (max - 1)) << 1;
+    static final int signSafeMod(long n, int Max) {
+        return (int) (n & (Max - 1)) << 1;
     }
 
-    private static int alignToPowerOfTwo(int n) {
+    private static final int alignToPowerOfTwo(int n) {
         return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
     }
 
-    private static void checkBiggerEqualZero(long n) {
+    private static final void checkBiggerEqualZero(long n) {
         if (n < 0L) {
             throw new IllegalArgumentException("Keys and values must be >= 0");
         }

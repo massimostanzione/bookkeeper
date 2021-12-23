@@ -1,3 +1,5 @@
+package org.apache.bookkeeper.bookie;
+
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -18,28 +20,27 @@
  * under the License.
  *
  */
-package org.apache.bookkeeper.bookie;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 import java.util.Enumeration;
 
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.junit.Test;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.junit.Assert;
+import org.junit.Test;
+
+import static org.junit.Assert.*;
+
 /**
- * This class tests that index corruption cases.
+ * This class tests that index corruption cases
  */
 public class IndexCorruptionTest extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(IndexCorruptionTest.class);
+    private final static Logger LOG = LoggerFactory.getLogger(IndexCorruptionTest.class);
 
     DigestType digestType;
 
@@ -55,7 +56,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
     public void testNoSuchLedger() throws Exception {
         LOG.debug("Testing NoSuchLedger");
 
-        SyncThread syncThread = ((BookieImpl) serverByIndex(0).getBookie()).syncThread;
+        SyncThread syncThread = bs.get(0).getBookie().syncThread;
         syncThread.suspendSync();
         // Create a ledger
         LedgerHandle lh = bkc.createLedger(1, 1, digestType, "".getBytes());
@@ -67,7 +68,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
         String dummyMsg = "NoSuchLedger";
         int numMsgs = 3;
         LedgerHandle wlh = bkc.createLedger(1, 1, digestType, "".getBytes());
-        for (int i = 0; i < numMsgs; i++) {
+        for (int i=0; i<numMsgs; i++) {
             wlh.addEntry(dummyMsg.getBytes());
         }
 
@@ -86,7 +87,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
             LedgerEntry e = seq.nextElement();
             assertEquals(entryId, e.getEntryId());
 
-            assertArrayEquals(dummyMsg.getBytes(), e.getEntry());
+            Assert.assertArrayEquals(dummyMsg.getBytes(), e.getEntry());
             ++entryId;
         }
         assertEquals(entryId, numMsgs);
@@ -96,7 +97,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
     public void testEmptyIndexPage() throws Exception {
         LOG.debug("Testing EmptyIndexPage");
 
-        SyncThread syncThread = ((BookieImpl) serverByIndex(0).getBookie()).syncThread;
+        SyncThread syncThread = bs.get(0).getBookie().syncThread;
         assertNotNull("Not found SyncThread.", syncThread);
 
         syncThread.suspendSync();
@@ -109,7 +110,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
         // write two page entries to ledger 2
         int numMsgs = 2 * pageSize / 8;
         LedgerHandle lh2 = bkc.createLedger(1, 1, digestType, "".getBytes());
-        for (int i = 0; i < numMsgs; i++) {
+        for (int i=0; i<numMsgs; i++) {
             lh2.addEntry(dummyMsg.getBytes());
         }
 
@@ -124,7 +125,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
         LedgerHandle newLh1 = bkc.openLedger(lh1.getId(), digestType, "".getBytes());
 
         // write another 3 entries to ledger 2
-        for (int i = 0; i < 3; i++) {
+        for (int i=0; i<3; i++) {
             lh2.addEntry(dummyMsg.getBytes());
         }
 
@@ -144,7 +145,7 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
             LedgerEntry e = seq.nextElement();
             assertEquals(entryId, e.getEntryId());
 
-            assertArrayEquals(dummyMsg.getBytes(), e.getEntry());
+            Assert.assertArrayEquals(dummyMsg.getBytes(), e.getEntry());
             ++entryId;
         }
         assertEquals(entryId, numMsgs);

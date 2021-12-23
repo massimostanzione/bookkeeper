@@ -11,7 +11,7 @@ You can install BookKeeper either by [downloading](#download) a [GZipped](http:/
 ## Requirements
 
 * [Unix environment](http://www.opengroup.org/unix)
-* [Java Development Kit 1.8](http://www.oracle.com/technetwork/java/javase/downloads/index.html) or later
+* [Java Development Kit 1.6](http://www.oracle.com/technetwork/java/javase/downloads/index.html) or later
 * [Maven 3.0](https://maven.apache.org/install.html) or later
 
 ## Download
@@ -44,12 +44,6 @@ Once you have the BookKeeper on your local machine, either by [downloading](#dow
 $ mvn package
 ```
 
-Since 4.8.0, bookkeeper introduces `table service`. If you would like to build and tryout table service, you can build it with `stream` profile.
-
-```shell
-$ mvn package -Dstream
-```
-
 > You can skip tests by adding the `-DskipTests` flag when running `mvn package`.
 
 ### Useful Maven commands
@@ -60,15 +54,13 @@ Command | Action
 :-------|:------
 `mvn clean` | Removes build artifacts
 `mvn compile` | Compiles JAR files from Java sources
-`mvn compile spotbugs:spotbugs` | Compile using the Maven [SpotBugs](https://github.com/spotbugs/spotbugs-maven-plugin) plugin
+`mvn compile findbugs:findbugs` | Compile using the Maven [FindBugs](http://gleclaire.github.io/findbugs-maven-plugin) plugin
 `mvn install` | Install the BookKeeper JAR locally in your local Maven cache (usually in the `~/.m2` directory)
 `mvn deploy` | Deploy the BookKeeper JAR to the Maven repo (if you have the proper credentials)
 `mvn verify` | Performs a wide variety of verification and validation tasks
 `mvn apache-rat:check` | Run Maven using the [Apache Rat](http://creadur.apache.org/rat/apache-rat-plugin/) plugin
 `mvn compile javadoc:aggregate` | Build Javadocs locally
-`mvn -am -pl bookkeeper-dist/server package` | Build a server distribution using the Maven [Assembly](http://maven.apache.org/plugins/maven-assembly-plugin/) plugin
-
-> You can enable `table service` by adding the `-Dstream` flag when running above commands.
+`mvn package assembly:single` | Build a complete distribution using the Maven [Assembly](http://maven.apache.org/plugins/maven-assembly-plugin/) plugin
 
 ## Package directory
 

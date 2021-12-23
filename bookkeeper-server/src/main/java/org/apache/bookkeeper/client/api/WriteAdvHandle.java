@@ -26,10 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience.Public;
 import org.apache.bookkeeper.common.annotation.InterfaceStability.Unstable;
-<<<<<<< HEAD
-=======
-import org.apache.bookkeeper.common.concurrent.FutureUtils;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
 /**
  * Provide write access to a ledger. Using WriteAdvHandler the writer MUST explictly set an entryId. Beware that the
@@ -42,70 +38,22 @@ import org.apache.bookkeeper.common.concurrent.FutureUtils;
  */
 @Public
 @Unstable
-<<<<<<< HEAD
 public interface WriteAdvHandle extends ReadHandle {
-=======
-public interface WriteAdvHandle extends ReadHandle, ForceableHandle {
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     /**
      * Add entry asynchronously to an open ledger.
      *
      * @param entryId entryId to be added
      * @param data array of bytes to be written
-<<<<<<< HEAD
-     * @return an handle to the result, in case of success it will return the same value of param entryId.
-=======
-     *             do not reuse the buffer, bk-client will release it appropriately.
      * @return an handle to the result, in case of success it will return the same value of param entryId.
      */
-    default CompletableFuture<Long> writeAsync(final long entryId, final ByteBuffer data) {
-        return writeAsync(entryId, Unpooled.wrappedBuffer(data));
-    }
-
-    /**
-     * Add entry synchronously to an open ledger.
-     *
-     * @param entryId entryId to be added
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @return the same value of param entryId.
-     */
-    default long write(final long entryId, final ByteBuffer data)
-            throws BKException, InterruptedException {
+    default CompletableFuture<Long> write(final long entryId, final ByteBuffer data) {
         return write(entryId, Unpooled.wrappedBuffer(data));
     }
 
     /**
      * Add entry asynchronously to an open ledger.
      *
-     * @param entryId entryId to be added.
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @return an handle to the result, in case of success it will return the same value of param {@code entryId}.
-     */
-    default CompletableFuture<Long> writeAsync(final long entryId, final byte[] data) {
-        return writeAsync(entryId, Unpooled.wrappedBuffer(data));
-    }
-
-    /**
-     * Add entry synchronously to an open ledger.
-     *
-     * @param entryId entryId to be added.
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @return same value of param {@code entryId}.
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
-     */
-    default long write(final long entryId, final byte[] data)
-            throws BKException, InterruptedException {
-        return write(entryId, Unpooled.wrappedBuffer(data));
-    }
-
-    /**
-     * Add entry asynchronously to an open ledger.
-     *
-<<<<<<< HEAD
      * @param entryId entryId to be added.
      * @param data array of bytes to be written
      * @return an handle to the result, in case of success it will return the same value of param {@code entryId}.
@@ -124,31 +72,6 @@ public interface WriteAdvHandle extends ReadHandle, ForceableHandle {
      * @return an handle to the result, in case of success it will return the same value of param {@code entryId}.
      */
     default CompletableFuture<Long> write(final long entryId, final byte[] data, int offset, int length) {
-=======
-     * @param entryId entryId to  be added.
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @param offset the offset of the bytes array
-     * @param length the length to data to write
-     * @return an handle to the result, in case of success it will return the same value of param {@code entryId}.
-     */
-    default CompletableFuture<Long> writeAsync(final long entryId, final byte[] data, int offset, int length) {
-        return writeAsync(entryId, Unpooled.wrappedBuffer(data, offset, length));
-    }
-
-    /**
-     * Add entry synchronously to an open ledger.
-     *
-     * @param entryId entryId to  be added.
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @param offset the offset of the bytes array
-     * @param length the length to data to write
-     * @return the same value of param {@code entryId}.
-     */
-    default long write(final long entryId, final byte[] data, int offset, int length)
-            throws BKException, InterruptedException {
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         return write(entryId, Unpooled.wrappedBuffer(data, offset, length));
     }
 
@@ -157,20 +80,8 @@ public interface WriteAdvHandle extends ReadHandle, ForceableHandle {
      *
      * @param entryId entryId to be added
      * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
      * @return an handle to the result, in case of success it will return the same value of param entryId
      */
-    CompletableFuture<Long> writeAsync(long entryId, ByteBuf data);
+    CompletableFuture<Long> write(final long entryId, final ByteBuf data);
 
-    /**
-     * Add entry asynchronously to an open ledger.
-     *
-     * @param entryId entryId to be added
-     * @param data array of bytes to be written
-     *             do not reuse the buffer, bk-client will release it appropriately.
-     * @return the same value of param entryId
-     */
-    default long write(long entryId, ByteBuf data) throws BKException, InterruptedException {
-        return FutureUtils.<Long, BKException>result(writeAsync(entryId, data), BKException.HANDLER);
-    }
 }

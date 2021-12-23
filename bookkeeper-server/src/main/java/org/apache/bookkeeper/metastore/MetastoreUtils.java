@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MetastoreUtils {
 
-    private static final Logger logger = LoggerFactory.getLogger(MetastoreUtils.class);
+    protected final static Logger logger = LoggerFactory.getLogger(MetastoreUtils.class);
 
     static class MultiMetastoreCallback<T> implements MetastoreCallback<T> {
 

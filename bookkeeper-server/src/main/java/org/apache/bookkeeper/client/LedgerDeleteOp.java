@@ -30,15 +30,16 @@ import org.apache.bookkeeper.client.SyncCallbackUtils.SyncDeleteCallback;
 import org.apache.bookkeeper.client.api.DeleteBuilder;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.util.MathUtils;
+import org.apache.bookkeeper.util.OrderedSafeExecutor.OrderedSafeGenericCallback;
 import org.apache.bookkeeper.versioning.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Encapsulates asynchronous ledger delete operation.
+ * Encapsulates asynchronous ledger delete operation
  *
  */
-class LedgerDeleteOp {
+class LedgerDeleteOp extends OrderedSafeGenericCallback<Void> {
 
     static final Logger LOG = LoggerFactory.getLogger(LedgerDeleteOp.class);
 
@@ -50,7 +51,7 @@ class LedgerDeleteOp {
     final OpStatsLogger deleteOpLogger;
 
     /**
-     * Constructor.
+     * Constructor
      *
      * @param bk
      *            BookKeeper object
@@ -61,31 +62,36 @@ class LedgerDeleteOp {
      * @param ctx
      *            optional control object
      */
-    LedgerDeleteOp(BookKeeper bk, BookKeeperClientStats clientStats,
-                   long ledgerId, DeleteCallback cb, Object ctx) {
+    LedgerDeleteOp(BookKeeper bk, long ledgerId, DeleteCallback cb, Object ctx) {
+        super(bk.getMainWorkerPool(), ledgerId);
         this.bk = bk;
         this.ledgerId = ledgerId;
         this.cb = cb;
         this.ctx = ctx;
         this.startTime = MathUtils.nowInNano();
-        this.deleteOpLogger = clientStats.getDeleteOpLogger();
+        this.deleteOpLogger = bk.getDeleteOpLogger();
     }
 
     /**
-     * Initiates the operation.
+     * Initiates the operation
      */
     public void initiate() {
         // Asynchronously delete the ledger from meta manager
         // When this completes, it will invoke the callback method below.
-        bk.getLedgerManager().removeLedgerMetadata(ledgerId, Version.ANY)
-            .whenCompleteAsync((ignore, exception) -> {
-                    if (exception != null) {
-                        deleteOpLogger.registerFailedEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);
-                    } else {
-                        deleteOpLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);
-                    }
-                    cb.deleteComplete(BKException.getExceptionCode(exception), this.ctx);
-                }, bk.getMainWorkerPool().chooseThread(ledgerId));
+        bk.getLedgerManager().removeLedgerMetadata(ledgerId, Version.ANY, this);
+    }
+
+    /**
+     * Implements Delete Callback.
+     */
+    @Override
+    public void safeOperationComplete(int rc, Void result) {
+        if (BKException.Code.OK != rc) {
+            deleteOpLogger.registerFailedEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);
+        } else {
+            deleteOpLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);
+        }
+        cb.deleteComplete(rc, this.ctx);
     }
 
     @Override
@@ -129,7 +135,7 @@ class LedgerDeleteOp {
                 cb.deleteComplete(BKException.Code.IncorrectParameterException, null);
                 return;
             }
-            LedgerDeleteOp op = new LedgerDeleteOp(bk, bk.getClientCtx().getClientStats(), ledgerId, cb, null);
+            LedgerDeleteOp op = new LedgerDeleteOp(bk, ledgerId, cb, null);
             ReentrantReadWriteLock closeLock = bk.getCloseLock();
             closeLock.readLock().lock();
             try {

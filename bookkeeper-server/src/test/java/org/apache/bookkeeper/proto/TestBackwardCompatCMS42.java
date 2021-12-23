@@ -20,11 +20,13 @@
  */
 package org.apache.bookkeeper.proto;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import com.google.protobuf.ByteString;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.protobuf.ExtensionRegistry;
 
 import io.netty.channel.Channel;
@@ -32,31 +34,23 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-
-import org.apache.bookkeeper.auth.AuthProviderFactoryFactory;
 import org.apache.bookkeeper.auth.ClientAuthProvider;
-import org.apache.bookkeeper.auth.TestAuth;
-import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieSocketAddress;
-import org.apache.bookkeeper.proto.BookieProtocol.AuthRequest;
-import org.apache.bookkeeper.proto.BookieProtocol.AuthResponse;
-import org.apache.bookkeeper.proto.BookieProtocol.ReadRequest;
-import org.apache.bookkeeper.proto.BookieProtocol.Request;
-import org.apache.bookkeeper.proto.BookieProtocol.Response;
-import org.apache.bookkeeper.proto.BookkeeperProtocol.AuthMessage;
-import org.apache.bookkeeper.stats.NullStatsLogger;
-import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.junit.Test;
+import org.apache.bookkeeper.util.OrderedSafeExecutor;
+import org.apache.bookkeeper.auth.TestAuth;
+import org.apache.bookkeeper.auth.AuthProviderFactoryFactory;
 
-/**
- * Test backward compatibility.
- */
+import org.apache.bookkeeper.proto.BookieProtocol.*;
+import org.apache.bookkeeper.proto.BookkeeperProtocol.AuthMessage;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ArrayBlockingQueue;
+
+import static org.junit.Assert.*;
+
 public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
+    static final Logger LOG = LoggerFactory.getLogger(TestBackwardCompatCMS42.class);
 
     private static final byte[] SUCCESS_RESPONSE = {1};
     private static final byte[] FAILURE_RESPONSE = {2};
@@ -65,7 +59,7 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
     ExtensionRegistry extRegistry = ExtensionRegistry.newInstance();
     ClientAuthProvider.Factory authProvider;
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    OrderedExecutor executor = OrderedExecutor.newBuilder().numThreads(1).name("TestBackwardCompatClient")
+    OrderedSafeExecutor executor = OrderedSafeExecutor.newBuilder().numThreads(1).name("TestBackwardCompatClient")
             .build();
 
     public TestBackwardCompatCMS42() throws Exception {
@@ -88,7 +82,7 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
         builder.setPayload(ByteString.copyFrom(PAYLOAD_MESSAGE));
         final AuthMessage authMessage = builder.build();
 
-        CompatClient42 client = newCompatClient(bookie1.getBookieId());
+        CompatClient42 client = newCompatClient(bookie1.getLocalAddress());
 
         Request request = new AuthRequest(BookieProtocol.CURRENT_PROTOCOL_VERSION, authMessage);
         client.sendRequest(request);
@@ -109,14 +103,14 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
             .setAuthPluginName(TestAuth.TEST_AUTH_PROVIDER_PLUGIN_NAME);
         builder.setPayload(ByteString.copyFrom(PAYLOAD_MESSAGE));
         final AuthMessage authMessage = builder.build();
-        CompatClient42 client = newCompatClient(bookie1.getBookieId());
+        CompatClient42 client = newCompatClient(bookie1.getLocalAddress());
 
         Request request = new AuthRequest(BookieProtocol.CURRENT_PROTOCOL_VERSION, authMessage);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3 ; i++) {
             client.sendRequest(request);
             Response response = client.takeResponse();
             assertTrue("Should be auth response", response instanceof AuthResponse);
-            AuthResponse authResponse = (AuthResponse) response;
+            AuthResponse authResponse = (AuthResponse)response;
             assertEquals("Should have succeeded",
                          response.getErrorCode(), BookieProtocol.EOK);
             byte[] type = authResponse.getAuthMessage()
@@ -142,14 +136,14 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
             .setAuthPluginName(TestAuth.TEST_AUTH_PROVIDER_PLUGIN_NAME);
         builder.setPayload(ByteString.copyFrom(PAYLOAD_MESSAGE));
         final AuthMessage authMessage = builder.build();
-        CompatClient42 client = newCompatClient(bookie1.getBookieId());
+        CompatClient42 client = newCompatClient(bookie1.getLocalAddress());
 
         Request request = new AuthRequest(BookieProtocol.CURRENT_PROTOCOL_VERSION, authMessage);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3 ; i++) {
             client.sendRequest(request);
             Response response = client.takeResponse();
             assertTrue("Should be auth response", response instanceof AuthResponse);
-            AuthResponse authResponse = (AuthResponse) response;
+            AuthResponse authResponse = (AuthResponse)response;
             assertEquals("Should have succeeded",
                          response.getErrorCode(), BookieProtocol.EOK);
             byte[] type = authResponse.getAuthMessage()
@@ -165,7 +159,7 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
         }
 
         client.sendRequest(new ReadRequest(BookieProtocol.CURRENT_PROTOCOL_VERSION,
-                                           1L, 1L, (short) 0, null));
+                                           1L, 1L, (short)0));
         Response response = client.takeResponse();
         assertEquals("Should have failed",
                      response.getErrorCode(), BookieProtocol.EUA);
@@ -173,13 +167,14 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
 
     // copy from TestAuth
     BookieServer startAndStoreBookie(ServerConfiguration conf) throws Exception {
-        return startAndAddBookie(conf).getServer();
+        bsConfs.add(conf);
+        BookieServer s = startBookie(conf);
+        bs.add(s);
+        return s;
     }
 
-    CompatClient42 newCompatClient(BookieId addr) throws Exception {
-        ClientConfiguration conf = new ClientConfiguration();
-        conf.setUseV2WireProtocol(true);
-        return new CompatClient42(conf, executor, eventLoopGroup, addr, authProvider, extRegistry);
+    CompatClient42 newCompatClient(BookieSocketAddress addr) throws Exception {
+        return new CompatClient42(executor, eventLoopGroup, addr, authProvider, extRegistry);
     }
 
     // extending PerChannelBookieClient to get the pipeline factory
@@ -188,21 +183,11 @@ public class TestBackwardCompatCMS42 extends BookKeeperClusterTestCase {
         Channel channel;
         final CountDownLatch connected = new CountDownLatch(1);
 
-        CompatClient42(ClientConfiguration conf,
-                       OrderedExecutor executor,
-                       EventLoopGroup eventLoopGroup,
-                       BookieId addr,
+        CompatClient42(OrderedSafeExecutor executor, EventLoopGroup eventLoopGroup,
+                       BookieSocketAddress addr,
                        ClientAuthProvider.Factory authProviderFactory,
                        ExtensionRegistry extRegistry) throws Exception {
-            super(conf,
-                executor,
-                eventLoopGroup,
-                addr,
-                NullStatsLogger.INSTANCE,
-                authProviderFactory,
-                extRegistry,
-                null,
-                BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+            super(executor, eventLoopGroup, addr, authProviderFactory, extRegistry);
 
             state = ConnectionState.CONNECTING;
             ChannelFuture future = connect();

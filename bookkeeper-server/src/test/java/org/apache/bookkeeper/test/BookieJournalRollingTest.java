@@ -20,29 +20,32 @@
  */
 package org.apache.bookkeeper.test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.Enumeration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.conf.TestBKConfiguration;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.junit.Assert.*;
+
 /**
- * This class tests that bookie rolling journals.
+ * This class tests that bookie rolling journals
  */
 public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(BookieJournalRollingTest.class);
+    private final static Logger LOG = LoggerFactory.getLogger(BookieJournalRollingTest.class);
 
     private final DigestType digestType;
 
@@ -91,7 +94,7 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         }
         String msg = msgSB.toString();
 
-        final CountDownLatch completeLatch = new CountDownLatch(numMsgs * lhs.length);
+        final CountDownLatch completeLatch = new CountDownLatch(numMsgs*lhs.length);
         final AtomicInteger rc = new AtomicInteger(BKException.Code.OK);
 
         // Write all of the entries for all of the ledgers
@@ -147,7 +150,7 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
                     StringBuilder sb = new StringBuilder();
                     sb.append(ledgerIds[j]).append('-').append(entryId).append('-')
                       .append(msg);
-                    assertArrayEquals(sb.toString().getBytes(), e.getEntry());
+                    Assert.assertArrayEquals(sb.toString().getBytes(), e.getEntry());
                     entryId++;
                 }
                 assertEquals(entryId - 1, end);
@@ -156,16 +159,12 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
                 end = start + read - 1;
             }
         }
-
-        for (LedgerHandle lh : lhs) {
-            lh.close();
-        }
     }
 
     /**
-     * This test writes enough ledger entries to roll over the journals.
+     * This test writes enough ledger entries to roll over the journals
      *
-     * <p>It will then keep only 1 journal file before last marked journal
+     * It will then keep only 1 journal file before last marked journal
      *
      * @throws Exception
      */
@@ -177,7 +176,7 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         // Write enough ledger entries so that we roll over journals
         LedgerHandle[] lhs = writeLedgerEntries(4, 1024, 1024);
         long[] ledgerIds = new long[lhs.length];
-        for (int i = 0; i < lhs.length; i++) {
+        for (int i=0; i<lhs.length; i++) {
             ledgerIds[i] = lhs[i].getId();
             lhs[i].close();
         }
@@ -186,7 +185,7 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         Thread.sleep(2000);
 
         // verify that we only keep at most journal files
-        for (File journalDir : bookieJournalDirs()) {
+        for (File journalDir : tmpDirs) {
             File[] journals = journalDir.listFiles();
             int numJournals = 0;
             for (File f : journals) {
@@ -206,7 +205,7 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
 
     /**
      * This test writes enough ledger entries to roll over the journals
-     * without sync up.
+     * without sync up
      *
      * @throws Exception
      */
@@ -217,17 +216,16 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         }
 
         // set flush interval to a large value
+        ServerConfiguration newConf = TestBKConfiguration.newServerConfiguration();
+        newConf.setFlushInterval(999999999);
+        newConf.setAllowEphemeralPorts(false);
         // restart bookies
-        restartBookies(c -> {
-                c.setFlushInterval(999999999);
-                c.setAllowEphemeralPorts(false);
-                return c;
-            });
+        restartBookies(newConf);
 
         // Write enough ledger entries so that we roll over journals
         LedgerHandle[] lhs = writeLedgerEntries(4, 1024, 1024);
         long[] ledgerIds = new long[lhs.length];
-        for (int i = 0; i < lhs.length; i++) {
+        for (int i=0; i<lhs.length; i++) {
             ledgerIds[i] = lhs[i].getId();
             lhs[i].close();
         }
@@ -235,13 +233,13 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         // ledger indexes are not flushed
         // and after bookies restarted, journals will be relayed
         // ensure that we can still read the entries
-        restartBookies();
+        restartBookies(newConf);
         validLedgerEntries(ledgerIds, 1024, 1024);
     }
 
     /**
      * This test writes enough ledger entries to roll over the journals
-     * without sync up.
+     * without sync up
      *
      * @throws Exception
      */
@@ -257,12 +255,11 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
         Thread.sleep(3 * baseConf.getFlushInterval());
 
         // restart bookies with flush interval set to a large value
+        ServerConfiguration newConf = TestBKConfiguration.newServerConfiguration();
+        newConf.setFlushInterval(999999999);
+        newConf.setAllowEphemeralPorts(false);
         // restart bookies
-        restartBookies(c -> {
-                c.setFlushInterval(999999999);
-                c.setAllowEphemeralPorts(false);
-                return c;
-            });
+        restartBookies(newConf);
 
         // Write entries again to let them existed in journal
         writeLedgerEntries(lhs, 1024, 10);
@@ -272,10 +269,10 @@ public class BookieJournalRollingTest extends BookKeeperClusterTestCase {
             bkc.deleteLedger(lh.getId());
         }
         // wait for gc
-        Thread.sleep(2 * confByIndex(0).getGcWaitTime());
+        Thread.sleep(2 * newConf.getGcWaitTime());
 
         // restart bookies again to trigger replaying journal
-        restartBookies();
+        restartBookies(newConf);
     }
 
 }

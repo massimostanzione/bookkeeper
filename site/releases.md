@@ -3,52 +3,15 @@ title: Apache BookKeeper&trade; Releases
 layout: community
 ---
 
-{% capture mirror_url %}https://www.apache.org/dyn/closer.lua/bookkeeper{% endcapture %}
-{% capture latest_source_url %}{{ mirror_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-{{ site.latest_release }}-src.tar.gz{% endcapture %}
-{% capture latest_bin_url %}{{ mirror_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-server-{{ site.latest_release }}-bin.tar.gz{% endcapture %}
-{% capture dist_url %}https://www.apache.org/dist/bookkeeper{% endcapture %}
-{% capture latest_source_dist_url %}{{ dist_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-{{ site.latest_release }}-src.tar.gz{% endcapture %}
-{% capture latest_bin_dist_url %}{{ dist_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-server-{{ site.latest_release }}-bin.tar.gz{% endcapture %}
+## Download
 
-{% capture archive_url %}https://archive.apache.org/dist/bookkeeper{% endcapture %}
-{% capture stable_source_url %}{{ archive_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-{{ site.stable_release }}-src.tar.gz{% endcapture %}
-{% capture stable_bin_url %}{{ archive_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-server-{{ site.stable_release }}-bin.tar.gz{% endcapture %}
+{{ site.latest_release }} is latest release. The current stable version is {{ site.stable_release }}.
 
-Version **{{ site.latest_release }}** is the [latest release](#latest-release) of BookKeeper. The current [stable version](#latest-stable-release) is **{{ site.stable_release }}**.
+Releases are available to download from Apache mirrors: [Download](http://www.apache.org/dyn/closer.cgi/bookkeeper)
 
-> You can verify your download by following these [procedures](http://www.apache.org/info/verification.html) and using these [KEYS](https://www.apache.org/dist/bookkeeper/KEYS).
+You can verify your download by following these [procedures](http://www.apache.org/info/verification.html) and using these [KEYS](https://dist.apache.org/repos/dist/release/bookkeeper/KEYS).
 
-If you want to download older, archived releases, they are available in the [Apache archive](http://archive.apache.org/dist/bookkeeper/).
-
-## Latest release (version {{ site.latest_release }})
-<a name="latest-release"></a>
-
-Release | Link | Crypto files
-:-------|:-----|:------------
-Source | [bookkeeper-{{ site.latest_release }}-src.tar.gz]({{ latest_source_url }}) | [asc]({{ latest_source_dist_url }}.asc), [sha512]({{ latest_source_dist_url }}.sha512)
-Binary | [bookkeeper-server-{{ site.latest_release }}-bin.tar.gz]({{ latest_bin_url }}) | [asc]({{ latest_bin_dist_url }}.asc), [sha512]({{ latest_bin_dist_url }}.sha512)
-
-## Latest stable release (version {{ site.stable_release }})
-<a name="latest-stable-release"></a>
-
-Release | Link | Crypto files
-:-------|:-----|:------------
-Source | [bookkeeper-{{ site.stable_release }}-src.tar.gz]({{ stable_source_url }}) | [asc]({{ stable_source_url }}.asc), [sha1]({{ stable_source_url }}.sha1)
-Binary | [bookkeeper-server-{{ site.stable_release }}-bin.tar.gz]({{ stable_bin_url }}) | [asc]({{ stable_bin_url }}.asc), [sha1]({{ stable_bin_url }}.sha1)
-
-## Recent releases
-
-{% for version in site.versions %}{% if version != site.latest_release %}
-{% capture root_url %}https://archive.apache.org/dist/bookkeeper/bookkeeper-{{ version }}{% endcapture %}
-{% capture src_root %}{{ root_url }}/bookkeeper-{{ version }}-src.tar.gz{% endcapture %}
-{% capture bin_root %}{{ root_url }}/bookkeeper-server-{{ version }}-bin.tar.gz{% endcapture %}
-### Version {{ version }}
-
-Release | Link | Crypto files
-:-------|:-----|:------------
-Source | [bookkeeper-{{ version }}-src.tar.gz]({{ src_root }}) | [asc]({{ src_root }}.asc), [sha1]({{ src_root }}.sha1)
-Binary | [bookkeeper-server-{{ version }}-bin.tar.gz]({{ bin_root }}) | [asc]({{ bin_root }}.asc), [sha1]({{ bin_root }}.sha1)
-{% endif %}{% endfor %}
+If you want to download older releases, they are available in the [Apache archive](http://archive.apache.org/dist/bookkeeper/).
 
 ## Getting Started
 
@@ -63,178 +26,6 @@ Client Guide | API docs
 [The DistributedLog Library]({{ site.baseurl }}docs/latest/api/distributedlog-api) | [Javadoc](https://distributedlog.io/docs/latest/api/java)
 
 ## News
-
-### 31 May, 2021 Release 4.14.1 available
-
-This is the 27th release of Apache BookKeeper !
-See [BookKeeper 4.14.1 Release Notes](../docs/4.14.1/overview/releaseNotes) for details.
-
-### 25 May, 2021 Release 4.14.0 available
-
-This is the 26th release of Apache BookKeeper !
-See [BookKeeper 4.14.0 Release Notes](../docs/4.14.0/overview/releaseNotes) for details.
-
-### 25 February, 2021 Release 4.13.0 available
-
-This is the 25th release of Apache BookKeeper !
-See [BookKeeper 4.13.0 Release Notes](../docs/4.13.0/overview/releaseNotes) for details.
-
-### 11 January, 2021 Release 4.12.1 available
-
-This is the 24th release of Apache BookKeeper !
-
-See [BookKeeper 4.12.1 Release Notes](../docs/4.12.1/overview/releaseNotes) for details.
-
-### 11 November, 2020 Release 4.12.0 available
-
-This is the 23th release of Apache BookKeeper !
-
-See [BookKeeper 4.12.0 Release Notes](../docs/4.12.0/overview/releaseNotes) for details.
-
-### 20 October, 2020 Release 4.11.1 available
-
-This is the 22th release of Apache BookKeeper !
-
-See [BookKeeper 4.11.1 Release Notes](../docs/4.11.1/overview/releaseNotes) for details.
-
-### 10 July, 2020  Release 4.11.0 available
-
-This is the 21th release of Apache BookKeeper !
-
-See [BookKeeper 4.11.0 Release Notes](../docs/4.11.0/overview/releaseNotes) for details.
-
-### 6 November, 2019 Release 4.10.0 available
-
-This is the 20th release of Apache BookKeeper!
-
-The 4.10.0 release incorporates hundreds of bug fixes, improvements, and features since previous major release, 4.9.0.
-
-See [BookKeeper 4.10.0 Release Notes](../docs/4.10.0/overview/releaseNotes) for details.
-
-### 16 May, 2019 Release 4.9.2 available
-
-This is the 19th release of Apache BookKeeper !
-
-The 4.9.2 release is a bugfix release which fixes a couple of issues reported from users of 4.9.1.
-
-See [BookKeeper 4.9.2 Release Notes](../docs/4.9.2/overview/releaseNotes) for details.
-
-### 7 April, 2019 Release 4.9.1 available
-
-This is the 18th release of Apache BookKeeper !
-
-The 4.9.1 release is a bugfix release which fixes a couple of issues reported from users of 4.9.0.
-
-See [BookKeeper 4.9.1 Release Notes](../docs/4.9.1/overview/releaseNotes) for details.
-
-### 19 March, 2019 Release 4.8.2 available
-
-This is the 17th release of Apache BookKeeper!
-
-The 4.8.2 release is a bugfix release which fixes a couple of issues reported from users of 4.8.1.
-
-See [BookKeeper 4.8.2 Release Notes](../docs/4.8.2/overview/releaseNotes) for details.
-
-### 31 January, 2019 Release 4.9.0 available
-
-This is the 16th release of Apache BookKeeper!
-
-The 4.9.0 release incorporates hundreds of bug fixes, improvements, and features since previous major release, 4.8.0,
-which was released four months ago. It is a new milestone in Apache BookKeeper community.
-
-See [BookKeeper 4.9.0 Release Notes](../docs/4.9.0/overview/releaseNotes) for details.
-
-### 04 December, 2018 Release 4.7.3 available
-
-This is the 15th release of Apache BookKeeper!
-
-The 4.7.3 release is a bugfix release which fixes a bunch of issues reported from users of 4.7.2.
-
-See [BookKeeper 4.7.3 Release Notes](../docs/4.7.3/overview/releaseNotes) for details.
-
-### 22 November, 2018 Release 4.8.1 available
-
-This is the 14th release of Apache BookKeeper !
-
-The 4.8.1 release is a bugfix release which fixes a bunch of issues reported from users of 4.8.0.
-
-See [BookKeeper 4.8.1 Release Notes](../docs/4.8.1/overview/releaseNotes) for details.
-
-### 26 September, 2018 Release 4.8.0 available
-
-This is the 13th release of Apache BookKeeper !
-
-The 4.8.0 release incorporates hundreds of bug fixes, improvements, and features since previous major release, 4.7.0.
-It is a new big milestone in Apache BookKeeper community, this release include great new features, like Relaxed Durability, Stream Storage service and Multiple Active Entrylogs.
-
-See [BookKeeper 4.8.0 Release Notes](../docs/4.8.0/overview/releaseNotes) for details.
-
-### 29 August, 2018: Release 4.7.2 available
-
-This is the 12th release of Apache BookKeeper!
-
-The 4.7.2 release is a bugfix release which fixes a bunch of issues reported from users of 4.7.1. These fixes include
-bug fixes around DbLedgerStorage, failure handling around ensemble changes, bookie shutdown and such.
-
-See [BookKeeper 4.7.2 Release Notes](../docs/4.7.2/overview/releaseNotes) for details.
-
-
-### 19 June, 2018: Release 4.7.1 available
-
-This is the 11th release of Apache BookKeeper!
-
-The 4.7.1 release is a bugfix release which fixes a bunch of issues reported from users of 4.7.0. These fixes include
-bug fixes around ledger cache and object pooling, performance enhancement avoiding memory copies and such.
-
-See [BookKeeper 4.7.1 Release Notes](../docs/4.7.1/overview/releaseNotes) for details.
-
-
-### 17 April, 2018: Release 4.7.0 available
-
-This is the 10th release of Apache BookKeeper!
-
-The 4.7.0 release incorporates hundreds of bug fixes, improvements, and features since previous major release, 4.6.0,
-which was released four months ago. It is a big milestone in Apache BookKeeper community - Yahoo branch is fully merged
-back to upstream, and Apache Pulsar (incubating) starts using official BookKeeper release for its upcoming 2.0 release.
-
-It is also the first release of Apache DistributedLog after it is merged as sub modules of Apache BookKeeper.
-
-See [BookKeeper 4.7.0 Release Notes](../docs/4.7.0/overview/releaseNotes) for details.
-
-
-### 9 April, 2018: Release 4.6.2 available
-
-This is the ninth release of BookKeeper as an Apache Top Level Project!
-
-The 4.6.2 release is a bugfix release.
-
-See [BookKeeper 4.6.2 Release Notes](../docs/4.6.2/overview/releaseNotes) for details.
-
-
-### 30 January, 2018: Release 4.6.1 available
-
-This is the eighth release of BookKeeper as an Apache Top Level Project!
-
-The 4.6.1 release is a bugfix release.
-
-See [BookKeeper 4.6.1 Release Notes](../docs/4.6.1/overview/releaseNotes) for details.
-
-
-### 27 December, 2017: Release 4.6.0 available
-
-This is the seventh release of BookKeeper as an Apache Top Level Project!
-
-The 4.6.0 release incorporates new fixes, improvements, and features since previous major release 4.5.0.
-
-See [BookKeeper 4.6.0 Release Notes](../docs/4.6.0/overview/releaseNotes) for details.
-
-### 22 November, 2017: Release 4.5.1 available
-
-This is the sixth release of BookKeeper as an Apache Top Level Project!
-
-The 4.5.1 release is a bugfix release.
-
-See [BookKeeper 4.5.1 Release Notes](../docs/4.5.1/overview/releaseNotes) for details.
 
 ### 10 August, 2017: Release 4.5.0 available
 
@@ -329,3 +120,4 @@ See [BookKeeper 4.1.0 Release Notes]({{ site.baseurl }}archives/docs/r4.1.0/rele
 
 This is the first release of BookKeeper as a subproject of Zookeeper.
 See [BookKeeper 4.0.0 Release Notes]({{ site.baseurl }}archives/docs/r4.0.0/releaseNotes.html) for details.
+

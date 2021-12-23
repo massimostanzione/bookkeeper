@@ -17,15 +17,6 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
@@ -33,12 +24,16 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test try read last confirmed.
- */
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.Assert.*;
+
 public class TestTryReadLastConfirmed extends BookKeeperClusterTestCase {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestTryReadLastConfirmed.class);
+    static final Logger logger = LoggerFactory.getLogger(TestTryReadLastConfirmed.class);
 
     final DigestType digestType;
 
@@ -119,7 +114,7 @@ public class TestTryReadLastConfirmed extends BookKeeperClusterTestCase {
             ServerConfiguration[] confs = new ServerConfiguration[ensembleSize - 1];
             for (int j = 0; j < ensembleSize - 1; j++) {
                 int idx = (i + 1 + j) % ensembleSize;
-                confs[j] = killBookie(lh.getCurrentEnsemble().get(idx));
+                confs[j] = killBookie(lh.getLedgerMetadata().currentEnsemble.get(idx));
             }
 
             final AtomicBoolean success = new AtomicBoolean(false);
@@ -144,7 +139,8 @@ public class TestTryReadLastConfirmed extends BookKeeperClusterTestCase {
 
             // start the bookies
             for (ServerConfiguration conf : confs) {
-                startAndAddBookie(conf);
+                bs.add(startBookie(conf));
+                bsConfs.add(conf);
             }
         }
         lh.close();
@@ -163,7 +159,7 @@ public class TestTryReadLastConfirmed extends BookKeeperClusterTestCase {
             lh.addEntry(("data" + i).getBytes());
         }
         for (int i = 0; i < ensembleSize; i++) {
-            killBookie(lh.getCurrentEnsemble().get(i));
+            killBookie(lh.getLedgerMetadata().currentEnsemble.get(i));
         }
         final AtomicBoolean success = new AtomicBoolean(false);
         final AtomicInteger numCallbacks = new AtomicInteger(0);

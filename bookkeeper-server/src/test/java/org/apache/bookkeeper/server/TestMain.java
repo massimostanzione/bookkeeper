@@ -22,19 +22,16 @@ package org.apache.bookkeeper.server;
 import static org.apache.bookkeeper.server.Main.buildBookieServer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.whenNew;
 
 import java.io.IOException;
-
-import java.util.function.Supplier;
 import org.apache.bookkeeper.common.component.LifecycleComponentStack;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.bookkeeper.server.component.ServerLifecycleComponent;
 import org.apache.bookkeeper.server.conf.BookieConfiguration;
@@ -83,12 +80,8 @@ public class TestMain {
 
         BookieServer mockServer = PowerMockito.mock(BookieServer.class);
         whenNew(BookieServer.class)
-            .withArguments(any(ServerConfiguration.class), any(StatsLogger.class), any(Supplier.class))
+            .withArguments(any(ServerConfiguration.class), any(StatsLogger.class))
             .thenReturn(mockServer);
-
-        BookieSocketAddress bookieAddress = new BookieSocketAddress("127.0.0.1", 1281);
-        when(mockServer.getLocalAddress()).thenReturn(bookieAddress);
-        when(mockServer.getBookieId()).thenReturn(bookieAddress.toBookieId());
 
         LifecycleComponentStack stack = buildBookieServer(conf);
         assertEquals(3, stack.getNumComponents());
@@ -101,62 +94,6 @@ public class TestMain {
 
         stack.close();
         verify(mockServer, times(1)).shutdown();
-    }
-
-    @Test
-    public void testIgnoreExtraServerComponentsStartupFailures() throws Exception {
-        ServerConfiguration serverConf = new ServerConfiguration()
-            .setAutoRecoveryDaemonEnabled(false)
-            .setHttpServerEnabled(false)
-            .setExtraServerComponents(new String[] { "bad-server-component"})
-            .setIgnoreExtraServerComponentsStartupFailures(true);
-        BookieConfiguration conf = new BookieConfiguration(serverConf);
-
-        BookieServer mockServer = PowerMockito.mock(BookieServer.class);
-        whenNew(BookieServer.class)
-            .withArguments(any(ServerConfiguration.class), any(StatsLogger.class), any(Supplier.class))
-            .thenReturn(mockServer);
-
-        BookieSocketAddress bookieAddress = new BookieSocketAddress("127.0.0.1", 1281);
-        when(mockServer.getLocalAddress()).thenReturn(bookieAddress);
-        when(mockServer.getBookieId()).thenReturn(bookieAddress.toBookieId());
-
-        LifecycleComponentStack stack = buildBookieServer(conf);
-        assertEquals(2, stack.getNumComponents());
-
-        stack.start();
-        verify(mockServer, times(1)).start();
-
-        stack.stop();
-
-        stack.close();
-        verify(mockServer, times(1)).shutdown();
-    }
-
-    @Test
-    public void testExtraServerComponentsStartupFailures() throws Exception {
-        ServerConfiguration serverConf = new ServerConfiguration()
-            .setAutoRecoveryDaemonEnabled(false)
-            .setHttpServerEnabled(false)
-            .setExtraServerComponents(new String[] { "bad-server-component"})
-            .setIgnoreExtraServerComponentsStartupFailures(false);
-        BookieConfiguration conf = new BookieConfiguration(serverConf);
-
-        BookieServer mockServer = PowerMockito.mock(BookieServer.class);
-        whenNew(BookieServer.class)
-            .withArguments(any(ServerConfiguration.class), any(StatsLogger.class), any(Supplier.class))
-            .thenReturn(mockServer);
-
-        BookieSocketAddress bookieAddress = new BookieSocketAddress("127.0.0.1", 1281);
-        when(mockServer.getLocalAddress()).thenReturn(bookieAddress);
-        when(mockServer.getBookieId()).thenReturn(bookieAddress.toBookieId());
-
-        try {
-            buildBookieServer(conf);
-            fail("Should fail to start bookie server if `ignoreExtraServerComponentsStartupFailures` is set to false");
-        } catch (RuntimeException re) {
-            assertTrue(re.getCause() instanceof ClassNotFoundException);
-        }
     }
 
 }

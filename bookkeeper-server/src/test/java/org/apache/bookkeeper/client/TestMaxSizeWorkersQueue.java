@@ -19,24 +19,9 @@ package org.apache.bookkeeper.client;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-<<<<<<< HEAD
 
 import java.util.Enumeration;
 import java.util.concurrent.CountDownLatch;
-=======
-import static org.junit.Assert.fail;
-
-import com.google.common.collect.Lists;
-
-import java.util.Enumeration;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -46,13 +31,7 @@ import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Test;
 
-<<<<<<< HEAD
 
-=======
-/**
- * Test the maximum size of a worker queue.
- */
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 public class TestMaxSizeWorkersQueue extends BookKeeperClusterTestCase {
     DigestType digestType = DigestType.CRC32;
 
@@ -67,24 +46,14 @@ public class TestMaxSizeWorkersQueue extends BookKeeperClusterTestCase {
         baseConf.setMaxPendingAddRequestPerThread(1);
     }
 
-<<<<<<< HEAD
     @Test(timeout = 60000)
-=======
-    @Test
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     public void testReadRejected() throws Exception {
         LedgerHandle lh = bkc.createLedger(1, 1, digestType, new byte[0]);
         byte[] content = new byte[100];
 
-<<<<<<< HEAD
         final int N = 1000;
         // Write few entries
         for (int i = 0; i < N; i++) {
-=======
-        final int n = 1000;
-        // Write few entries
-        for (int i = 0; i < n; i++) {
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             lh.addEntry(content);
         }
 
@@ -106,11 +75,7 @@ public class TestMaxSizeWorkersQueue extends BookKeeperClusterTestCase {
 
         final AtomicInteger rcSecondReadOperation = new AtomicInteger();
 
-<<<<<<< HEAD
         lh.asyncReadEntries(0, N - 1, new ReadCallback() {
-=======
-        lh.asyncReadEntries(0, n - 1, new ReadCallback() {
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             @Override
             public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
                 rcSecondReadOperation.set(rc);
@@ -124,37 +89,21 @@ public class TestMaxSizeWorkersQueue extends BookKeeperClusterTestCase {
         assertEquals(BKException.Code.TooManyRequestsException, rcSecondReadOperation.get());
     }
 
-<<<<<<< HEAD
     @Test(timeout = 60000)
-=======
-    @Test
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     public void testAddRejected() throws Exception {
         LedgerHandle lh = bkc.createLedger(1, 1, digestType, new byte[0]);
         byte[] content = new byte[100];
 
-<<<<<<< HEAD
         final int N = 1000;
-=======
-        final int n = 1000;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
         // Write asynchronously, and expect at least few writes to have failed with NotEnoughBookies,
         // because when we get the TooManyRequestException, the client will try to form a new ensemble and that
         // operation will fail since we only have 1 bookie available
-<<<<<<< HEAD
         final CountDownLatch counter = new CountDownLatch(N);
         final AtomicBoolean receivedTooManyRequestsException = new AtomicBoolean();
 
         // Write few entries
         for (int i = 0; i < N; i++) {
-=======
-        final CountDownLatch counter = new CountDownLatch(n);
-        final AtomicBoolean receivedTooManyRequestsException = new AtomicBoolean();
-
-        // Write few entries
-        for (int i = 0; i < n; i++) {
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             lh.asyncAddEntry(content, new AddCallback() {
                 @Override
                 public void addComplete(int rc, LedgerHandle lh, long entryId, Object ctx) {
@@ -171,63 +120,4 @@ public class TestMaxSizeWorkersQueue extends BookKeeperClusterTestCase {
 
         assertTrue(receivedTooManyRequestsException.get());
     }
-<<<<<<< HEAD
-=======
-
-    @Test
-    public void testRecoveryNotRejected() throws Exception {
-        LedgerHandle lh = bkc.createLedger(1, 1, digestType, new byte[0]);
-        byte[] content = new byte[100];
-
-        final int numEntriesToRead = 1000;
-        // Write few entries
-        for (int i = 0; i < numEntriesToRead; i++) {
-            lh.addEntry(content);
-        }
-
-        final int numLedgersToRecover = 10;
-        List<Long> ledgersToRecover = Lists.newArrayList();
-        for (int i = 0; i < numLedgersToRecover; i++) {
-            LedgerHandle lhr = bkc.createLedger(1, 1, digestType, new byte[0]);
-            lhr.addEntry(content);
-            // Leave the ledger in open state
-            ledgersToRecover.add(lhr.getId());
-        }
-
-        ExecutorService executor = Executors.newCachedThreadPool();
-        final CyclicBarrier barrier = new CyclicBarrier(1 + numLedgersToRecover);
-
-        List<Future<?>> futures = Lists.newArrayList();
-        futures.add(executor.submit(new Callable<Void>() {
-            @Override
-            public Void call() throws Exception {
-                barrier.await();
-                try {
-                    lh.readEntries(0, numEntriesToRead - 1);
-                    fail("Should have thrown exception");
-                } catch (Exception e) {
-                    // Expected
-                }
-                return null;
-            }
-        }));
-
-        for (long ledgerId : ledgersToRecover) {
-            futures.add(executor.submit(new Callable<Void>() {
-                @Override
-                public Void call() throws Exception {
-                    barrier.await();
-
-                    // Recovery should always succeed
-                    bkc.openLedger(ledgerId, digestType, new byte[0]);
-                    return null;
-                }
-            }));
-        }
-
-        for (Future<?> future : futures) {
-            future.get();
-        }
-    }
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

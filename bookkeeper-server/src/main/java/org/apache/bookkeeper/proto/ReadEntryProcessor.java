@@ -21,159 +21,134 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.Recycler.Handle;
+
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
-import org.apache.bookkeeper.common.concurrent.FutureEventListener;
-import org.apache.bookkeeper.proto.BookieProtocol.ReadRequest;
-import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.proto.BookieProtocol.Request;
 import org.apache.bookkeeper.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+class ReadEntryProcessor extends PacketProcessorBase {
+    private final static Logger LOG = LoggerFactory.getLogger(ReadEntryProcessor.class);
 
-class ReadEntryProcessor extends PacketProcessorBase<ReadRequest> {
-    private static final Logger LOG = LoggerFactory.getLogger(ReadEntryProcessor.class);
-
-    private ExecutorService fenceThreadPool;
-    private boolean throttleReadResponses;
-
-    public static ReadEntryProcessor create(ReadRequest request,
-                                            Channel channel,
-                                            BookieRequestProcessor requestProcessor,
-                                            ExecutorService fenceThreadPool,
-                                            boolean throttleReadResponses) {
+    public static ReadEntryProcessor create(Request request, Channel channel,
+                              BookieRequestProcessor requestProcessor) {
         ReadEntryProcessor rep = RECYCLER.get();
         rep.init(request, channel, requestProcessor);
-        rep.fenceThreadPool = fenceThreadPool;
-        rep.throttleReadResponses = throttleReadResponses;
         return rep;
     }
 
     @Override
     protected void processPacket() {
+        assert (request instanceof BookieProtocol.ReadRequest);
+        BookieProtocol.ReadRequest read = (BookieProtocol.ReadRequest) request;
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("Received new read request: {}", request);
         }
-        int errorCode = BookieProtocol.EOK;
+        int errorCode = BookieProtocol.EIO;
         long startTimeNanos = MathUtils.nowInNano();
         ByteBuf data = null;
         try {
-            CompletableFuture<Boolean> fenceResult = null;
-            if (request.isFencing()) {
+            Future<Boolean> fenceResult = null;
+            if (read.isFencingRequest()) {
                 LOG.warn("Ledger: {}  fenced by: {}", request.getLedgerId(), channel.remoteAddress());
 
-                if (request.hasMasterKey()) {
-                    fenceResult = requestProcessor.getBookie().fenceLedger(request.getLedgerId(),
-                            request.getMasterKey());
+                if (read.hasMasterKey()) {
+                    fenceResult = requestProcessor.bookie.fenceLedger(read.getLedgerId(), read.getMasterKey());
                 } else {
-                    LOG.error("Password not provided, Not safe to fence {}", request.getLedgerId());
+                    LOG.error("Password not provided, Not safe to fence {}", read.getLedgerId());
                     throw BookieException.create(BookieException.Code.UnauthorizedAccessException);
                 }
             }
-            data = requestProcessor.getBookie().readEntry(request.getLedgerId(), request.getEntryId());
+            data = requestProcessor.bookie.readEntry(request.getLedgerId(), request.getEntryId());
             if (LOG.isDebugEnabled()) {
                 LOG.debug("##### Read entry ##### {} -- ref-count: {}", data.readableBytes(), data.refCnt());
             }
-            if (fenceResult != null) {
-                handleReadResultForFenceRead(fenceResult, data, startTimeNanos);
-                return;
+            if (null != fenceResult) {
+                // TODO: {@link https://github.com/apache/bookkeeper/issues/283}
+                // currently we don't have readCallback to run in separated read
+                // threads. after BOOKKEEPER-429 is complete, we could improve
+                // following code to make it not wait here
+                //
+                // For now, since we only try to wait after read entry. so writing
+                // to journal and read entry are executed in different thread
+                // it would be fine.
+                try {
+                    Boolean fenced = fenceResult.get(1000, TimeUnit.MILLISECONDS);
+                    if (null == fenced || !fenced) {
+                        // if failed to fence, fail the read request to make it retry.
+                        errorCode = BookieProtocol.EIO;
+                        data.release();
+                        data = null;
+                    } else {
+                        errorCode = BookieProtocol.EOK;
+                    }
+                } catch (InterruptedException ie) {
+                    LOG.error("Interrupting fence read entry " + read, ie);
+                    errorCode = BookieProtocol.EIO;
+                    data.release();
+                    data = null;
+                } catch (ExecutionException ee) {
+                    LOG.error("Failed to fence read entry " + read, ee);
+                    errorCode = BookieProtocol.EIO;
+                    data.release();
+                    data = null;
+                } catch (TimeoutException te) {
+                    LOG.error("Timeout to fence read entry " + read, te);
+                    errorCode = BookieProtocol.EIO;
+                    data.release();
+                    data = null;
+                }
+            } else {
+                errorCode = BookieProtocol.EOK;
             }
         } catch (Bookie.NoLedgerException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Error reading {}", request, e);
+            if (LOG.isTraceEnabled()) {
+                LOG.error("Error reading " + read, e);
             }
             errorCode = BookieProtocol.ENOLEDGER;
         } catch (Bookie.NoEntryException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Error reading {}", request, e);
+            if (LOG.isTraceEnabled()) {
+                LOG.error("Error reading " + read, e);
             }
             errorCode = BookieProtocol.ENOENTRY;
         } catch (IOException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Error reading {}", request, e);
+            if (LOG.isTraceEnabled()) {
+                LOG.error("Error reading " + read, e);
             }
             errorCode = BookieProtocol.EIO;
         } catch (BookieException e) {
-            LOG.error("Unauthorized access to ledger {}", request.getLedgerId(), e);
+            LOG.error("Unauthorized access to ledger " + read.getLedgerId(), e);
             errorCode = BookieProtocol.EUA;
-        } catch (Throwable t) {
-            LOG.error("Unexpected exception reading at {}:{} : {}", request.getLedgerId(), request.getEntryId(),
-                      t.getMessage(), t);
-            errorCode = BookieProtocol.EBADREQ;
         }
 
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Read entry rc = {} for {}", errorCode, request);
+            LOG.trace("Read entry rc = {} for {}", new Object[] { errorCode, read });
         }
-        sendResponse(data, errorCode, startTimeNanos);
-    }
-
-    private void sendResponse(ByteBuf data, int errorCode, long startTimeNanos) {
-        final RequestStats stats = requestProcessor.getRequestStats();
-        final OpStatsLogger logger = stats.getReadEntryStats();
-        BookieProtocol.Response response;
         if (errorCode == BookieProtocol.EOK) {
-            logger.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
-            response = ResponseBuilder.buildReadResponse(data, request);
-        } else {
-            if (data != null) {
-                ReferenceCountUtil.release(data);
-            }
-            logger.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
-            response = ResponseBuilder.buildErrorResponse(errorCode, request);
-        }
+            requestProcessor.readEntryStats.registerSuccessfulEvent(MathUtils.elapsedNanos(startTimeNanos),
+                    TimeUnit.NANOSECONDS);
+            sendResponse(errorCode, ResponseBuilder.buildReadResponse(data, read),
+                         requestProcessor.readRequestStats);
 
-        if (throttleReadResponses) {
-            sendResponseAndWait(errorCode, response, stats.getReadRequestStats());
         } else {
-            sendResponse(errorCode, response, stats.getReadRequestStats());
+            ReferenceCountUtil.release(data);
+
+            requestProcessor.readEntryStats.registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos),
+                    TimeUnit.NANOSECONDS);
+            sendResponse(errorCode, ResponseBuilder.buildErrorResponse(errorCode, read),
+                         requestProcessor.readRequestStats);
         }
         recycle();
-    }
-
-    private void sendFenceResponse(Boolean result, ByteBuf data, long startTimeNanos) {
-        final int retCode = result != null && result ? BookieProtocol.EOK : BookieProtocol.EIO;
-        sendResponse(data, retCode, startTimeNanos);
-    }
-
-    private void handleReadResultForFenceRead(CompletableFuture<Boolean> fenceResult,
-                                              ByteBuf data,
-                                              long startTimeNanos) {
-        if (null != fenceThreadPool) {
-            fenceResult.whenCompleteAsync(new FutureEventListener<Boolean>() {
-                @Override
-                public void onSuccess(Boolean result) {
-                    sendFenceResponse(result, data, startTimeNanos);
-                }
-
-                @Override
-                public void onFailure(Throwable t) {
-                    LOG.error("Error processing fence request", t);
-                    // if failed to fence, fail the read request to make it retry.
-                    sendResponse(data, BookieProtocol.EIO, startTimeNanos);
-                }
-            }, fenceThreadPool);
-        } else {
-            try {
-                Boolean fenced = fenceResult.get(1000, TimeUnit.MILLISECONDS);
-                sendFenceResponse(fenced, data, startTimeNanos);
-                return;
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                LOG.error("Interrupting fence read entry {}", request, ie);
-            } catch (ExecutionException ee) {
-                LOG.error("Failed to fence read entry {}", request, ee.getCause());
-            } catch (TimeoutException te) {
-                LOG.error("Timeout to fence read entry {}", request, te);
-            }
-            sendResponse(data, BookieProtocol.EIO, startTimeNanos);
-        }
     }
 
     @Override

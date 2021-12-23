@@ -37,9 +37,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test the ZK ledger id generator.
- */
 public class TestZkLedgerIdGenerator extends TestCase {
     private static final Logger LOG = LoggerFactory.getLogger(TestZkLedgerIdGenerator.class);
 
@@ -55,7 +52,7 @@ public class TestZkLedgerIdGenerator extends TestCase {
         super.setUp();
 
         zkutil = new ZooKeeperUtil();
-        zkutil.startCluster();
+        zkutil.startServer();
         zk = zkutil.getZooKeeperClient();
 
         ledgerIdGenerator = new ZkLedgerIdGenerator(zk,
@@ -68,7 +65,7 @@ public class TestZkLedgerIdGenerator extends TestCase {
         LOG.info("Tearing down test");
         ledgerIdGenerator.close();
         zk.close();
-        zkutil.killCluster();
+        zkutil.killServer();
 
         super.tearDown();
     }
@@ -79,7 +76,7 @@ public class TestZkLedgerIdGenerator extends TestCase {
         // and then check there is no identical ledger id.
         final int nThread = 2;
         final int nLedgers = 2000;
-        final CountDownLatch countDownLatch = new CountDownLatch(nThread * nLedgers);
+        final CountDownLatch countDownLatch = new CountDownLatch(nThread*nLedgers);
 
         final AtomicInteger errCount = new AtomicInteger(0);
         final ConcurrentLinkedQueue<Long> ledgerIds = new ConcurrentLinkedQueue<Long>();

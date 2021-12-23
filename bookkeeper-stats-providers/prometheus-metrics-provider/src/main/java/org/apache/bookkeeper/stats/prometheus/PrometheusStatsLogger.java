@@ -17,10 +17,8 @@
 package org.apache.bookkeeper.stats.prometheus;
 
 import com.google.common.base.Joiner;
-
 import io.prometheus.client.Collector;
-import java.util.Map;
-import java.util.TreeMap;
+import io.prometheus.client.CollectorRegistry;
 import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.Gauge;
 import org.apache.bookkeeper.stats.OpStatsLogger;
@@ -31,29 +29,43 @@ import org.apache.bookkeeper.stats.StatsLogger;
  */
 public class PrometheusStatsLogger implements StatsLogger {
 
-    private final PrometheusMetricsProvider provider;
+    private final CollectorRegistry registry;
     private final String scope;
-    private final Map<String, String> labels;
 
-    PrometheusStatsLogger(PrometheusMetricsProvider provider, String scope, Map<String, String> labels) {
-        this.provider = provider;
+    PrometheusStatsLogger(CollectorRegistry registry, String scope) {
+        this.registry = registry;
         this.scope = scope;
-        this.labels = labels;
     }
 
     @Override
     public OpStatsLogger getOpStatsLogger(String name) {
-        return provider.opStats.computeIfAbsent(scopeContext(name), x -> new DataSketchesOpStatsLogger(labels));
+        return new PrometheusOpStatsLogger(registry, completeName(name));
     }
 
     @Override
     public Counter getCounter(String name) {
-        return provider.counters.computeIfAbsent(scopeContext(name), x -> new LongAdderCounter(labels));
+        return new PrometheusCounter(registry, completeName(name));
     }
 
     @Override
     public <T extends Number> void registerGauge(String name, Gauge<T> gauge) {
-        provider.gauges.computeIfAbsent(scopeContext(name), x -> new SimpleGauge<T>(gauge, labels));
+        PrometheusUtil.safeRegister(registry, io.prometheus.client.Gauge.build().name(completeName(name)).help("-")
+                .create().setChild(new io.prometheus.client.Gauge.Child() {
+                    @Override
+                    public double get() {
+                        Number value = null;
+                        try {
+                            value = gauge.getSample();
+                        } catch (Exception e) {
+                            // no-op
+                        }
+
+                        if (value == null) {
+                            value = gauge.getDefaultValue();
+                        }
+                        return value.doubleValue();
+                    }
+                }));
     }
 
     @Override
@@ -68,21 +80,11 @@ public class PrometheusStatsLogger implements StatsLogger {
 
     @Override
     public StatsLogger scope(String name) {
-        return new PrometheusStatsLogger(provider, completeName(name), labels);
-    }
-
-    @Override
-    public StatsLogger scopeLabel(String labelName, String labelValue) {
-        Map<String, String> newLabels = new TreeMap<>(labels);
-        newLabels.put(labelName, labelValue);
-        return new PrometheusStatsLogger(provider, scope, newLabels);
-    }
-
-    private ScopeContext scopeContext(String name) {
-        return new ScopeContext(completeName(name), labels);
+        return new PrometheusStatsLogger(registry, completeName(name));
     }
 
     private String completeName(String name) {
-        return Collector.sanitizeMetricName(scope.isEmpty() ? name : Joiner.on('_').join(scope, name));
+        String completeName = scope.isEmpty() ? name : Joiner.on('_').join(scope, name);
+        return Collector.sanitizeMetricName(completeName);
     }
 }

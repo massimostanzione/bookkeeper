@@ -21,7 +21,6 @@
 
 package org.apache.bookkeeper.bookie;
 
-<<<<<<< HEAD
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,17 +30,6 @@ import java.util.List;
 import com.google.common.util.concurrent.RateLimiter;
 
 import org.apache.bookkeeper.bookie.EntryLogger.EntryLogScanner;
-=======
-import io.netty.buffer.ByteBuf;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.bookkeeper.bookie.EntryLogger.EntryLogScanner;
-import org.apache.bookkeeper.conf.ServerConfiguration;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.util.HardLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,21 +54,10 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
     // flushed compaction log file suffix
     static final String COMPACTED_SUFFIX = ".compacted";
 
-<<<<<<< HEAD
     public TransactionalEntryLogCompactor(GarbageCollectorThread gcThread) {
         super(gcThread);
         this.entryLogger = gcThread.getEntryLogger();
         this.ledgerStorage = gcThread.getLedgerStorage();
-=======
-    public TransactionalEntryLogCompactor(
-            ServerConfiguration conf,
-            EntryLogger entryLogger,
-            CompactableLedgerStorage ledgerStorage,
-            LogRemovalListener logRemover) {
-        super(conf, logRemover);
-        this.entryLogger = entryLogger;
-        this.ledgerStorage = ledgerStorage;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
     }
 
     /**
@@ -102,12 +79,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
             File[] compactedPhaseFiles = dir.listFiles(file -> file.getName().endsWith(COMPACTED_SUFFIX));
             if (compactedPhaseFiles != null) {
                 for (File compactedFile : compactedPhaseFiles) {
-<<<<<<< HEAD
                     LOG.info("Found compacted log file {} has partially flushed index, recovering index.", compactedFile);
-=======
-                    LOG.info("Found compacted log file {} has partially flushed index, recovering index.",
-                            compactedFile);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                     CompactionPhase updateIndex = new UpdateIndexPhase(compactedFile, true);
                     updateIndex.run();
                 }
@@ -119,11 +91,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
     public boolean compact(EntryLogMetadata metadata) {
         if (metadata != null) {
             LOG.info("Compacting entry log {} with usage {}.",
-<<<<<<< HEAD
                 new Object[]{metadata.getEntryLogId(), metadata.getUsage()});
-=======
-                metadata.getEntryLogId(), metadata.getUsage());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             CompactionPhase scanEntryLog = new ScanEntryLogPhase(metadata);
             if (!scanEntryLog.run()) {
                 LOG.info("Compaction for entry log {} end in ScanEntryLogPhase.", metadata.getEntryLogId());
@@ -148,11 +116,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
     }
 
     /**
-<<<<<<< HEAD
      * An abstract class that would be extended to be the actual transactional phases for compaction
-=======
-     * An abstract class that would be extended to be the actual transactional phases for compaction.
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
      */
     abstract static class CompactionPhase {
         private String phaseName = "";
@@ -187,13 +151,8 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
      * If after scanning, there's no data written, it means there's no valid entries to be compacted,
      * so we can remove 1.log directly, clear the offsets and end the compaction.
      * Otherwise, we should move on to the next phase.
-<<<<<<< HEAD
      * <p>
      * If anything failed in this phase, we should delete the compaction log and clean the offsets.
-=======
-     *
-     * <p>If anything failed in this phase, we should delete the compaction log and clean the offsets.
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
      */
     class ScanEntryLogPhase extends CompactionPhase {
         private final EntryLogMetadata metadata;
@@ -214,7 +173,6 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                 }
 
                 @Override
-<<<<<<< HEAD
                 public void process(long ledgerId, long offset, ByteBuffer entry) throws IOException {
                     throttler.acquire(entry.remaining());
                     synchronized (TransactionalEntryLogCompactor.this) {
@@ -227,29 +185,12 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                             throw new IOException("Invalid entry found @ offset " + offset);
                         }
                         entry.rewind();
-=======
-                public void process(long ledgerId, long offset, ByteBuf entry) throws IOException {
-                    throttler.acquire(entry.readableBytes());
-                    synchronized (TransactionalEntryLogCompactor.this) {
-                        long lid = entry.getLong(entry.readerIndex());
-                        long entryId = entry.getLong(entry.readerIndex() + 8);
-                        if (lid != ledgerId || entryId < -1) {
-                            LOG.warn("Scanning expected ledgerId {}, but found invalid entry "
-                                    + "with ledgerId {} entryId {} at offset {}",
-                                    ledgerId, lid, entryId, offset);
-                            throw new IOException("Invalid entry found @ offset " + offset);
-                        }
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                         long newOffset = entryLogger.addEntryForCompaction(ledgerId, entry);
                         offsets.add(new EntryLocation(ledgerId, entryId, newOffset));
 
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Compact add entry : lid = {}, eid = {}, offset = {}",
-<<<<<<< HEAD
                                 new Object[]{ledgerId, entryId, newOffset});
-=======
-                                    ledgerId, entryId, newOffset);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                         }
                     }
                 }
@@ -261,11 +202,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
             if (offsets.isEmpty()) {
                 // no valid entries is compacted, delete entry log file
                 LOG.info("No valid entry is found in entry log after scan, removing entry log now.");
-<<<<<<< HEAD
                 gcThread.removeEntryLog(metadata.getEntryLogId());
-=======
-                logRemovalListener.removeEntryLog(metadata.getEntryLogId());
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                 entryLogger.removeCurCompactionLog();
                 return false;
             }
@@ -344,13 +281,8 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
      * where 3 is the new compaction logId and 1 is the old entry logId.
      * After the index the flushed successfully, a hardlink "3.log" file should be created,
      * and 3.log.1.compacted file should be deleted to indicate the phase is succeed.
-<<<<<<< HEAD
      * <p>
      * This phase can also used to recover partially flushed index when we pass isInRecovery=true
-=======
-     *
-     * <p>This phase can also used to recover partially flushed index when we pass isInRecovery=true
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
      */
     class UpdateIndexPhase extends CompactionPhase {
         File compactedLogFile;
@@ -373,12 +305,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                 File dir = compactedLogFile.getParentFile();
                 String compactedFilename = compactedLogFile.getName();
                 // create a hard link "x.log" for file "x.log.y.compacted"
-<<<<<<< HEAD
                 this.newEntryLogFile = new File(dir, compactedFilename.substring(0, compactedFilename.indexOf(".log") + 4));
-=======
-                this.newEntryLogFile = new File(dir, compactedFilename.substring(0,
-                            compactedFilename.indexOf(".log") + 4));
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                 if (!newEntryLogFile.exists()) {
                     HardLink.createHardLink(compactedLogFile, newEntryLogFile);
                 }
@@ -408,11 +335,7 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                 String compactedFilename = compactedLogFile.getName();
                 String oldEntryLogFilename = compactedFilename.substring(compactedFilename.indexOf(".log") + 5);
                 long entryLogId = EntryLogger.fileName2LogId(oldEntryLogFilename);
-<<<<<<< HEAD
                 gcThread.removeEntryLog(entryLogId);
-=======
-                logRemovalListener.removeEntryLog(entryLogId);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
             }
             return true;
         }
@@ -433,7 +356,6 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                 }
 
                 @Override
-<<<<<<< HEAD
                 public void process(long ledgerId, long offset, ByteBuffer entry) throws IOException {
                     long lid = entry.getLong();
                     long entryId = entry.getLong();
@@ -444,17 +366,6 @@ public class TransactionalEntryLogCompactor extends AbstractLogCompactor {
                         throw new IOException("Invalid entry found @ offset " + offset);
                     }
                     entry.rewind();
-=======
-                public void process(long ledgerId, long offset, ByteBuf entry) throws IOException {
-                    long lid = entry.getLong(entry.readerIndex());
-                    long entryId = entry.getLong(entry.readerIndex() + 8);
-                    if (lid != ledgerId || entryId < -1) {
-                        LOG.warn("Scanning expected ledgerId {}, but found invalid entry "
-                                + "with ledgerId {} entryId {} at offset {}",
-                                ledgerId, lid, entryId, offset);
-                        throw new IOException("Invalid entry found @ offset " + offset);
-                    }
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
                     long location = (compactedLogId << 32L) | (offset + 4);
                     offsets.add(new EntryLocation(lid, entryId, location));
                 }

@@ -17,21 +17,23 @@
  */
 package org.apache.bookkeeper.proto;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Stopwatch;
 import io.netty.channel.Channel;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
+import io.netty.util.TimerTask;
 import java.io.IOException;
-import java.util.Optional;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.LastAddConfirmedUpdateNotification;
-import org.apache.bookkeeper.common.util.Watcher;
-import org.apache.bookkeeper.proto.BookkeeperProtocol.ReadResponse;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.Request;
+import org.apache.bookkeeper.proto.BookkeeperProtocol.ReadResponse;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.StatusCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,12 +41,12 @@ import org.slf4j.LoggerFactory;
 /**
  * Processor handling long poll read entry request.
  */
-class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watcher<LastAddConfirmedUpdateNotification> {
+class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Observer {
 
-    private static final Logger logger = LoggerFactory.getLogger(LongPollReadEntryProcessorV3.class);
+    private final static Logger logger = LoggerFactory.getLogger(LongPollReadEntryProcessorV3.class);
 
     private final Long previousLAC;
-    private Optional<Long> lastAddConfirmedUpdateTime = Optional.empty();
+    private Optional<Long> lastAddConfirmedUpdateTime = Optional.absent();
 
     // long poll execution state
     private final ExecutorService longPollThreadPool;
@@ -81,7 +83,7 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
                                      Stopwatch startTimeSw)
             throws IOException {
         if (RequestUtils.shouldPiggybackEntry(readRequest)) {
-            if (!readRequest.hasPreviousLAC() || (BookieProtocol.LAST_ADD_CONFIRMED != entryId)) {
+            if(!readRequest.hasPreviousLAC() || (BookieProtocol.LAST_ADD_CONFIRMED != entryId)) {
                 // This is not a valid request - client bug?
                 logger.error("Incorrect read request, entry piggyback requested incorrectly for ledgerId {} entryId {}",
                         ledgerId, entryId);
@@ -101,10 +103,9 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
                     try {
                         return super.readEntry(readResponseBuilder, entryId, true, startTimeSw);
                     } catch (Bookie.NoEntryException e) {
-                        requestProcessor.getRequestStats().getReadLastEntryNoEntryErrorCounter().inc();
-                        logger.info(
-                                "No entry found while piggyback reading entry {} from ledger {} : previous lac = {}",
-                                entryId, ledgerId, previousLAC);
+                        requestProcessor.readLastEntryNoEntryErrorCounter.inc();
+                        logger.info("No entry found while piggyback reading entry {} from ledger {} : previous lac = {}",
+                                new Object[] { entryId, ledgerId, previousLAC });
                         // piggy back is best effort and this request can fail genuinely because of striping
                         // entries across the ensemble
                         return buildResponse(readResponseBuilder, StatusCode.EOK, startTimeSw);
@@ -112,9 +113,9 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
                 } else {
                     if (knownLAC < previousLAC) {
                         if (logger.isDebugEnabled()) {
-                            logger.debug("Found smaller lac when piggy back reading lac and entry from ledger {} :"
-                                    + " previous lac = {}, known lac = {}",
-                                    ledgerId, previousLAC, knownLAC);
+                            logger.debug("Found smaller lac when piggy back reading lac and entry from ledger {} :" +
+                                    " previous lac = {}, known lac = {}",
+                                    new Object[]{ ledgerId, previousLAC, knownLAC });
                         }
                     }
                     return buildResponse(readResponseBuilder, StatusCode.EOK, startTimeSw);
@@ -140,33 +141,35 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
 
             final Stopwatch startTimeSw = Stopwatch.createStarted();
 
-            final boolean watched;
+            final Observable observable;
             try {
-                watched = requestProcessor.getBookie().waitForLastAddConfirmedUpdate(ledgerId, previousLAC, this);
+                observable = requestProcessor.bookie.waitForLastAddConfirmedUpdate(ledgerId, previousLAC, this);
             } catch (Bookie.NoLedgerException e) {
                 logger.info("No ledger found while longpoll reading ledger {}, previous lac = {}.",
                         ledgerId, previousLAC);
                 return buildErrorResponse(StatusCode.ENOLEDGER, startTimeSw);
             } catch (IOException ioe) {
                 logger.error("IOException while longpoll reading ledger {}, previous lac = {} : ",
-                        ledgerId, previousLAC, ioe);
+                        new Object[] { ledgerId, previousLAC, ioe });
                 return buildErrorResponse(StatusCode.EIO, startTimeSw);
             }
 
-            registerSuccessfulEvent(requestProcessor.getRequestStats().getLongPollPreWaitStats(), startTimeSw);
+            registerSuccessfulEvent(requestProcessor.longPollPreWaitStats, startTimeSw);
             lastPhaseStartTime.reset().start();
 
-            if (watched) {
-                // successfully registered watcher to lac updates
+            if (null != observable) {
+                // successfully registered observable to lac updates
                 if (logger.isTraceEnabled()) {
                     logger.trace("Waiting For LAC Update {}: Timeout {}", previousLAC, readRequest.getTimeOut());
                 }
                 synchronized (this) {
-                    expirationTimerTask = requestTimer.newTimeout(timeout -> {
-                            requestProcessor.getBookie().cancelWaitForLastAddConfirmedUpdate(ledgerId, this);
+                    expirationTimerTask = requestTimer.newTimeout(new TimerTask() {
+                        @Override
+                        public void run(Timeout timeout) throws Exception {
                             // When the timeout expires just get whatever is the current
                             // readLastConfirmed
-                            LongPollReadEntryProcessorV3.this.scheduleDeferredRead(true);
+                            LongPollReadEntryProcessorV3.this.scheduleDeferredRead(observable, true);
+                        }
                     }, readRequest.getTimeOut(), TimeUnit.MILLISECONDS);
                 }
                 return null;
@@ -185,25 +188,27 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
     }
 
     @Override
-    public void update(LastAddConfirmedUpdateNotification newLACNotification) {
-        if (newLACNotification.getLastAddConfirmed() > previousLAC) {
-            if (newLACNotification.getLastAddConfirmed() != Long.MAX_VALUE && !lastAddConfirmedUpdateTime.isPresent()) {
-                lastAddConfirmedUpdateTime = Optional.of(newLACNotification.getTimestamp());
+    public void update(Observable observable, Object o) {
+        LastAddConfirmedUpdateNotification newLACNotification = (LastAddConfirmedUpdateNotification)o;
+        if (newLACNotification.lastAddConfirmed > previousLAC) {
+            if (newLACNotification.lastAddConfirmed != Long.MAX_VALUE &&
+                    !lastAddConfirmedUpdateTime.isPresent()) {
+                lastAddConfirmedUpdateTime = Optional.of(newLACNotification.timestamp);
             }
             if (logger.isTraceEnabled()) {
                 logger.trace("Last Add Confirmed Advanced to {} for request {}",
-                        newLACNotification.getLastAddConfirmed(), request);
+                        newLACNotification.lastAddConfirmed, request);
             }
-            scheduleDeferredRead(false);
+            scheduleDeferredRead(observable, false);
         }
-        newLACNotification.recycle();
     }
 
-    private synchronized void scheduleDeferredRead(boolean timeout) {
+    private synchronized void scheduleDeferredRead(Observable observable, boolean timeout) {
         if (null == deferredTask) {
             if (logger.isTraceEnabled()) {
                 logger.trace("Deferred Task, expired: {}, request: {}", timeout, request);
             }
+            observable.deleteObserver(this);
             try {
                 shouldReadEntry = true;
                 deferredTask = longPollThreadPool.submit(this);
@@ -214,7 +219,7 @@ class LongPollReadEntryProcessorV3 extends ReadEntryProcessorV3 implements Watch
                 expirationTimerTask.cancel();
             }
 
-            registerEvent(timeout, requestProcessor.getRequestStats().getLongPollWaitStats(), lastPhaseStartTime);
+            registerEvent(timeout, requestProcessor.longPollWaitStats, lastPhaseStartTime);
             lastPhaseStartTime.reset().start();
         }
     }

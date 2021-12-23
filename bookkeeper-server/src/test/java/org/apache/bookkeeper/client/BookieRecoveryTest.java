@@ -20,13 +20,24 @@
  */
 package org.apache.bookkeeper.client;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.apache.bookkeeper.client.AsyncCallback.RecoverCallback;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
+import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -39,27 +50,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.bookkeeper.client.AsyncCallback.RecoverCallback;
-import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.proto.BookieProtocol;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
-import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.Assert.*;
 
 /**
  * This class tests the bookie recovery admin functionality.
  */
 public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BookieRecoveryTest.class);
+    private final static Logger LOG = LoggerFactory.getLogger(BookieRecoveryTest.class);
 
     // Object used for synchronizing async method calls
     class SyncObject {
@@ -117,7 +115,7 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         sync = new SyncObject();
         bookieRecoverCb = new BookieRecoverCallback();
         ClientConfiguration adminConf = new ClientConfiguration(baseClientConf);
-        adminConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        adminConf.setZkServers(zkUtil.getZooKeeperConnectString());
         bkAdmin = new BookKeeperAdmin(adminConf);
     }
 
@@ -125,26 +123,27 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
     @Override
     public void tearDown() throws Exception {
         // Release any resources used by the BookieRecoveryTest instance.
-        if (bkAdmin != null){
+        if(bkAdmin != null){
             bkAdmin.close();
         }
         super.tearDown();
     }
 
     /**
-     * Helper method to create a number of ledgers.
+     * Helper method to create a number of ledgers
      *
      * @param numLedgers
      *            Number of ledgers to create
      * @return List of LedgerHandles for each of the ledgers created
      */
     private List<LedgerHandle> createLedgers(int numLedgers)
-      throws BKException, IOException, InterruptedException {
+      throws BKException, IOException, InterruptedException
+    {
         return createLedgers(numLedgers, 3, 2);
     }
 
     /**
-     * Helper method to create a number of ledgers.
+     * Helper method to create a number of ledgers
      *
      * @param numLedgers
      *            Number of ledgers to create
@@ -212,8 +211,8 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
      * @throws BKException
      * @throws InterruptedException
      */
-    private void verifyRecoveredLedgers(List<LedgerHandle> oldLhs, long startEntryId, long endEntryId)
-            throws BKException, InterruptedException {
+    private void verifyRecoveredLedgers(List<LedgerHandle> oldLhs, long startEntryId, long endEntryId) throws BKException,
+      InterruptedException {
         // Get a set of LedgerHandles for all of the ledgers to verify
         List<LedgerHandle> lhs = new ArrayList<LedgerHandle>();
         for (int i = 0; i < oldLhs.size(); i++) {
@@ -248,10 +247,13 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
     @Test
     public void testMetadataConflictWhenDelayingEnsembleChange() throws Exception {
         ClientConfiguration newConf = new ClientConfiguration(baseClientConf);
-        newConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        newConf.setZkServers(zkUtil.getZooKeeperConnectString());
         newConf.setDelayEnsembleChange(true);
-        try (BookKeeper newBkc = new BookKeeper(newConf)) {
+        BookKeeper newBkc = new BookKeeper(newConf);
+        try {
             metadataConflictWithRecovery(newBkc);
+        } finally {
+            newBkc.close();
         }
     }
 
@@ -263,7 +265,7 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         for (int i = 0; i < numEntries; i++) {
             lh.addEntry(data);
         }
-        BookieId bookieToKill = lh.getLedgerMetadata().getEnsembleAt(numEntries - 1).get(1);
+        BookieSocketAddress bookieToKill = lh.getLedgerMetadata().getEnsemble(numEntries - 1).get(1);
         killBookie(bookieToKill);
         startNewBookie();
         for (int i = 0; i < numEntries; i++) {
@@ -271,15 +273,15 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         }
         bkAdmin.recoverBookieData(bookieToKill);
         // fail another bookie to cause ensemble change again
-        bookieToKill = lh.getLedgerMetadata().getEnsembleAt(2 * numEntries - 1).get(1);
+        bookieToKill = lh.getLedgerMetadata().getEnsemble(2 * numEntries - 1).get(1);
         ServerConfiguration confOfKilledBookie = killBookie(bookieToKill);
         startNewBookie();
         for (int i = 0; i < numEntries; i++) {
             lh.addEntry(data);
         }
         // start the killed bookie again
-        startAndAddBookie(confOfKilledBookie);
-
+        bsConfs.add(confOfKilledBookie);
+        bs.add(startBookie(confOfKilledBookie));
         // all ensembles should be fully replicated since it is recovered
         assertTrue("Not fully replicated", verifyFullyReplicated(lh, 3 * numEntries));
         lh.close();
@@ -306,17 +308,20 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
+        int initialPort = bsConfs.get(0).getBookiePort();
+        bs.get(0).shutdown();
+        bs.remove(0);
 
         // Startup a new bookie server
-        startNewBookie();
+        int newBookiePort = startNewBookie();
 
         // Write some more entries for the ledgers so a new ensemble will be
         // created for them.
         writeEntriestoLedgers(numMsgs, 10, lhs);
 
         // Call the async recover bookie method.
+        BookieSocketAddress bookieSrc = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
+          initialPort);
         // Initiate the sync object
         sync.value = false;
         bkAdmin.asyncRecoverBookieData(bookieSrc, bookieRecoverCb, sync);
@@ -355,9 +360,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
+        int initialPort = bsConfs.get(0).getBookiePort();
+        bs.get(0).shutdown();
+        bs.remove(0);
 
         // Startup three new bookie servers
         for (int i = 0; i < 3; i++) {
@@ -369,6 +374,8 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         writeEntriestoLedgers(numMsgs, 10, lhs);
 
         // Call the async recover bookie method.
+        BookieSocketAddress bookieSrc = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
+          initialPort);
         LOG.info("Now recover the data on the killed bookie (" + bookieSrc
           + ") and replicate it to a random available one");
         // Initiate the sync object
@@ -408,28 +415,24 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
+        int initialPort = bsConfs.get(0).getBookiePort();
+        bs.get(0).shutdown();
+        bs.remove(0);
 
         // Startup a new bookie server
         int newBookiePort = startNewBookie();
 
         // Write some more entries for the ledgers so a new ensemble will be
-        //created for them.
+        // created for them.
         writeEntriestoLedgers(numMsgs, 10, lhs);
 
         // Call the sync recover bookie method.
-<<<<<<< HEAD
         BookieSocketAddress bookieSrc = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
           initialPort);
         BookieSocketAddress bookieDest = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
           newBookiePort);
         LOG.info("Now recover the data on the killed bookie (" + bookieSrc + ") and replicate it to the new one ("
           + bookieDest + ")");
-=======
-        LOG.info("Now recover the data on the killed bookie (" + bookieSrc + ") and replicate it to other bookies");
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         bkAdmin.recoverBookieData(bookieSrc);
 
         // Verify the recovered ledger entries are okay.
@@ -458,9 +461,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
+        int initialPort = bsConfs.get(0).getBookiePort();
+        bs.get(0).shutdown();
+        bs.remove(0);
 
         // Startup three new bookie servers
         for (int i = 0; i < 3; i++) {
@@ -472,11 +475,8 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         writeEntriestoLedgers(numMsgs, 10, lhs);
 
         // Call the sync recover bookie method.
-<<<<<<< HEAD
         BookieSocketAddress bookieSrc = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
           initialPort);
-=======
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
         LOG.info("Now recover the data on the killed bookie (" + bookieSrc
           + ") and replicate it to a random available one");
         bkAdmin.recoverBookieData(bookieSrc);
@@ -518,29 +518,28 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
     private boolean verifyFullyReplicated(LedgerHandle lh, long untilEntry) throws Exception {
         LedgerMetadata md = getLedgerMetadata(lh);
 
-        Map<Long, ? extends List<BookieId>> ensembles = md.getAllEnsembles();
+        Map<Long, ArrayList<BookieSocketAddress>> ensembles = md.getEnsembles();
 
         HashMap<Long, Long> ranges = new HashMap<Long, Long>();
         ArrayList<Long> keyList = Collections.list(
           Collections.enumeration(ensembles.keySet()));
         Collections.sort(keyList);
         for (int i = 0; i < keyList.size() - 1; i++) {
-            ranges.put(keyList.get(i), keyList.get(i + 1));
+            ranges.put(keyList.get(i), keyList.get(i+1));
         }
-        ranges.put(keyList.get(keyList.size() - 1), untilEntry);
+        ranges.put(keyList.get(keyList.size()-1), untilEntry);
 
-        for (Map.Entry<Long, ? extends List<BookieId>> e : ensembles.entrySet()) {
+        for (Map.Entry<Long, ArrayList<BookieSocketAddress>> e : ensembles.entrySet()) {
             int quorum = md.getAckQuorumSize();
             long startEntryId = e.getKey();
             long endEntryId = ranges.get(startEntryId);
-            long expectedSuccess = quorum * (endEntryId - startEntryId);
-            int numRequests = e.getValue().size() * ((int) (endEntryId - startEntryId));
+            long expectedSuccess = quorum*(endEntryId-startEntryId);
+            int numRequests = e.getValue().size()*((int)(endEntryId-startEntryId));
 
             ReplicationVerificationCallback cb = new ReplicationVerificationCallback(numRequests);
             for (long i = startEntryId; i < endEntryId; i++) {
-                for (BookieId addr : e.getValue()) {
-                    bkc.getBookieClient().readEntry(addr, lh.getId(), i,
-                                                    cb, addr, BookieProtocol.FLAG_NONE);
+                for (BookieSocketAddress addr : e.getValue()) {
+                    bkc.getBookieClient().readEntry(addr, lh.getId(), i, cb, addr);
                 }
             }
 
@@ -570,18 +569,39 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
     }
 
     private LedgerMetadata getLedgerMetadata(LedgerHandle lh) throws Exception {
-        return bkc.getLedgerManager().readLedgerMetadata(lh.getId()).get().getValue();
+        final SyncLedgerMetaObject syncObj = new SyncLedgerMetaObject();
+        bkc.getLedgerManager().readLedgerMetadata(lh.getId(), new GenericCallback<LedgerMetadata>() {
+
+            @Override
+            public void operationComplete(int rc, LedgerMetadata result) {
+                synchronized (syncObj) {
+                    syncObj.rc = rc;
+                    syncObj.meta = result;
+                    syncObj.value = true;
+                    syncObj.notify();
+                }
+            }
+
+        });
+
+        synchronized (syncObj) {
+            while (!syncObj.value) {
+                syncObj.wait();
+            }
+        }
+        assertEquals(BKException.Code.OK, syncObj.rc);
+        return syncObj.meta;
     }
 
     private boolean findDupesInEnsembles(List<LedgerHandle> lhs) throws Exception {
         long numDupes = 0;
         for (LedgerHandle lh : lhs) {
             LedgerMetadata md = getLedgerMetadata(lh);
-            for (Map.Entry<Long, ? extends List<BookieId>> e : md.getAllEnsembles().entrySet()) {
-                HashSet<BookieId> set = new HashSet<BookieId>();
+            for (Map.Entry<Long, ArrayList<BookieSocketAddress>> e : md.getEnsembles().entrySet()) {
+                HashSet<BookieSocketAddress> set = new HashSet<BookieSocketAddress>();
                 long fragment = e.getKey();
 
-                for (BookieId addr : e.getValue()) {
+                for (BookieSocketAddress addr : e.getValue()) {
                     if (set.contains(addr)) {
                         LOG.error("Dupe " + addr + " found in ensemble for fragment " + fragment
                           + " of ledger " + lh.getId());
@@ -595,7 +615,7 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
     }
 
     /**
-     * Test recoverying the closed ledgers when the failed bookie server is in the last ensemble.
+     * Test recoverying the closed ledgers when the failed bookie server is in the last ensemble
      */
     @Test
     public void testBookieRecoveryOnClosedLedgers() throws Exception {
@@ -610,9 +630,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         closeLedgers(lhs);
 
         // Shutdown last bookie server in last ensemble
-        List<BookieId> lastEnsemble = lhs.get(0).getLedgerMetadata().getAllEnsembles()
+        ArrayList<BookieSocketAddress> lastEnsemble = lhs.get(0).getLedgerMetadata().getEnsembles()
           .entrySet().iterator().next().getValue();
-        BookieId bookieToKill = lastEnsemble.get(lastEnsemble.size() - 1);
+        BookieSocketAddress bookieToKill = lastEnsemble.get(lastEnsemble.size() - 1);
         killBookie(bookieToKill);
 
         // start a new bookie
@@ -639,9 +659,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         writeEntriestoLedgers(numMsgs, 0, lhs);
 
         // Shutdown the first bookie server
-        List<BookieId> lastEnsemble = lhs.get(0).getLedgerMetadata().getAllEnsembles()
+        ArrayList<BookieSocketAddress> lastEnsemble = lhs.get(0).getLedgerMetadata().getEnsembles()
           .entrySet().iterator().next().getValue();
-        BookieId bookieToKill = lastEnsemble.get(lastEnsemble.size() - 1);
+        BookieSocketAddress bookieToKill = lastEnsemble.get(lastEnsemble.size() - 1);
         killBookie(bookieToKill);
 
         // start a new bookie
@@ -675,13 +695,13 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         writeEntriestoLedgers(numMsgs, 0, lhs);
 
         // Shutdown the first bookie server
-        List<BookieId> lastEnsemble = lhs.get(0).getLedgerMetadata().getAllEnsembles()
+        ArrayList<BookieSocketAddress> lastEnsemble = lhs.get(0).getLedgerMetadata().getEnsembles()
           .entrySet().iterator().next().getValue();
         // removed bookie
-        BookieId bookieToKill = lastEnsemble.get(0);
+        BookieSocketAddress bookieToKill = lastEnsemble.get(0);
         killBookie(bookieToKill);
         // temp failure
-        BookieId bookieToKill2 = lastEnsemble.get(1);
+        BookieSocketAddress bookieToKill2 = lastEnsemble.get(1);
         ServerConfiguration conf2 = killBookie(bookieToKill2);
 
         // start a new bookie
@@ -704,7 +724,8 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         }
 
         // restart failed bookie
-        startAndAddBookie(conf2);
+        bs.add(startBookie(conf2));
+        bsConfs.add(conf2);
 
         // recover them
         bkAdmin.recoverBookieData(bookieToKill);
@@ -717,8 +738,8 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         List<LedgerHandle> newLhs = openLedgers(lhs);
         for (LedgerHandle newLh : newLhs) {
             // first ensemble should contains bookieToKill2 and not contain bookieToKill
-            Map.Entry<Long, ? extends List<BookieId>> entry =
-              newLh.getLedgerMetadata().getAllEnsembles().entrySet().iterator().next();
+            Map.Entry<Long, ArrayList<BookieSocketAddress>> entry =
+              newLh.getLedgerMetadata().getEnsembles().entrySet().iterator().next();
             assertFalse(entry.getValue().contains(bookieToKill));
             assertTrue(entry.getValue().contains(bookieToKill2));
         }
@@ -737,11 +758,13 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
+        int initialPort = bsConfs.get(0).getBookiePort();
+        bs.get(0).shutdown();
+        bs.remove(0);
 
         // Call the async recover bookie method.
+        BookieSocketAddress bookieSrc = new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(),
+          initialPort);
         LOG.info("Now recover the data on the killed bookie (" + bookieSrc
           + ") and replicate it to a random available one");
         // Initiate the sync object
@@ -768,9 +791,10 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Shutdown the first bookie server
         LOG.info("Finished writing all ledger entries so shutdown one of the bookies.");
-        int removeIndex = r.nextInt(bookieCount());
-        BookieId bookieSrc = addressByIndex(removeIndex);
-        killBookie(removeIndex);
+        int removeIndex = r.nextInt(bs.size());
+        BookieSocketAddress bookieSrc = bs.get(removeIndex).getLocalAddress();
+        bs.get(removeIndex).shutdown();
+        bs.remove(removeIndex);
 
         // Startup new bookie server
         startNewBookie();
@@ -789,10 +813,10 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         assertFalse("Dupes exist in ensembles", findDupesInEnsembles(lhs));
 
         // Write some more entries to ensure fencing hasn't broken stuff
-        writeEntriestoLedgers(numMsgs, numMsgs * 2, lhs);
+        writeEntriestoLedgers(numMsgs, numMsgs*2, lhs);
 
         for (LedgerHandle lh : lhs) {
-            assertTrue("Not fully replicated", verifyFullyReplicated(lh, numMsgs * 3));
+            assertTrue("Not fully replicated", verifyFullyReplicated(lh, numMsgs*3));
             lh.close();
         }
     }
@@ -810,9 +834,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         }
         lh.close();
 
-        BookieId bookieSrc = addressByIndex(0);
-        killBookie(0);
-
+        BookieSocketAddress bookieSrc = bs.get(0).getLocalAddress();
+        bs.get(0).shutdown();
+        bs.remove(0);
         startNewBookie();
 
         // Check that entries are missing
@@ -824,7 +848,7 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         // This is fine, because it only falls back to the configured
         // password if the password info is missing from the metadata
         ClientConfiguration adminConf = new ClientConfiguration();
-        adminConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        adminConf.setZkServers(zkUtil.getZooKeeperConnectString());
         adminConf.setBookieRecoveryDigestType(digestCorrect);
         adminConf.setBookieRecoveryPasswd(passwdBad);
         setMetastoreImplClass(adminConf);
@@ -837,8 +861,9 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
         assertTrue("Should be back to fully replication", verifyFullyReplicated(lh, 100));
         lh.close();
 
-        bookieSrc = addressByIndex(0);
-        killBookie(0);
+        bookieSrc = bs.get(0).getLocalAddress();
+        bs.get(0).shutdown();
+        bs.remove(0);
         startNewBookie();
 
         // Check that entries are missing
@@ -848,7 +873,7 @@ public class BookieRecoveryTest extends BookKeeperClusterTestCase {
 
         // Try to recover with no password in conf
         adminConf = new ClientConfiguration();
-        adminConf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        adminConf.setZkServers(zkUtil.getZooKeeperConnectString());
         setMetastoreImplClass(adminConf);
 
         bka = new BookKeeperAdmin(adminConf);

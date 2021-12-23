@@ -22,11 +22,12 @@ package org.apache.bookkeeper.auth;
 
 import java.io.IOException;
 import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.common.util.ReflectionUtils;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.proto.BookieConnectionPeer;
 import org.apache.bookkeeper.proto.ClientConnectionPeer;
+import org.apache.bookkeeper.util.ReflectionUtils;
+
 
 /**
  * A factory to manage the authentication provider factories.
@@ -75,7 +76,6 @@ public class AuthProviderFactoryFactory {
                                               AuthCallbacks.GenericCallback<Void> completeCb) {
             completeCb.operationComplete(BKException.Code.OK, null);
             return new BookieAuthProvider() {
-                @Override
                 public void process(AuthToken m, AuthCallbacks.GenericCallback<AuthToken> cb) {
                     // any request of authentication for clients is going to be answered with a standard response
                     // the client will d
@@ -101,9 +101,7 @@ public class AuthProviderFactoryFactory {
             addr.setAuthorizedId(BookKeeperPrincipal.ANONYMOUS);
             completeCb.operationComplete(BKException.Code.OK, null);
             return new ClientAuthProvider() {
-                @Override
                 public void init(AuthCallbacks.GenericCallback<AuthToken> cb) {}
-                @Override
                 public void process(AuthToken m, AuthCallbacks.GenericCallback<AuthToken> cb) {}
             };
         }

@@ -20,8 +20,22 @@
  */
 package org.apache.bookkeeper.proto;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.apache.bookkeeper.auth.ClientAuthProvider;
+import org.apache.bookkeeper.auth.AuthProviderFactoryFactory;
+import org.apache.bookkeeper.bookie.Bookie;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
+import org.apache.bookkeeper.proto.PerChannelBookieClient.ConnectionState;
+import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
+import org.apache.bookkeeper.util.OrderedSafeExecutor;
+import org.apache.bookkeeper.util.SafeRunnable;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.ExtensionRegistry;
 
@@ -35,31 +49,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.bookkeeper.auth.AuthProviderFactoryFactory;
-import org.apache.bookkeeper.auth.ClientAuthProvider;
-import org.apache.bookkeeper.bookie.Bookie;
-import org.apache.bookkeeper.bookie.BookieImpl;
-import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.common.util.OrderedExecutor;
-import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.net.BookieSocketAddress;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
-import org.apache.bookkeeper.proto.PerChannelBookieClient.ConnectionState;
-import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
-import org.apache.bookkeeper.util.SafeRunnable;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.Assert.*;
 
 /**
  * Tests for PerChannelBookieClient. Historically, this class has
  * had a few race conditions, so this is what these tests focus on.
  */
 public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
-    private static final Logger LOG = LoggerFactory.getLogger(TestPerChannelBookieClient.class);
+    private final static Logger LOG = LoggerFactory.getLogger(TestPerChannelBookieClient.class);
 
     ExtensionRegistry extRegistry = ExtensionRegistry.newInstance();
     ClientAuthProvider.Factory authProvider;
@@ -81,12 +78,12 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
     @Test
     public void testConnectCloseRace() throws Exception {
         EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-        OrderedExecutor executor = getOrderedSafeExecutor();
+        OrderedSafeExecutor executor = getOrderedSafeExecutor();
 
-        BookieId addr = getBookie(0);
+        BookieSocketAddress addr = getBookie(0);
         for (int i = 0; i < 1000; i++) {
             PerChannelBookieClient client = new PerChannelBookieClient(executor, eventLoopGroup, addr,
-                    authProvider, extRegistry, BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+                    authProvider, extRegistry);
             client.connectIfNeededAndDoOp(new GenericCallback<PerChannelBookieClient>() {
                     @Override
                     public void operationComplete(int rc, PerChannelBookieClient client) {
@@ -100,8 +97,8 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
         executor.shutdown();
     }
 
-    public OrderedExecutor getOrderedSafeExecutor() {
-        return OrderedExecutor.newBuilder()
+    public OrderedSafeExecutor getOrderedSafeExecutor() {
+        return OrderedSafeExecutor.newBuilder()
             .name("PCBC")
             .numThreads(1)
             .traceTaskExecution(true)
@@ -124,13 +121,12 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
             }
         };
         EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-        OrderedExecutor executor = getOrderedSafeExecutor();
+        OrderedSafeExecutor executor = getOrderedSafeExecutor();
 
-        BookieId addr = getBookie(0);
+        BookieSocketAddress addr = getBookie(0);
         for (int i = 0; i < 100; i++) {
             PerChannelBookieClient client = new PerChannelBookieClient(executor, eventLoopGroup, addr,
-                                                                       authProvider, extRegistry,
-                                                                       BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+                                                                       authProvider, extRegistry);
             for (int j = i; j < 10; j++) {
                 client.connectIfNeededAndDoOp(nullop);
             }
@@ -155,14 +151,13 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
                 // we just want to trigger it connecting.
             }
         };
-        final int iterations = 100000;
+        final int ITERATIONS = 100000;
         EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-        OrderedExecutor executor = getOrderedSafeExecutor();
-        BookieId addr = getBookie(0);
+        OrderedSafeExecutor executor = getOrderedSafeExecutor();
+        BookieSocketAddress addr = getBookie(0);
 
         final PerChannelBookieClient client = new PerChannelBookieClient(executor, eventLoopGroup,
-                addr, authProvider, extRegistry,
-                BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+                addr, authProvider, extRegistry);
         final AtomicBoolean shouldFail = new AtomicBoolean(false);
         final AtomicBoolean running = new AtomicBoolean(true);
         final CountDownLatch disconnectRunning = new CountDownLatch(1);
@@ -178,7 +173,7 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
                         Thread.currentThread().interrupt();
                         running.set(false);
                     }
-                    for (int i = 0; i < iterations && running.get(); i++) {
+                    for (int i = 0; i < ITERATIONS && running.get(); i++) {
                         client.connectIfNeededAndDoOp(nullop);
                     }
                     running.set(false);
@@ -231,34 +226,33 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
 
     /**
      * Test that requests are completed even if the channel is disconnected
-     * {@link https://issues.apache.org/jira/browse/BOOKKEEPER-668}.
+     * {@link https://issues.apache.org/jira/browse/BOOKKEEPER-668}
      */
     @Test
     public void testRequestCompletesAfterDisconnectRace() throws Exception {
         ServerConfiguration conf = killBookie(0);
 
-        Bookie delayBookie = new BookieImpl(conf) {
+        Bookie delayBookie = new Bookie(conf) {
             @Override
             public ByteBuf readEntry(long ledgerId, long entryId)
                     throws IOException, NoLedgerException {
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
                     throw new IOException("Interrupted waiting", ie);
                 }
                 return super.readEntry(ledgerId, entryId);
             }
         };
-        startAndAddBookie(conf, delayBookie);
+        bsConfs.add(conf);
+        bs.add(startBookie(conf, delayBookie));
 
         EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-        final OrderedExecutor executor = getOrderedSafeExecutor();
-        BookieId addr = getBookie(0);
+        final OrderedSafeExecutor executor = getOrderedSafeExecutor();
+        BookieSocketAddress addr = getBookie(0);
 
         final PerChannelBookieClient client = new PerChannelBookieClient(executor, eventLoopGroup,
-                addr, authProvider, extRegistry,
-                BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+                addr, authProvider, extRegistry);
         final CountDownLatch completion = new CountDownLatch(1);
         final ReadEntryCallback cb = new ReadEntryCallback() {
                 @Override
@@ -272,7 +266,7 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
             @Override
             public void operationComplete(final int rc, PerChannelBookieClient pcbc) {
                 if (rc != BKException.Code.OK) {
-                    executor.executeOrdered(1, new SafeRunnable() {
+                    executor.submitOrdered(1, new SafeRunnable() {
                         @Override
                         public void safeRun() {
                             cb.readEntryComplete(rc, 1, 1, null, null);
@@ -281,8 +275,7 @@ public class TestPerChannelBookieClient extends BookKeeperClusterTestCase {
                     return;
                 }
 
-                client.readEntry(1, 1, cb, null, BookieProtocol.FLAG_DO_FENCING,
-                        "00000111112222233333".getBytes(), false);
+                client.readEntryAndFenceLedger(1, "00000111112222233333".getBytes(), 1, cb, null);
             }
         });
 

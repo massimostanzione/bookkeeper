@@ -16,7 +16,6 @@
    limitations under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<<<<<<< HEAD
     <parent>
         <artifactId>bookkeeper</artifactId>
         <groupId>org.apache.bookkeeper</groupId>
@@ -37,21 +36,4 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
-=======
-  <parent>
-    <artifactId>bookkeeper</artifactId>
-    <groupId>org.apache.bookkeeper</groupId>
-    <version>4.15.0-SNAPSHOT</version>
-  </parent>
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.bookkeeper.http</groupId>
-  <artifactId>bookkeeper-http</artifactId>
-  <packaging>pom</packaging>
-  <name>Apache BookKeeper :: Http</name>
-  <modules>
-    <module>http-server</module>
-    <module>vertx-http-server</module>
-    <module>servlet-http-server</module>
-  </modules>
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 </project>

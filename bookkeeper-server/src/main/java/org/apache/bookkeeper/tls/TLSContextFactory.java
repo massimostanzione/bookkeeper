@@ -17,11 +17,16 @@
  */
 package org.apache.bookkeeper.tls;
 
+import org.apache.bookkeeper.conf.AbstractConfiguration;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Strings;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
@@ -32,163 +37,60 @@ import io.netty.handler.ssl.SslProvider;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.Provider;
-import java.security.Security;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.security.spec.InvalidKeySpecException;
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.bookkeeper.conf.AbstractConfiguration;
-import org.apache.bookkeeper.conf.ClientConfiguration;
-import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.commons.io.FileUtils;
-
-/**
- * A factory to manage TLS contexts.
- */
-@Slf4j
 public class TLSContextFactory implements SecurityHandlerFactory {
-
-    public static final Provider BC_PROVIDER = getProvider();
-    public static final String BC_FIPS_PROVIDER_CLASS = "org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider";
-    public static final String BC_NON_FIPS_PROVIDER_CLASS = "org.bouncycastle.jce.provider.BouncyCastleProvider";
-
-    // Security.getProvider("BC") / Security.getProvider("BCFIPS").
-    // also used to get Factories. e.g. CertificateFactory.getInstance("X.509", "BCFIPS")
-    public static final String BC_FIPS = "BCFIPS";
-    public static final String BC = "BC";
-
-    /**
-     * Get Bouncy Castle provider, and call Security.addProvider(provider) if success.
-     */
-    public static Provider getProvider() {
-        boolean isProviderInstalled =
-            Security.getProvider(BC) != null || Security.getProvider(BC_FIPS) != null;
-
-        if (isProviderInstalled) {
-            Provider provider = Security.getProvider(BC) != null
-                ? Security.getProvider(BC)
-                : Security.getProvider(BC_FIPS);
-            if (log.isDebugEnabled()) {
-                log.debug("Already instantiated Bouncy Castle provider {}", provider.getName());
-            }
-            return provider;
-        }
-
-        // Not installed, try load from class path
-        try {
-            return getBCProviderFromClassPath();
-        } catch (Exception e) {
-            log.warn("Not able to get Bouncy Castle provider for both FIPS and Non-FIPS from class path:", e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Get Bouncy Castle provider from classpath, and call Security.addProvider.
-     * Throw Exception if failed.
-     */
-    public static Provider getBCProviderFromClassPath() throws Exception {
-        Class clazz;
-        try {
-            clazz = Class.forName(BC_FIPS_PROVIDER_CLASS);
-        } catch (ClassNotFoundException cnf) {
-            if (log.isDebugEnabled()) {
-                log.debug("Not able to get Bouncy Castle provider: {}, try to get FIPS provider {}",
-                    BC_NON_FIPS_PROVIDER_CLASS, BC_FIPS_PROVIDER_CLASS);
-            }
-            // attempt to use the NON_FIPS provider.
-            clazz = Class.forName(BC_NON_FIPS_PROVIDER_CLASS);
-
-        }
-
-        @SuppressWarnings("unchecked")
-        Provider provider = (Provider) clazz.getDeclaredConstructor().newInstance();
-        Security.addProvider(provider);
-        if (log.isDebugEnabled()) {
-            log.debug("Found and Instantiated Bouncy Castle provider in classpath {}", provider.getName());
-        }
-        return provider;
-    }
-
-    /**
-     * Supported Key File Types.
-     */
-    public enum KeyStoreType {
-        PKCS12("PKCS12"),
-        JKS("JKS"),
-        PEM("PEM");
-
-        private String str;
-
-        KeyStoreType(String str) {
-            this.str = str;
-        }
-
-        @Override
-        public String toString() {
-            return this.str;
-        }
-    }
-
-    private static final String TLSCONTEXT_HANDLER_NAME = "tls";
+    private final static Logger LOG = LoggerFactory.getLogger(TLSContextFactory.class);
+    private final static String TLSCONTEXT_HANDLER_NAME = "tls";
     private String[] protocols;
     private String[] ciphers;
-    private volatile SslContext sslContext;
-    private ByteBufAllocator allocator;
-    private AbstractConfiguration config;
-    private FileModifiedTimeUpdater tlsCertificateFilePath, tlsKeyStoreFilePath, tlsKeyStorePasswordFilePath,
-            tlsTrustStoreFilePath, tlsTrustStorePasswordFilePath;
-    private long certRefreshTime;
-    private volatile long certLastRefreshTime;
-    private boolean isServerCtx;
+    private SslContext sslContext;
 
     private String getPasswordFromFile(String path) throws IOException {
+        FileInputStream pwdin = new FileInputStream(path);
         byte[] pwd;
-        File passwdFile = new File(path);
-        if (passwdFile.length() == 0) {
-            return "";
+        try {
+            File passwdFile = new File(path);
+            if (passwdFile.length() == 0) {
+                return "";
+            }
+            pwd = FileUtils.readFileToByteArray(passwdFile);
+        } finally {
+            pwdin.close();
         }
-        pwd = FileUtils.readFileToByteArray(passwdFile);
-        return new String(pwd, StandardCharsets.UTF_8);
+        return new String(pwd, "UTF-8");
     }
 
-    @SuppressFBWarnings(
-        value = "OBL_UNSATISFIED_OBLIGATION",
-        justification = "work around for java 9: https://github.com/spotbugs/spotbugs/issues/493")
     private KeyStore loadKeyStore(String keyStoreType, String keyStoreLocation, String keyStorePassword)
             throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
         KeyStore ks = KeyStore.getInstance(keyStoreType);
-
-        try (FileInputStream ksin = new FileInputStream(keyStoreLocation)) {
+        FileInputStream ksin = new FileInputStream(keyStoreLocation);
+        try {
             ks.load(ksin, keyStorePassword.trim().toCharArray());
+        } finally {
+            ksin.close();
         }
         return ks;
     }
 
-    @Override
     public String getHandlerName() {
         return TLSCONTEXT_HANDLER_NAME;
     }
 
     private KeyManagerFactory initKeyManagerFactory(String keyStoreType, String keyStoreLocation,
             String keyStorePasswordPath) throws SecurityException, KeyStoreException, NoSuchAlgorithmException,
-            CertificateException, IOException, UnrecoverableKeyException, InvalidKeySpecException {
+            CertificateException, IOException, UnrecoverableKeyException {
         KeyManagerFactory kmf = null;
 
         if (Strings.isNullOrEmpty(keyStoreLocation)) {
-            log.error("Key store location cannot be empty when Mutual Authentication is enabled!");
+            LOG.error("Key store location cannot be empty when Mutual Authentication is enabled!");
             throw new SecurityException("Key store location cannot be empty when Mutual Authentication is enabled!");
         }
 
@@ -197,7 +99,7 @@ public class TLSContextFactory implements SecurityHandlerFactory {
             keyStorePassword = getPasswordFromFile(keyStorePasswordPath);
         }
 
-        // Initialize key file
+        // Initialize key store
         KeyStore ks = loadKeyStore(keyStoreType, keyStoreLocation, keyStorePassword);
         kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(ks, keyStorePassword.trim().toCharArray());
@@ -211,7 +113,7 @@ public class TLSContextFactory implements SecurityHandlerFactory {
         TrustManagerFactory tmf;
 
         if (Strings.isNullOrEmpty(trustStoreLocation)) {
-            log.error("Trust Store location cannot be empty!");
+            LOG.error("Trust Store location cannot be empty!");
             throw new SecurityException("Trust Store location cannot be empty!");
         }
 
@@ -220,7 +122,7 @@ public class TLSContextFactory implements SecurityHandlerFactory {
             trustStorePassword = getPasswordFromFile(trustStorePasswordPath);
         }
 
-        // Initialize trust file
+        // Initialize trust store
         KeyStore ts = loadKeyStore(trustStoreType, trustStoreLocation, trustStorePassword);
         tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(ts);
@@ -231,253 +133,113 @@ public class TLSContextFactory implements SecurityHandlerFactory {
     private SslProvider getTLSProvider(String sslProvider) {
         if (sslProvider.trim().equalsIgnoreCase("OpenSSL")) {
             if (OpenSsl.isAvailable()) {
-                log.info("Security provider - OpenSSL");
+                LOG.info("Security provider - OpenSSL");
                 return SslProvider.OPENSSL;
             }
 
             Throwable causeUnavailable = OpenSsl.unavailabilityCause();
-            log.warn("OpenSSL Unavailable: ", causeUnavailable);
+            LOG.warn("OpenSSL Unavailable: ", causeUnavailable);
 
-            log.info("Security provider - JDK");
+            LOG.info("Security provider - JDK");
             return SslProvider.JDK;
         }
 
-        log.info("Security provider - JDK");
+        LOG.info("Security provider - JDK");
         return SslProvider.JDK;
     }
 
-    private void createClientContext()
-            throws SecurityException, KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException,
-            UnrecoverableKeyException, InvalidKeySpecException, NoSuchProviderException {
-        ClientConfiguration clientConf = (ClientConfiguration) config;
-        markAutoCertRefresh(clientConf.getTLSCertificatePath(), clientConf.getTLSKeyStore(),
-                clientConf.getTLSKeyStorePasswordPath(), clientConf.getTLSTrustStore(),
-                clientConf.getTLSTrustStorePasswordPath());
-        updateClientContext();
-    }
-
-    private synchronized void updateClientContext()
-            throws SecurityException, KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException,
-            UnrecoverableKeyException, InvalidKeySpecException, NoSuchProviderException {
+    private void createClientContext(AbstractConfiguration conf) throws SecurityException, KeyStoreException, NoSuchAlgorithmException,
+            CertificateException, IOException, UnrecoverableKeyException {
         final SslContextBuilder sslContextBuilder;
         final ClientConfiguration clientConf;
         final SslProvider provider;
-        final boolean clientAuthentication;
+        final boolean Authentication;
 
-        // get key-file and trust-file locations and passwords
-        if (!(config instanceof ClientConfiguration)) {
+        KeyManagerFactory kmf = null;
+        TrustManagerFactory tmf = null;
+
+        // get key-store and trust-store locations and passwords
+        if (!(conf instanceof ClientConfiguration)) {
             throw new SecurityException("Client configruation not provided");
         }
 
-        clientConf = (ClientConfiguration) config;
+        clientConf = (ClientConfiguration) conf;
         provider = getTLSProvider(clientConf.getTLSProvider());
-        clientAuthentication = clientConf.getTLSClientAuthentication();
+        Authentication = clientConf.getTLSClientAuthentication();
 
-        switch (KeyStoreType.valueOf(clientConf.getTLSTrustStoreType())) {
-        case PEM:
-            if (Strings.isNullOrEmpty(clientConf.getTLSTrustStore())) {
-                throw new SecurityException("CA Certificate required");
-            }
+        tmf = initTrustManagerFactory(clientConf.getTLSTrustStoreType(), clientConf.getTLSTrustStore(),
+                clientConf.getTLSTrustStorePasswordPath());
 
-            sslContextBuilder = SslContextBuilder.forClient()
-                    .trustManager(new File(clientConf.getTLSTrustStore()))
-                    .ciphers(null)
-                    .sessionCacheSize(0)
-                    .sessionTimeout(0)
-                    .sslProvider(provider)
-                    .clientAuth(ClientAuth.REQUIRE);
-
-            break;
-        case JKS:
-            // falling thru, same as PKCS12
-        case PKCS12:
-            TrustManagerFactory tmf = initTrustManagerFactory(clientConf.getTLSTrustStoreType(),
-                    clientConf.getTLSTrustStore(), clientConf.getTLSTrustStorePasswordPath());
-
-            sslContextBuilder = SslContextBuilder.forClient()
-                    .trustManager(tmf)
-                    .ciphers(null)
-                    .sessionCacheSize(0)
-                    .sessionTimeout(0)
-                    .sslProvider(provider)
-                    .clientAuth(ClientAuth.REQUIRE);
-
-            break;
-        default:
-            throw new SecurityException("Invalid Truststore type: " + clientConf.getTLSTrustStoreType());
+        if (Authentication) {
+            kmf = initKeyManagerFactory(clientConf.getTLSKeyStoreType(), clientConf.getTLSKeyStore(),
+                    clientConf.getTLSKeyStorePasswordPath());
         }
 
-        if (clientAuthentication) {
-            switch (KeyStoreType.valueOf(clientConf.getTLSKeyStoreType())) {
-            case PEM:
-                final String keyPassword;
+        // Build Ssl context
+        sslContextBuilder = SslContextBuilder.forClient()
+                                            .trustManager(tmf)
+                                            .ciphers(null)
+                                            .sessionCacheSize(0)
+                                            .sessionTimeout(0)
+                                            .sslProvider(provider)
+                                            .clientAuth(ClientAuth.REQUIRE);
 
-                if (Strings.isNullOrEmpty(clientConf.getTLSCertificatePath())) {
-                    throw new SecurityException("Valid Certificate is missing");
-                }
-
-                if (Strings.isNullOrEmpty(clientConf.getTLSKeyStore())) {
-                    throw new SecurityException("Valid Key is missing");
-                }
-
-                if (!Strings.isNullOrEmpty(clientConf.getTLSKeyStorePasswordPath())) {
-                    keyPassword = getPasswordFromFile(clientConf.getTLSKeyStorePasswordPath());
-                } else {
-                    keyPassword = null;
-                }
-
-                sslContextBuilder.keyManager(new File(clientConf.getTLSCertificatePath()),
-                        new File(clientConf.getTLSKeyStore()), keyPassword);
-                break;
-            case JKS:
-                // falling thru, same as PKCS12
-            case PKCS12:
-                KeyManagerFactory kmf = initKeyManagerFactory(clientConf.getTLSKeyStoreType(),
-                        clientConf.getTLSKeyStore(), clientConf.getTLSKeyStorePasswordPath());
-
-                sslContextBuilder.keyManager(kmf);
-                break;
-            default:
-                throw new SecurityException("Invalid Keyfile type" + clientConf.getTLSKeyStoreType());
-            }
+        /* if mutual authentication is enabled */
+        if (Authentication) {
+            sslContextBuilder.keyManager(kmf);
         }
 
         sslContext = sslContextBuilder.build();
-        certLastRefreshTime = System.currentTimeMillis();
     }
 
-    private void createServerContext()
-            throws SecurityException, KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException,
-            UnrecoverableKeyException, InvalidKeySpecException, IllegalArgumentException {
-        isServerCtx = true;
-        ServerConfiguration clientConf = (ServerConfiguration) config;
-        markAutoCertRefresh(clientConf.getTLSCertificatePath(), clientConf.getTLSKeyStore(),
-                clientConf.getTLSKeyStorePasswordPath(), clientConf.getTLSTrustStore(),
-                clientConf.getTLSTrustStorePasswordPath());
-        updateServerContext();
-    }
-
-    private synchronized SslContext getSSLContext() {
-        long now = System.currentTimeMillis();
-        if ((certRefreshTime > 0 && now > (certLastRefreshTime + certRefreshTime))) {
-            if (tlsCertificateFilePath.checkAndRefresh() || tlsKeyStoreFilePath.checkAndRefresh()
-                    || tlsKeyStorePasswordFilePath.checkAndRefresh() || tlsTrustStoreFilePath.checkAndRefresh()
-                    || tlsTrustStorePasswordFilePath.checkAndRefresh()) {
-                try {
-                    log.info("Updating tls certs certFile={}, keyStoreFile={}, trustStoreFile={}",
-                            tlsCertificateFilePath.getFileName(), tlsKeyStoreFilePath.getFileName(),
-                            tlsTrustStoreFilePath.getFileName());
-                    if (isServerCtx) {
-                        updateServerContext();
-                    } else {
-                        updateClientContext();
-                    }
-                } catch (Exception e) {
-                    log.info("Failed to refresh tls certs", e);
-                }
-            }
-        }
-        return sslContext;
-    }
-
-    private synchronized void updateServerContext() throws SecurityException, KeyStoreException,
-            NoSuchAlgorithmException, CertificateException, IOException, UnrecoverableKeyException,
-            InvalidKeySpecException, IllegalArgumentException {
+    private void createServerContext(AbstractConfiguration conf) throws SecurityException, KeyStoreException, NoSuchAlgorithmException,
+            CertificateException, IOException, UnrecoverableKeyException {
         final SslContextBuilder sslContextBuilder;
         final ServerConfiguration serverConf;
         final SslProvider provider;
-        final boolean clientAuthentication;
+        final boolean Authentication;
 
-        // get key-file and trust-file locations and passwords
-        if (!(config instanceof ServerConfiguration)) {
+        KeyManagerFactory kmf = null;
+        TrustManagerFactory tmf = null;
+
+        // get key-store and trust-store locations and passwords
+        if (!(conf instanceof ServerConfiguration)) {
             throw new SecurityException("Server configruation not provided");
         }
 
-        serverConf = (ServerConfiguration) config;
+        serverConf = (ServerConfiguration) conf;
         provider = getTLSProvider(serverConf.getTLSProvider());
-        clientAuthentication = serverConf.getTLSClientAuthentication();
+        Authentication = serverConf.getTLSClientAuthentication();
 
-        switch (KeyStoreType.valueOf(serverConf.getTLSKeyStoreType())) {
-        case PEM:
-            final String keyPassword;
+        kmf = initKeyManagerFactory(serverConf.getTLSKeyStoreType(), serverConf.getTLSKeyStore(),
+                serverConf.getTLSKeyStorePasswordPath());
 
-            if (Strings.isNullOrEmpty(serverConf.getTLSKeyStore())) {
-                throw new SecurityException("Key path is required");
-            }
-
-            if (Strings.isNullOrEmpty(serverConf.getTLSCertificatePath())) {
-                throw new SecurityException("Certificate path is required");
-            }
-
-            if (!Strings.isNullOrEmpty(serverConf.getTLSKeyStorePasswordPath())) {
-                keyPassword = getPasswordFromFile(serverConf.getTLSKeyStorePasswordPath());
-            } else {
-                keyPassword = null;
-            }
-
-            sslContextBuilder = SslContextBuilder
-                                .forServer(new File(serverConf.getTLSCertificatePath()),
-                            new File(serverConf.getTLSKeyStore()), keyPassword)
-                                .ciphers(null)
-                                .sessionCacheSize(0)
-                                .sessionTimeout(0)
-                                .sslProvider(provider)
-                                .startTls(true);
-
-            break;
-        case JKS:
-            // falling thru, same as PKCS12
-        case PKCS12:
-            KeyManagerFactory kmf = initKeyManagerFactory(serverConf.getTLSKeyStoreType(),
-                    serverConf.getTLSKeyStore(),
-                    serverConf.getTLSKeyStorePasswordPath());
-
-            sslContextBuilder = SslContextBuilder.forServer(kmf)
-                                .ciphers(null)
-                                .sessionCacheSize(0)
-                                .sessionTimeout(0)
-                                .sslProvider(provider)
-                                .startTls(true);
-
-            break;
-        default:
-            throw new SecurityException("Invalid Keyfile type" + serverConf.getTLSKeyStoreType());
+        if (Authentication) {
+            tmf = initTrustManagerFactory(serverConf.getTLSTrustStoreType(), serverConf.getTLSTrustStore(),
+                    serverConf.getTLSTrustStorePasswordPath());
         }
 
-        if (clientAuthentication) {
-            sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        // Build Ssl context
+        sslContextBuilder = SslContextBuilder.forServer(kmf)
+                                            .ciphers(null)
+                                            .sessionCacheSize(0)
+                                            .sessionTimeout(0)
+                                            .sslProvider(provider)
+                                            .startTls(true);
 
-            switch (KeyStoreType.valueOf(serverConf.getTLSTrustStoreType())) {
-            case PEM:
-                if (Strings.isNullOrEmpty(serverConf.getTLSTrustStore())) {
-                    throw new SecurityException("CA Certificate chain is required");
-                }
-                sslContextBuilder.trustManager(new File(serverConf.getTLSTrustStore()));
-                break;
-            case JKS:
-                // falling thru, same as PKCS12
-            case PKCS12:
-                TrustManagerFactory tmf = initTrustManagerFactory(serverConf.getTLSTrustStoreType(),
-                        serverConf.getTLSTrustStore(), serverConf.getTLSTrustStorePasswordPath());
-                sslContextBuilder.trustManager(tmf);
-                break;
-            default:
-                throw new SecurityException("Invalid Truststore type" + serverConf.getTLSTrustStoreType());
-            }
+        /* if mutual authentication is enabled */
+        if (Authentication) {
+            sslContextBuilder.trustManager(tmf)
+                            .clientAuth(ClientAuth.REQUIRE);
         }
 
         sslContext = sslContextBuilder.build();
-        certLastRefreshTime = System.currentTimeMillis();
     }
 
     @Override
-    public synchronized void init(NodeType type, AbstractConfiguration conf, ByteBufAllocator allocator)
-            throws SecurityException {
-        this.allocator = allocator;
-        this.config = conf;
+    public synchronized void init(NodeType type, AbstractConfiguration conf) throws SecurityException {
         final String enabledProtocols;
         final String enabledCiphers;
-        certRefreshTime = TimeUnit.SECONDS.toMillis(conf.getTLSCertFilesRefreshDurationSeconds());
 
         enabledCiphers = conf.getTLSEnabledCipherSuites();
         enabledProtocols = conf.getTLSEnabledProtocols();
@@ -485,10 +247,10 @@ public class TLSContextFactory implements SecurityHandlerFactory {
         try {
             switch (type) {
             case Client:
-                createClientContext();
+                createClientContext(conf);
                 break;
             case Server:
-                createServerContext();
+                createServerContext(conf);
                 break;
             default:
                 throw new SecurityException(new IllegalArgumentException("Invalid NodeType"));
@@ -508,45 +270,24 @@ public class TLSContextFactory implements SecurityHandlerFactory {
         } catch (CertificateException e) {
             throw new SecurityException("Unable to load keystore", e);
         } catch (IOException e) {
-            throw new SecurityException("Error initializing SSLContext", e);
+            throw new SecurityException("Error initializing TLSContext", e);
         } catch (UnrecoverableKeyException e) {
-            throw new SecurityException("Unable to load key manager, possibly bad password", e);
-        } catch (InvalidKeySpecException e) {
-            throw new SecurityException("Unable to load key manager", e);
-        } catch (IllegalArgumentException e) {
-            throw new SecurityException("Invalid TLS configuration", e);
-        } catch (NoSuchProviderException e) {
-            throw new SecurityException("No such provider", e);
+            throw new SecurityException("Unable to load key manager, possibly wrong password given", e);
         }
     }
 
     @Override
     public SslHandler newTLSHandler() {
-        SslHandler sslHandler = getSSLContext().newHandler(allocator);
+        SslHandler sslHandler = sslContext.newHandler(PooledByteBufAllocator.DEFAULT);
 
         if (protocols != null && protocols.length != 0) {
             sslHandler.engine().setEnabledProtocols(protocols);
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("Enabled cipher protocols: {} ", Arrays.toString(sslHandler.engine().getEnabledProtocols()));
         }
 
         if (ciphers != null && ciphers.length != 0) {
             sslHandler.engine().setEnabledCipherSuites(ciphers);
         }
-        if (log.isDebugEnabled()) {
-            log.debug("Enabled cipher suites: {} ", Arrays.toString(sslHandler.engine().getEnabledCipherSuites()));
-        }
 
         return sslHandler;
-    }
-
-    private void markAutoCertRefresh(String tlsCertificatePath, String tlsKeyStore, String tlsKeyStorePasswordPath,
-            String tlsTrustStore, String tlsTrustStorePasswordPath) {
-        tlsCertificateFilePath = new FileModifiedTimeUpdater(tlsCertificatePath);
-        tlsKeyStoreFilePath = new FileModifiedTimeUpdater(tlsKeyStore);
-        tlsKeyStorePasswordFilePath = new FileModifiedTimeUpdater(tlsKeyStorePasswordPath);
-        tlsTrustStoreFilePath = new FileModifiedTimeUpdater(tlsTrustStore);
-        tlsTrustStorePasswordFilePath = new FileModifiedTimeUpdater(tlsTrustStorePasswordPath);
     }
 }

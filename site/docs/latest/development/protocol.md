@@ -53,7 +53,7 @@ First entry | Bookies
 
 Each entry in the log is written to **Q<sub>w</sub>** nodes. This is considered the write quorum for that entry. The write quorum is the subsequence of the ensemble, **Q<sub>w</sub>** in length, and starting at the bookie at index (entryid % **E**).
 
-For example, in a ledger of **E** = 4, **Q<sub>w</sub>** = 3, and **Q<sub>a</sub>** = 2, with an ensemble consisting of B1, B2, B3, and B4, the write quorums for the first 6 entries will be:
+For example, in a ledger of **E** = 4, **Q<sub>w</sub>**, and **Q<sub>a</sub>** = 2, with an ensemble consisting of B1, B2, B3, and B4, the write quorums for the first 6 entries will be:
 
 Entry | Write quorum
 :-----|:------------
@@ -64,7 +64,7 @@ Entry | Write quorum
 4 | B1, B2, B3
 5 | B2, B3, B4
 
-There are only **E** distinct write quorums in any ensemble. If **Q<sub>w</sub>** = **E**, then there is only one, as no striping occurs.
+There are only **E** distinct write quorums in any ensemble. If **Q<sub>w</sub>** = **Q<sub>a</sub>**, then there is only one, as no striping occurs.
 
 ### Ack quorums
 
@@ -124,7 +124,7 @@ In many cases, leader election is really leader suggestion. Multiple nodes could
 Once a node thinks it is leader for a particular log, it must take the following steps:
 
 1. Read the list of ledgers for the log
-1. {% pop Fence %} the last two ledgers in the list. Two ledgers are fenced because the writer may be writing to the second-to-last ledger while adding the last ledger to the list.
+1. {% pop Fence %} the last two ledgers in the list. Two ledgers are fenced because because the writer may be writing to the second-to-last ledger while adding the last ledger to the list.
 1. Create a new ledger
 1. Add the new ledger to the ledger list
 1. Write the new ledger back to the datastore using a CAS operation

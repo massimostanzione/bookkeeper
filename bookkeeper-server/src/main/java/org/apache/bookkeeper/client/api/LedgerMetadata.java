@@ -24,11 +24,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience.LimitedPrivate;
 import org.apache.bookkeeper.common.annotation.InterfaceStability.Unstable;
-<<<<<<< HEAD
 import org.apache.bookkeeper.net.BookieSocketAddress;
-=======
-import org.apache.bookkeeper.net.BookieId;
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
 /**
  * Represents the client-side metadata of a ledger. It is immutable.
@@ -38,15 +34,6 @@ import org.apache.bookkeeper.net.BookieId;
 @LimitedPrivate
 @Unstable
 public interface LedgerMetadata {
-<<<<<<< HEAD
-=======
-    /**
-     * Returns the id of this ledger.
-     *
-     * @return the id of this ledger.
-     */
-    long getLedgerId();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     /**
      * Returns the ensemble size of this ledger.
@@ -88,28 +75,7 @@ public interface LedgerMetadata {
     long getLength();
 
     /**
-<<<<<<< HEAD
      * Returns the digest type used by this ledger.
-=======
-     * Whether the metadata contains the password and digest type for the ledger.
-     * Ledgers created with version 4.1.0 clients or older do not have this information.
-     *
-     * @return true if the metadata contains the password and digest type, false otherwise.
-     */
-    boolean hasPassword();
-
-    /**
-     * Get the password for the ledger.
-     * For ledgers created with version 4.1.0 or older, an empty byte array is returned.
-     *
-     * @return the password for the ledger.
-     */
-    byte[] getPassword();
-
-    /**
-     * Returns the digest type used by this ledger.
-     * May return null if the ledger was created with version 4.1.0 or below.
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
      *
      * @return the digest type used by this ledger.
      */
@@ -142,7 +108,6 @@ public interface LedgerMetadata {
      * @param entryId the entry id to retrieve its ensemble information
      * @return the ensemble which contains the given {@code entryId}.
      */
-<<<<<<< HEAD
     List<BookieSocketAddress> getEnsembleAt(long entryId);
 
     /**
@@ -153,62 +118,4 @@ public interface LedgerMetadata {
     NavigableMap<Long, ? extends List<BookieSocketAddress>> getAllEnsembles();
 
 
-=======
-    List<BookieId> getEnsembleAt(long entryId);
-
-    /**
-     * Returns all the ensembles of this ledger.
-     *
-     * @return all the ensembles of this ledger.
-     */
-    NavigableMap<Long, ? extends List<BookieId>> getAllEnsembles();
-
-    /**
-     * Returns the state of the metadata.
-     *
-     * @return the state of the metadata.
-     */
-    State getState();
-
-    /**
-     * Possible metadata states.
-     */
-    enum State {
-        /** The ledger is open. New entry may be added to it. */
-        OPEN,
-
-        /** A reader has tried to, or may be trying to recover the ledger.
-            The writer may be able to add new entries if fencing hasn't already occurred,
-            but any attempt to change ensemble will fail and the write will be forced to
-            close the ledger.
-        */
-        IN_RECOVERY,
-
-        /** The ledger is closed. No new entries may be added to it.
-            The length and lastEntryId are fixed. Ensembles may change, but only for rereplication.
-        */
-        CLOSED
-    }
-
-    /**
-     * Similar to #toString(), but omits the password of the ledger, so that it is safe to log the output.
-     *
-     * @return a string representation of the metadata, omitting the password.
-     */
-    String toSafeString();
-
-    /**
-     * Get the format version which should be used to serialize the metadata.
-     *
-     * @return the format version.
-     */
-    int getMetadataFormatVersion();
-
-    /**
-     * Get the unique creator token of the Ledger.
-     *
-     * @return the creator token
-     */
-    long getCToken();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 }

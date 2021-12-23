@@ -22,24 +22,18 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
-
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.client.BookieInfoReader.BookieInfo;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.client.BookieInfoReader.BookieInfo;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.stats.OpStatsLogger;
-import org.apache.bookkeeper.util.AvailabilityOfEntriesOfLedger;
 import org.apache.bookkeeper.util.MathUtils;
-import org.apache.bookkeeper.versioning.Versioned;
 import org.apache.zookeeper.AsyncCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,101 +64,29 @@ public class BookkeeperInternalCallbacks {
          * @param metadata
          *          new ledger metadata.
          */
-        void onChanged(long ledgerId, Versioned<LedgerMetadata> metadata);
+        void onChanged(long ledgerId, LedgerMetadata metadata);
     }
 
-    /**
-     * A writer callback interface.
-     */
     public interface WriteCallback {
-        void writeComplete(int rc, long ledgerId, long entryId, BookieId addr, Object ctx);
+        void writeComplete(int rc, long ledgerId, long entryId, BookieSocketAddress addr, Object ctx);
     }
 
-    /**
-     * A last-add-confirmed (LAC) reader callback interface.
-     */
     public interface ReadLacCallback {
         void readLacComplete(int rc, long ledgerId, ByteBuf lac, ByteBuf buffer, Object ctx);
     }
 
-    /**
-     * A last-add-confirmed (LAC) writer callback interface.
-     */
     public interface WriteLacCallback {
-        void writeLacComplete(int rc, long ledgerId, BookieId addr, Object ctx);
+        void writeLacComplete(int rc, long ledgerId, BookieSocketAddress addr, Object ctx);
     }
 
-    /**
-     * Force callback interface.
-     */
-    public interface ForceLedgerCallback {
-        void forceLedgerComplete(int rc, long ledgerId, BookieId addr, Object ctx);
-    }
-
-    /**
-     * A callback interface for a STARTTLS command.
-     */
     public interface StartTLSCallback {
         void startTLSComplete(int rc, Object ctx);
     }
 
-    /**
-     * A callback interface for GetListOfEntriesOfLedger command.
-     */
-    public interface GetListOfEntriesOfLedgerCallback {
-        void getListOfEntriesOfLedgerComplete(int rc, long ledgerId,
-                AvailabilityOfEntriesOfLedger availabilityOfEntriesOfLedger);
-    }
-
-    /**
-     * Handle the Response Code and transform it to a BKException.
-     *
-     * @param <T>
-     * @param rc
-     * @param result
-     * @param future
-     */
-    public static <T> void finish(int rc, T result, CompletableFuture<? super T> future) {
-        if (rc != BKException.Code.OK) {
-            future.completeExceptionally(BKException.create(rc).fillInStackTrace());
-        } else {
-            future.complete(result);
-        }
-    }
-
-    /**
-     * Future for GetListOfEntriesOfLedger.
-     */
-    public static class FutureGetListOfEntriesOfLedger extends CompletableFuture<AvailabilityOfEntriesOfLedger>
-            implements GetListOfEntriesOfLedgerCallback {
-        private final long ledgerIdOfTheRequest;
-
-        FutureGetListOfEntriesOfLedger(long ledgerId) {
-            this.ledgerIdOfTheRequest = ledgerId;
-        }
-
-        @Override
-        public void getListOfEntriesOfLedgerComplete(int rc, long ledgerIdOfTheResponse,
-                AvailabilityOfEntriesOfLedger availabilityOfEntriesOfLedger) {
-            if ((rc == BKException.Code.OK) && (ledgerIdOfTheRequest != ledgerIdOfTheResponse)) {
-                LOG.error("For getListOfEntriesOfLedger expected ledgerId in the response: {} actual ledgerId: {}",
-                        ledgerIdOfTheRequest, ledgerIdOfTheResponse);
-                rc = BKException.Code.ReadException;
-            }
-            finish(rc, availabilityOfEntriesOfLedger, this);
-        }
-    }
-
-    /**
-     * A generic callback interface.
-     */
     public interface GenericCallback<T> {
         void operationComplete(int rc, T result);
     }
-
-    /**
-     * A callback implementation with an internal timer.
-     */
+    
     public static class TimedGenericCallback<T> implements GenericCallback<T> {
 
         final GenericCallback<T> cb;
@@ -190,24 +112,6 @@ public class BookkeeperInternalCallbacks {
         }
     }
 
-    /**
-     * Generic callback future.
-     */
-    public static class GenericCallbackFuture<T>
-        extends CompletableFuture<T> implements GenericCallback<T> {
-        @Override
-        public void operationComplete(int rc, T value) {
-            if (rc != BKException.Code.OK) {
-                completeExceptionally(BKException.create(rc));
-            } else {
-                complete(value);
-            }
-        }
-    }
-
-    /**
-     * Declaration of a callback interface for the Last Add Confirmed context of a reader.
-     */
     public interface ReadEntryCallbackCtx {
         void setLastAddConfirmed(long lac);
         long getLastAddConfirmed();
@@ -241,10 +145,7 @@ public class BookkeeperInternalCallbacks {
          */
         void onEntryComplete(int rc, LedgerHandle lh, LedgerEntry entry, Object ctx);
     }
-
-    /**
-     * This is a callback interface for fetching metadata about a bookie.
-     */
+    
     public interface GetBookieInfoCallback {
         void getBookieInfoComplete(int rc, BookieInfo bInfo, Object ctx);
     }
@@ -330,18 +231,18 @@ public class BookkeeperInternalCallbacks {
     }
 
     /**
-     * Processor to process a specific element.
+     * Processor to process a specific element
      */
-    public interface Processor<T> {
+    public static interface Processor<T> {
         /**
-         * Process a specific element.
+         * Process a specific element
          *
          * @param data
          *          data to process
          * @param cb
          *          Callback to invoke when process has been done.
          */
-        void process(T data, AsyncCallback.VoidCallback cb);
+        public void process(T data, AsyncCallback.VoidCallback cb);
     }
 
 }

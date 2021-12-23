@@ -22,8 +22,6 @@ package org.apache.bookkeeper.util;
 
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.apache.bookkeeper.test.ZooKeeperUtil;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -35,12 +33,11 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test ZooKeeper utilities.
- */
+import junit.framework.TestCase;
+
 public class TestZkUtils extends TestCase {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestZkUtils.class);
+    static final Logger logger = LoggerFactory.getLogger(TestZkUtils.class);
 
     // ZooKeeper related variables
     protected ZooKeeperUtil zkUtil = new ZooKeeperUtil();
@@ -49,13 +46,13 @@ public class TestZkUtils extends TestCase {
     @Override
     public void setUp() throws Exception {
         logger.info("Setting up test {}.", getName());
-        zkUtil.startCluster();
+        zkUtil.startServer();
     }
 
     @After
     @Override
     public void tearDown() throws Exception {
-        zkUtil.killCluster();
+        zkUtil.killServer();
         logger.info("Teared down test {}.", getName());
     }
 

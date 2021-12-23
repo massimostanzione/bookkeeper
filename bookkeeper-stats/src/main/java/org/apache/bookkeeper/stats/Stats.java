@@ -37,10 +37,6 @@ public class Stats {
 
     public static void loadStatsProvider(Configuration conf) {
         String className = conf.getString(STATS_PROVIDER_CLASS);
-        loadStatsProvider(className);
-    }
-
-    public static void loadStatsProvider(String className) {
         if (className != null) {
             try {
                 Class cls = Class.forName(className);

@@ -8,7 +8,7 @@ The ledger API is a lower-level API for BookKeeper that enables you to interact 
 
 To get started with the Java client for BookKeeper, install the `bookkeeper-server` library as a dependency in your Java application.
 
-> For a more in-depth tutorial that involves a real use case for BookKeeper, see the [Example application](#example-application) guide.
+> For a more in-depth tutorial that involves a real use case for BookKeeper, see the [Example application](../example-application) guide.
 
 ## Installation
 
@@ -30,22 +30,6 @@ If you're using [Maven](https://maven.apache.org/), add this to your [`pom.xml`]
 </dependency>
 ```
 
-BookKeeper uses google [protobuf](https://github.com/google/protobuf/tree/master/java) and [guava](https://github.com/google/guava) libraries
-a lot. If your application might include different versions of protobuf or guava introduced by other dependencies, you can choose to use the
-shaded library, which relocate classes of protobuf and guava into a different namespace to avoid conflicts.
-
-```xml
-<!-- in your <properties> block -->
-<bookkeeper.version>{{ site.latest_version }}</bookkeeper.version>
-
-<!-- in your <dependencies> block -->
-<dependency>
-  <groupId>org.apache.bookkeeper</groupId>
-  <artifactId>bookkeeper-server-shaded</artifactId>
-  <version>${bookkeeper.version}</version>
-</dependency>
-```
-
 ### Gradle
 
 If you're using [Gradle](https://gradle.org/), add this to your [`build.gradle`](https://spring.io/guides/gs/gradle/) build configuration file:
@@ -58,15 +42,6 @@ dependencies {
 // Alternatively:
 dependencies {
     compile 'org.apache.bookkeeper:bookkeeper-server:{{ site.latest_version }}'
-}
-```
-
-Similarly as using maven, you can also configure to use the shaded jars.
-
-```groovy
-// use the `bookkeeper-server-shaded` jar
-dependencies {
-    compile 'org.apache.bookkeeper:bookkeeper-server-shaded:{{ site.latest-version }}'
 }
 ```
 
@@ -180,8 +155,8 @@ while (entries.hasNextElement()) {
 ### Reading entries after the LastAddConfirmed range
 
 `readUnconfirmedEntries` allowing to read after the LastAddConfirmed range.
-It lets the client read without checking the local value of LastAddConfirmed, so that it is possible to read entries for which the writer has not received the acknowledge yet.
-For entries which are within the range 0..LastAddConfirmed, BookKeeper guarantees that the writer has successfully received the acknowledge.
+It lets the client read without checking the local value of LastAddConfirmed, so that it is possible to read entries for which the writer has not received the acknowledge yet
+For entries which are within the range 0..LastAddConfirmed BookKeeper guarantees that the writer has successfully received the acknowledge.
 For entries outside that range it is possible that the writer never received the acknowledge and so there is the risk that the reader is seeing entries before the writer and this could result in a consistency issue in some cases.
 With this method you can even read entries before the LastAddConfirmed and entries after it with one call, the expected consistency will be as described above.
 
@@ -197,7 +172,7 @@ while (entries.hasNextElement()) {
 
 ## Deleting ledgers
 
-{% pop Ledgers %} can be deleted synchronously which may throw exception:
+{% pop Ledgers %} can also be deleted synchronously or asynchronously.
 
 ```java
 long ledgerId = 1234;
@@ -211,7 +186,9 @@ try {
 
 ### Delete entries asynchronously
 
-{% pop Ledgers %} can also be deleted asynchronously:
+Exceptions thrown:
+
+*
 
 ```java
 class DeleteEntryCallback implements AsyncCallback.DeleteCallback {
@@ -219,7 +196,6 @@ class DeleteEntryCallback implements AsyncCallback.DeleteCallback {
         System.out.println("Delete completed");
     }
 }
-bkClient.asyncDeleteLedger(ledgerID, new DeleteEntryCallback(), null);
 ```
 
 ## Simple example
@@ -301,7 +277,7 @@ Before you start, you will need to have a BookKeeper cluster running locally on 
 To start up a cluster consisting of six {% pop bookies %} locally:
 
 ```shell
-$ bin/bookkeeper localbookie 6
+$ bookkeeper-server/bin/bookkeeper localbookie 6
 ```
 
 You can specify a different number of bookies if you'd like.
@@ -494,347 +470,4 @@ $ fg
 mvn exec:java -Dexec.mainClass=org.apache.bookkeeper.Dice
 Value = 3, isLeader = true
 Value = 1, isLeader = false
-```
-
-## New API
-
-Since 4.6 BookKeeper provides a new client API which leverages Java8 [CompletableFuture](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html) facility.
-[WriteHandle](../javadoc/org/apache/bookkeeper/client/api/WriteHandle), [WriteAdvHandle](../javadoc/org/apache/bookkeeper/client/api/WriteAdvHandle), [ReadHandle](../javadoc/org/apache/bookkeeper/client/api/ReadHandle) are introduced for replacing the generic [LedgerHandle](../javadoc/org/apache/bookkeeper/client/LedgerHandle).
-
-> All the new API now is available in `org.apache.bookkeeper.client.api`. You should only use interfaces defined in this package.
-
-*Beware* that this API in 4.6 is still experimental API and can be subject to changes in next minor releases.
-
-### Create a new client
-
-In order to create a new [`BookKeeper`](../javadoc/org/apache/bookkeeper/client/api/BookKeeper) client object, you need to construct a [`ClientConfiguration`](../javadoc/org/apache/bookkeeper/conf/ClientConfiguration) object and set a [connection string](#connection-string) first, and then use [`BookKeeperBuilder`](../javadoc/org/apache/bookkeeper/client/api/BookKeeperBuilder) to build the client.
-
-Here is an example building the bookkeeper client.
-
-```java
-// construct a client configuration instance
-ClientConfiguration conf = new ClientConfiguration();
-conf.setZkServers(zkConnectionString);
-conf.setZkLedgersRootPath("/path/to/ledgers/root");
-
-// build the bookkeeper client
-BookKeeper bk = BookKeeper.newBuilder(conf)
-    .statsLogger(...)
-    ...
-    .build();
-
-```
-
-### Create ledgers
-
-the easiest way to create a {% pop ledger %} using the java client is via the [`createbuilder`](../javadoc/org/apache/bookkeeper/client/api/createbuilder). you must specify at least
-a [`digesttype`](../javadoc/org/apache/bookkeeper/client/api/digesttype) and a password.
-
-here's an example:
-
-```java
-BookKeeper bk = ...;
-
-byte[] password = "some-password".getBytes();
-
-WriteHandle wh = bk.newCreateLedgerOp()
-    .withDigestType(DigestType.CRC32)
-    .withPassword(password)
-    .withEnsembleSize(3)
-    .withWriteQuorumSize(3)
-    .withAckQuorumSize(2)
-    .execute()          // execute the creation op
-    .get();             // wait for the execution to complete
-```
-
-A [`WriteHandle`](../javadoc/org/apache/bookkeeper/client/api/WriteHandle) is returned for applications to write and read entries to and from the ledger.
-
-### Write flags
-
-You can specify behaviour of the writer by setting [`WriteFlags`](../javadoc/org/apache/bookkeeper/client/api/WriteFlag) at ledger creation type.
-These flags are applied only during write operations and are not recorded on metadata.
-
-
-Available write flags:
-
-| Flag  | Explanation  | Notes |
-:---------|:------------|:-------
-DEFERRED_SYNC | Writes are acknowledged early, without waiting for guarantees of durability | Data will be only written to the OS page cache, without forcing an fsync.
-
-```java
-BookKeeper bk = ...;
-
-byte[] password = "some-password".getBytes();
-
-WriteHandle wh = bk.newCreateLedgerOp()
-    .withDigestType(DigestType.CRC32)
-    .withPassword(password)
-    .withEnsembleSize(3)
-    .withWriteQuorumSize(3)
-    .withAckQuorumSize(2)
-    .withWriteFlags(DEFERRED_SYNC)
-    .execute()          // execute the creation op
-    .get();             // wait for the execution to complete
-```
-
-
-### Append entries to ledgers
-
-The [`WriteHandle`](../javadoc/org/apache/bookkeeper/client/api/WriteHandle) can be used for applications to append entries to the ledgers.
-
-```java
-WriteHandle wh = ...;
-
-CompletableFuture<Long> addFuture = wh.append("Some entry data".getBytes());
-
-// option 1: you can wait for add to complete synchronously
-try {
-    long entryId = FutureUtils.result(addFuture.get());
-} catch (BKException bke) {
-    // error handling
-}
-
-// option 2: you can process the result and exception asynchronously
-addFuture
-    .thenApply(entryId -> {
-        // process the result
-    })
-    .exceptionally(cause -> {
-        // handle the exception
-    })
-
-// option 3: bookkeeper provides a twitter-future-like event listener for processing result and exception asynchronously
-addFuture.whenComplete(new FutureEventListener() {
-    @Override
-    public void onSuccess(long entryId) {
-        // process the result
-    }
-    @Override
-    public void onFailure(Throwable cause) {
-        // handle the exception
-    }
-});
-```
-
-The append method supports three representations of a bytes array: the native java `byte[]`, java nio `ByteBuffer` and netty `ByteBuf`.
-It is recommended to use `ByteBuf` as it is more gc friendly.
-
-### Open ledgers
-
-You can open ledgers to read entries. Opening ledgers is done by [`openBuilder`](../javadoc/org/apache/bookkeeper/client/api/openBuilder). You must specify the ledgerId and the password
-in order to open the ledgers.
-
-here's an example:
-
-```java
-BookKeeper bk = ...;
-
-long ledgerId = ...;
-byte[] password = "some-password".getBytes();
-
-ReadHandle rh = bk.newOpenLedgerOp()
-    .withLedgerId(ledgerId)
-    .withPassword(password)
-    .execute()          // execute the open op
-    .get();             // wait for the execution to complete
-```
-
-A [`ReadHandle`](../javadoc/org/apache/bookkeeper/client/api/ReadHandle) is returned for applications to read entries to and from the ledger.
-
-#### Recovery vs NoRecovery
-
-By default, the [`openBuilder`](../javadoc/org/apache/bookkeeper/client/api/openBuilder) opens the ledger in a `NoRecovery` mode. You can open the ledger in `Recovery` mode by specifying
-`withRecovery(true)` in the open builder.
-
-```java
-BookKeeper bk = ...;
-
-long ledgerId = ...;
-byte[] password = "some-password".getBytes();
-
-ReadHandle rh = bk.newOpenLedgerOp()
-    .withLedgerId(ledgerId)
-    .withPassword(password)
-    .withRecovery(true)
-    .execute()
-    .get();
-
-```
-
-**What is the difference between "Recovery" and "NoRecovery"?**
-
-If you are opening a ledger in "Recovery" mode, it will basically fence and seal the ledger -- no more entries are allowed
-to be appended to it. The writer which is currently appending entries to the ledger will fail with [`LedgerFencedException`](../javadoc/org/apache/bookkeeper/client/api/BKException.Code#LedgerFencedException).
-
-In constrat, opening a ledger in "NoRecovery" mode, it will not fence and seal the ledger. "NoRecovery" mode is usually used by applications to tailing-read from a ledger.
-
-### Read entries from ledgers
-
-The [`ReadHandle`](../javadoc/org/apache/bookkeeper/client/api/ReadHandle) returned from the open builder can be used for applications to read entries from the ledgers.
-
-```java
-ReadHandle rh = ...;
-
-long startEntryId = ...;
-long endEntryId = ...;
-CompletableFuture<LedgerEntries> readFuture = rh.read(startEntryId, endEntryId);
-
-// option 1: you can wait for read to complete synchronously
-try {
-    LedgerEntries entries = FutureUtils.result(readFuture.get());
-} catch (BKException bke) {
-    // error handling
-}
-
-// option 2: you can process the result and exception asynchronously
-readFuture
-    .thenApply(entries -> {
-        // process the result
-    })
-    .exceptionally(cause -> {
-        // handle the exception
-    })
-
-// option 3: bookkeeper provides a twitter-future-like event listener for processing result and exception asynchronously
-readFuture.whenComplete(new FutureEventListener<>() {
-    @Override
-    public void onSuccess(LedgerEntries entries) {
-        // process the result
-    }
-    @Override
-    public void onFailure(Throwable cause) {
-        // handle the exception
-    }
-});
-```
-
-Once you are done with processing the [`LedgerEntries`](../javadoc/org/apache/bookkeeper/client/api/LedgerEntries), you can call `#close()` on the `LedgerEntries` instance to
-release the buffers held by it.
-
-Applications are allowed to read any entries between `0` and [`LastAddConfirmed`](../javadoc/org/apache/bookkeeper/client/api/ReadHandle.html#getLastAddConfirmed). If the applications
-attempts to read entries beyond `LastAddConfirmed`, they will receive [`IncorrectParameterException`](../javadoc/org/apache/bookkeeper/client/api/BKException.Code#IncorrectParameterException).
-
-### Read unconfirmed entries from ledgers
-
-`readUnconfirmed` is provided the mechanism for applications to read entries beyond `LastAddConfirmed`. Applications should be aware of `readUnconfirmed` doesn't provide any
-repeatable read consistency.
-
-```java
-CompletableFuture<LedgerEntries> readFuture = rh.readUnconfirmed(startEntryId, endEntryId);
-```
-
-### Tailing Reads
-
-There are two methods for applications to achieve tailing reads: `Polling` and `Long-Polling`.
-
-#### Polling
-
-You can do this in synchronous way:
-
-```java
-ReadHandle rh = ...;
-
-long startEntryId = 0L;
-long nextEntryId = startEntryId;
-int numEntriesPerBatch = 4;
-while (!rh.isClosed() || nextEntryId <= rh.getLastAddConfirmed()) {
-    long lac = rh.getLastAddConfirmed();
-    if (nextEntryId > lac) {
-        // no more entries are added
-        Thread.sleep(1000);
-
-        lac = rh.readLastAddConfirmed().get();
-        continue;
-    }
-
-    long endEntryId = Math.min(lac, nextEntryId + numEntriesPerBatch - 1);
-    LedgerEntries entries = rh.read(nextEntryId, endEntryId).get();
-
-    // process the entries
-
-    nextEntryId = endEntryId + 1;
-}
-```
-
-#### Long Polling
-
-```java
-ReadHandle rh = ...;
-
-long startEntryId = 0L;
-long nextEntryId = startEntryId;
-int numEntriesPerBatch = 4;
-while (!rh.isClosed() || nextEntryId <= rh.getLastAddConfirmed()) {
-    long lac = rh.getLastAddConfirmed();
-    if (nextEntryId > lac) {
-        // no more entries are added
-        try (LastConfirmedAndEntry lacAndEntry = rh.readLastAddConfirmedAndEntry(nextEntryId, 1000, false).get()) {
-            if (lacAndEntry.hasEntry()) {
-                // process the entry
-
-                ++nextEntryId;
-            }
-        }
-    } else {
-        long endEntryId = Math.min(lac, nextEntryId + numEntriesPerBatch - 1);
-        LedgerEntries entries = rh.read(nextEntryId, endEntryId).get();
-
-        // process the entries
-        nextEntryId = endEntryId + 1;
-    }
-}
-```
-
-### Delete ledgers
-
-{% pop Ledgers %} can be deleted by using [`DeleteBuilder`](../javadoc/org/apache/bookkeeper/client/api/DeleteBuilder).
-
-```java
-BookKeeper bk = ...;
-long ledgerId = ...;
-
-bk.newDeleteLedgerOp()
-    .withLedgerId(ledgerId)
-    .execute()
-    .get();
-```
-
-### Relaxing Durability
-
-In BookKeeper by default each write will be acklowledged to the client if and only if it has been persisted durably (fsync called on the file system) by a quorum of bookies.
-In this case the LastAddConfirmed pointer is updated on the writer side, this is the guarantee for the writer that data will not be lost and it will
-be always readable by other clients.
-
-On the client side you can temporary relax this constraint by using the [`DEFERRED_SYNC`](../javadoc/org/apache/bookkeeper/client/api/WriteFlag) Write flag. Using this flag bookies will acknowledge each entry after
-writing the entry to SO buffers without waiting for an fsync.
-In this case the LastAddConfirmed pointer is not advanced to the writer side neither is updated on the reader's side, this is because **there is some chance to lose the entry**.
-Such entries will be still readable using readUnconfirmed() API, but they won't be readable using Long Poll reads or regular read() API.
-
-In order to get guarantees of durability the writer must use explicitly the [force()](../javadoc/org/apache/bookkeeper/client/api/ForceableHandle) API which will return only after all the bookies in the ensemble acknowledge the call after
-performing an fsync to the disk which is storing the journal.
-This way the LastAddConfirmed pointer is advanced on the writer side and it will be eventually available to the readers.
-
-The *close()* operation on the writer writes on ledger's metadata the current LastAddConfirmed pointer, **it is up to the application to call force() before issuing the close command**.
-In case that you never call explicitly [force()](../javadoc/org/apache/bookkeeper/client/api/ForceableHandle) the LastAddConfirmed will remain unset (-1) on ledger metadata and regular readers won't be able to access data.
-
-
-```java
-BookKeeper bk = ...;
-long ledgerId = ...;
-
-WriteHandle wh = bk.newCreateLedgerOp()
-    .withDigestType(DigestType.CRC32)
-    .withPassword(password)
-    .withEnsembleSize(3)
-    .withWriteQuorumSize(3)
-    .withAckQuorumSize(2)
-    .withWriteFlags(DEFERRED_SYNC)
-    .execute()          // execute the creation op
-    .get();             // wait for the execution to complete
-
-
-wh.force().get();  // wait for fsync, make data available to readers and to the replicator
-
-wh.close(); // seal the ledger
-
 ```

@@ -22,12 +22,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.bookkeeper.client.ITopologyAwareEnsemblePlacementPolicy;
-import org.apache.bookkeeper.client.RackChangeNotifier;
 import org.apache.bookkeeper.net.AbstractDNSToSwitchMapping;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.net.BookieNode;
-import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.net.DNSToSwitchMapping;
 import org.apache.bookkeeper.net.NetworkTopology;
 import org.apache.bookkeeper.net.NodeBase;
@@ -37,7 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Implements {@link DNSToSwitchMapping} via static mappings. Used in test cases to simulate racks.
  */
-public class StaticDNSResolver extends AbstractDNSToSwitchMapping implements RackChangeNotifier {
+public class StaticDNSResolver extends AbstractDNSToSwitchMapping {
 
     static final Logger LOG = LoggerFactory.getLogger(StaticDNSResolver.class);
 
@@ -73,10 +68,6 @@ public class StaticDNSResolver extends AbstractDNSToSwitchMapping implements Rac
 
     @Override
     public List<String> resolve(List<String> names) {
-        if (getBookieAddressResolver() == null) {
-            // test that this istance has been properly initialized
-            throw new IllegalStateException("bookieAddressResolver was not set");
-        }
         List<String> racks = new ArrayList<String>();
         for (String n : names) {
             String rack = name2Racks.get(n);
@@ -93,20 +84,4 @@ public class StaticDNSResolver extends AbstractDNSToSwitchMapping implements Rac
         // nop
     }
 
-    private static ITopologyAwareEnsemblePlacementPolicy<BookieNode> rackawarePolicy = null;
-
-    @Override
-    public void registerRackChangeListener(ITopologyAwareEnsemblePlacementPolicy<BookieNode> rackawareEnsemblePolicy) {
-        rackawarePolicy = rackawareEnsemblePolicy;
-    }
-
-    public static void changeRack(List<BookieSocketAddress> bookieAddressList, List<String> rack) {
-        List<BookieId> bookieIds = new ArrayList<>();
-        for (int i = 0; i < bookieAddressList.size(); i++) {
-            BookieSocketAddress bkAddress = bookieAddressList.get(i);
-            name2Racks.put(bkAddress.getHostName(), rack.get(i));
-            bookieIds.add(bkAddress.toBookieId());
-        }
-        rackawarePolicy.onBookieRackChange(bookieIds);
-    }
 }

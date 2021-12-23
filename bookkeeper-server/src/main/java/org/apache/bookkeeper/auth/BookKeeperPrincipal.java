@@ -63,7 +63,10 @@ public class BookKeeperPrincipal {
             return false;
         }
         final BookKeeperPrincipal other = (BookKeeperPrincipal) obj;
-        return Objects.equals(this.name, other.name);
+        if (!Objects.equals(this.name, other.name)) {
+            return false;
+        }
+        return true;
     }
 
 }

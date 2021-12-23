@@ -21,16 +21,10 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 
 /**
- * A {@code BufferedChannelBase} adds functionality to an existing file channel, the ability
+ * A {@code BufferedChannelBase} adds functionlity to an existing file channel, the ability
  * to buffer the input and output data. This class is a base class for wrapping the {@link FileChannel}.
  */
 public abstract class BufferedChannelBase {
-    static class BufferedChannelClosedException extends IOException {
-        BufferedChannelClosedException() {
-            super("Attempting to access a file channel that has already been closed");
-        }
-    }
-
     protected final FileChannel fileChannel;
 
     protected BufferedChannelBase(FileChannel fc) {
@@ -42,7 +36,7 @@ public abstract class BufferedChannelBase {
         // guarantee that once a log file has been closed and possibly deleted during garbage
         // collection, attempts will not be made to read from it
         if (!fileChannel.isOpen()) {
-            throw new BufferedChannelClosedException();
+            throw new IOException("Attempting to access a file channel that has already been closed");
         }
         return fileChannel;
     }
@@ -55,4 +49,11 @@ public abstract class BufferedChannelBase {
         return validateAndGetFileChannel().size();
     }
 
+    /**
+     * Get the {@link FileChannel} that this BufferedChannel wraps around.
+     * @return
+     */
+    public FileChannel getFileChannel() {
+        return fileChannel;
+    }
 }

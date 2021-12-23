@@ -46,7 +46,6 @@ class ZooKeeperServerShimImpl implements ZooKeeperServerShim {
         try {
             serverFactory.startup(zks);
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             throw new IOException("Interrupted when starting zookeeper server : ", e);
         }
     }

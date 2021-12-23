@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.util.DiskChecker;
 
 /**
  * Read Only Entry Logger.
@@ -32,7 +33,18 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 public class ReadOnlyEntryLogger extends EntryLogger {
 
     public ReadOnlyEntryLogger(ServerConfiguration conf) throws IOException {
-        super(conf);
+        super(conf, new LedgerDirsManager(conf, conf.getLedgerDirs(),
+                new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold())));
+    }
+
+    @Override
+    protected void initialize() throws IOException {
+        // do nothing for read only entry logger
+    }
+
+    @Override
+    void createNewLog() throws IOException {
+        throw new IOException("Can't create new entry log using a readonly entry logger.");
     }
 
     @Override
@@ -42,7 +54,7 @@ public class ReadOnlyEntryLogger extends EntryLogger {
     }
 
     @Override
-    public synchronized long addEntry(long ledgerId, ByteBuffer entry) throws IOException {
+    public synchronized long addEntry(long ledger, ByteBuffer entry) throws IOException {
         throw new IOException("Can't add entry to a readonly entry logger.");
     }
 }

@@ -22,23 +22,23 @@ package org.apache.bookkeeper.util.collections;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.StampedLock;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 /**
  * Concurrent hash map where both keys and values are composed of pairs of longs.
- *
- * <p>(long,long) --&gt; (long,long)
- *
- * <p>Provides similar methods as a {@code ConcurrentMap<K,V>} but since it's an open hash map with linear probing,
- * no node allocations are required to store the keys and values, and no boxing is required.
- *
- * <p>Keys <strong>MUST</strong> be &gt;= 0.
+ * <p>
+ * (long,long) --&gt; (long,long)
+ * <p>
+ * Provides similar methods as a ConcurrentMap<K,V> but since it's an open hash map with linear probing, no node
+ * allocations are required to store the keys and values, and no boxing is required.
+ * <p>
+ * Keys <strong>MUST</strong> be >= 0.
  */
 public class ConcurrentLongLongPairHashMap {
 
@@ -54,24 +54,15 @@ public class ConcurrentLongLongPairHashMap {
 
     private final Section[] sections;
 
-    /**
-     * A BiConsumer Long pair.
-     */
-    public interface BiConsumerLongPair {
+    public static interface BiConsumerLongPair {
         void accept(long key1, long key2, long value1, long value2);
     }
 
-    /**
-     * A Long pair function.
-     */
-    public interface LongLongPairFunction {
+    public static interface LongLongPairFunction {
         long apply(long key1, long key2);
     }
 
-    /**
-     * A Long pair predicate.
-     */
-    public interface LongLongPairPredicate {
+    public static interface LongLongPairPredicate {
         boolean test(long key1, long key2, long value1, long value2);
     }
 
@@ -162,7 +153,7 @@ public class ConcurrentLongLongPairHashMap {
     }
 
     /**
-     * Remove an existing entry if found.
+     * Remove an existing entry if found
      *
      * @param key
      * @return the value associated with the key or -1 if key was not present
@@ -180,7 +171,7 @@ public class ConcurrentLongLongPairHashMap {
         return getSection(h).remove(key1, key2, value1, value2, (int) h);
     }
 
-    private Section getSection(long hash) {
+    private final Section getSection(long hash) {
         // Use 32 msb out of long to get the section
         final int sectionIdx = (int) (hash >>> 32) & (sections.length - 1);
         return sections[sectionIdx];
@@ -223,9 +214,9 @@ public class ConcurrentLongLongPairHashMap {
     @SuppressWarnings("serial")
     private static final class Section extends StampedLock {
         // Keys and values are stored interleaved in the table array
-        private volatile long[] table;
+        private long[] table;
 
-        private volatile int capacity;
+        private int capacity;
         private volatile int size;
         private int usedBuckets;
         private int resizeThreshold;
@@ -470,11 +461,9 @@ public class ConcurrentLongLongPairHashMap {
                 }
             }
 
+            capacity = newCapacity;
             table = newTable;
             usedBuckets = size;
-            // Capacity needs to be updated after the values, so that we won't see
-            // a capacity value bigger than the actual array size
-            capacity = newCapacity;
             resizeThreshold = (int) (capacity * MapFillFactor);
         }
 
@@ -502,7 +491,7 @@ public class ConcurrentLongLongPairHashMap {
     private static final long HashMixer = 0xc6a4a7935bd1e995L;
     private static final int R = 47;
 
-    static final long hash(long key1, long key2) {
+    final static long hash(long key1, long key2) {
         long hash = key1 * HashMixer;
         hash ^= hash >>> R;
         hash *= HashMixer;
@@ -512,23 +501,20 @@ public class ConcurrentLongLongPairHashMap {
         return hash;
     }
 
-    static final int signSafeMod(long n, int max) {
-        return (int) (n & (max - 1)) << 2;
+    static final int signSafeMod(long n, int Max) {
+        return (int) (n & (Max - 1)) << 2;
     }
 
-    private static int alignToPowerOfTwo(int n) {
+    private static final int alignToPowerOfTwo(int n) {
         return (int) Math.pow(2, 32 - Integer.numberOfLeadingZeros(n - 1));
     }
 
-    private static void checkBiggerEqualZero(long n) {
+    private static final void checkBiggerEqualZero(long n) {
         if (n < 0L) {
             throw new IllegalArgumentException("Keys and values must be >= 0");
         }
     }
 
-    /**
-     * A pair of long values.
-     */
     public static class LongPair implements Comparable<LongPair> {
         public final long first;
         public final long second;

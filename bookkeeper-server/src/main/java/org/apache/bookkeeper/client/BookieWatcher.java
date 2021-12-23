@@ -17,26 +17,35 @@
  */
 package org.apache.bookkeeper.client;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-<<<<<<< HEAD
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BKException.BKInterruptedException;
-=======
-
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.proto.BookieAddressResolver;
+import org.apache.bookkeeper.client.BKException.MetaStoreException;
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.discover.RegistrationClient;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 
 /**
- * Watch for Bookkeeper cluster status.
+ * This class is responsible for maintaining a consistent view of what bookies
+ * are available by reading Zookeeper (and setting watches on the bookie nodes).
+ * When a bookie fails, the other parts of the code turn to this class to find a
+ * replacement
+ *
  */
-<<<<<<< HEAD
 @Slf4j
 class BookieWatcher {
 
@@ -127,22 +136,12 @@ class BookieWatcher {
         this.readOnlyBookies = readOnlyBookies;
         placementPolicy.onClusterChanged(writableBookies, readOnlyBookies);
     }
-=======
-public interface BookieWatcher {
-    Set<BookieId> getBookies() throws BKException;
-    Set<BookieId> getAllBookies() throws BKException;
-    Set<BookieId> getReadOnlyBookies() throws BKException;
-    BookieAddressResolver getBookieAddressResolver();
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     /**
-     * Determine if a bookie should be considered unavailable.
+     * Blocks until bookies are read from zookeeper, used in the {@link BookKeeper} constructor.
      *
-     * @param id
-     *          Bookie to check
-     * @return whether or not the given bookie is unavailable
+     * @throws BKException when failed to read bookies
      */
-<<<<<<< HEAD
     public void initialBlockingBookieRead() throws BKException {
         CompletableFuture<?> writable;
         CompletableFuture<?> readonly;
@@ -178,9 +177,6 @@ public interface BookieWatcher {
             log.error("Failed getReadOnlyBookies: ", e);
         }
     }
-=======
-    boolean isBookieUnavailable(BookieId id);
->>>>>>> 2346686c3b8621a585ad678926adf60206227367
 
     /**
      * Create an ensemble with given <i>ensembleSize</i> and <i>writeQuorumSize</i>.
@@ -192,9 +188,22 @@ public interface BookieWatcher {
      * @return list of bookies for new ensemble.
      * @throws BKNotEnoughBookiesException
      */
-    List<BookieId> newEnsemble(int ensembleSize, int writeQuorumSize,
-                                          int ackQuorumSize, Map<String, byte[]> customMetadata)
-            throws BKNotEnoughBookiesException;
+    public ArrayList<BookieSocketAddress> newEnsemble(int ensembleSize, int writeQuorumSize,
+        int ackQuorumSize, Map<String, byte[]> customMetadata)
+            throws BKNotEnoughBookiesException {
+        try {
+            // we try to only get from the healthy bookies first
+            return placementPolicy.newEnsemble(ensembleSize,
+                    writeQuorumSize, ackQuorumSize, customMetadata, new HashSet<BookieSocketAddress>(
+                    quarantinedBookies.asMap().keySet()));
+        } catch (BKNotEnoughBookiesException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Not enough healthy bookies available, using quarantined bookies");
+            }
+            return placementPolicy.newEnsemble(
+                ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata, Collections.emptySet());
+        }
+    }
 
     /**
      * Choose a bookie to replace bookie <i>bookieIdx</i> in <i>existingBookies</i>.
@@ -205,16 +214,37 @@ public interface BookieWatcher {
      * @return the bookie to replace.
      * @throws BKNotEnoughBookiesException
      */
-    BookieId replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize,
-                                      Map<String, byte[]> customMetadata,
-                                      List<BookieId> existingBookies, int bookieIdx,
-                                      Set<BookieId> excludeBookies)
-            throws BKNotEnoughBookiesException;
-
+    public BookieSocketAddress replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize,
+                                             Map<String, byte[]> customMetadata,
+                                             List<BookieSocketAddress> existingBookies, int bookieIdx,
+                                             Set<BookieSocketAddress> excludeBookies)
+            throws BKNotEnoughBookiesException {
+        BookieSocketAddress addr = existingBookies.get(bookieIdx);
+        try {
+            // we exclude the quarantined bookies also first
+            Set<BookieSocketAddress> existingAndQuarantinedBookies = new HashSet<BookieSocketAddress>(existingBookies);
+            existingAndQuarantinedBookies.addAll(quarantinedBookies.asMap().keySet());
+            return placementPolicy.replaceBookie(ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata,
+                    existingAndQuarantinedBookies, addr, excludeBookies);
+        } catch (BKNotEnoughBookiesException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Not enough healthy bookies available, using quarantined bookies");
+            }
+            return placementPolicy.replaceBookie(ensembleSize, writeQuorumSize, ackQuorumSize, customMetadata,
+                    new HashSet<BookieSocketAddress>(existingBookies), addr, excludeBookies);
+        }
+    }
 
     /**
      * Quarantine <i>bookie</i> so it will not be preferred to be chosen for new ensembles.
      * @param bookie
+     * @return
      */
-    void quarantineBookie(BookieId bookie);
+    public void quarantineBookie(BookieSocketAddress bookie) {
+        if (quarantinedBookies.getIfPresent(bookie) == null) {
+            quarantinedBookies.put(bookie, Boolean.TRUE);
+            log.warn("Bookie {} has been quarantined because of read/write errors.", bookie);
+        }
+    }
+
 }

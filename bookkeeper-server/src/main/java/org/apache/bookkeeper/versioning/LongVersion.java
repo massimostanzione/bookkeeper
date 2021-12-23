@@ -17,12 +17,9 @@
  */
 package org.apache.bookkeeper.versioning;
 
-import lombok.EqualsAndHashCode;
-
 /**
  * A version object holds integer version.
  */
-@EqualsAndHashCode
 public class LongVersion implements Version {
     protected long version;
 

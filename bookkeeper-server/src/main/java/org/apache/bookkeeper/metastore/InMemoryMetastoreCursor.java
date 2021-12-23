@@ -19,8 +19,6 @@ package org.apache.bookkeeper.metastore;
 
 import static org.apache.bookkeeper.metastore.InMemoryMetastoreTable.cloneValue;
 
-import com.google.common.collect.ImmutableSortedMap;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -32,6 +30,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.bookkeeper.metastore.MSException.Code;
 import org.apache.bookkeeper.versioning.Versioned;
+
+import com.google.common.collect.ImmutableSortedMap;
 
 class InMemoryMetastoreCursor implements MetastoreCursor {
 

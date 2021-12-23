@@ -20,7 +20,7 @@ If you're using [Maven](https://maven.apache.org/), add this to your [`pom.xml`]
 
 ```xml
 <!-- in your <properties> block -->
-<bookkeeper.version>4.5.1</bookkeeper.version>
+<bookkeeper.version>4.5.0</bookkeeper.version>
 
 <!-- in your <dependencies> block -->
 <dependency>
@@ -155,8 +155,8 @@ while (entries.hasNextElement()) {
 ### Reading entries after the LastAddConfirmed range
 
 `readUnconfirmedEntries` allowing to read after the LastAddConfirmed range.
-It lets the client read without checking the local value of LastAddConfirmed, so that it is possible to read entries for which the writer has not received the acknowledge yet.
-For entries which are within the range 0..LastAddConfirmed, BookKeeper guarantees that the writer has successfully received the acknowledge.
+It lets the client read without checking the local value of LastAddConfirmed, so that it is possible to read entries for which the writer has not received the acknowledge yet
+For entries which are within the range 0..LastAddConfirmed BookKeeper guarantees that the writer has successfully received the acknowledge.
 For entries outside that range it is possible that the writer never received the acknowledge and so there is the risk that the reader is seeing entries before the writer and this could result in a consistency issue in some cases.
 With this method you can even read entries before the LastAddConfirmed and entries after it with one call, the expected consistency will be as described above.
 
@@ -172,7 +172,7 @@ while (entries.hasNextElement()) {
 
 ## Deleting ledgers
 
-{% pop Ledgers %} can be deleted synchronously which may throw exception:
+{% pop Ledgers %} can also be deleted synchronously or asynchronously.
 
 ```java
 long ledgerId = 1234;
@@ -186,7 +186,9 @@ try {
 
 ### Delete entries asynchronously
 
-{% pop Ledgers %} can also be deleted asynchronously:
+Exceptions thrown:
+
+*
 
 ```java
 class DeleteEntryCallback implements AsyncCallback.DeleteCallback {
@@ -194,7 +196,6 @@ class DeleteEntryCallback implements AsyncCallback.DeleteCallback {
         System.out.println("Delete completed");
     }
 }
-bkClient.asyncDeleteLedger(ledgerID, new DeleteEntryCallback(), null);
 ```
 
 ## Simple example

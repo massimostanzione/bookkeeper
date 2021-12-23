@@ -17,12 +17,9 @@
  */
 package org.apache.bookkeeper.metastore;
 
-/**
- * Metastore callback.
- */
 public interface MetastoreCallback<T> {
     /**
      * @see MSException.Code
      */
-    void complete(int rc, T value, Object ctx);
+    public void complete(int rc, T value, Object ctx);
 }

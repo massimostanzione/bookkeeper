@@ -107,7 +107,9 @@ public class LedgerOutputStream extends OutputStream {
         if (bytebuff.remaining() < len) {
             flush();
             bytebuff.clear();
-            return bytebuff.capacity() >= len;
+            if (bytebuff.capacity() < len) {
+                return false;
+            }
         }
         return true;
     }

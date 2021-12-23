@@ -1,3 +1,5 @@
+package org.apache.bookkeeper.meta;
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,29 +17,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.bookkeeper.meta;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.bookkeeper.conf.AbstractConfiguration;
-import org.apache.bookkeeper.meta.zk.ZKMetadataDriverBase;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZKUtil;
 import org.apache.bookkeeper.replication.ReplicationException;
 import org.apache.bookkeeper.util.ZkUtils;
-import org.apache.zookeeper.KeeperException;
+import org.apache.bookkeeper.conf.AbstractConfiguration;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
 /**
- * Hierarchical Ledger Manager Factory.
+ * Hierarchical Ledger Manager Factory
  */
-public class LegacyHierarchicalLedgerManagerFactory extends AbstractZkLedgerManagerFactory {
+public class LegacyHierarchicalLedgerManagerFactory extends LedgerManagerFactory {
 
     public static final String NAME = "legacyhierarchical";
     public static final int CUR_VERSION = 1;
 
     AbstractConfiguration conf;
+    ZooKeeper zk;
 
     @Override
     public int getCurrentVersion() {
@@ -46,24 +47,20 @@ public class LegacyHierarchicalLedgerManagerFactory extends AbstractZkLedgerMana
 
     @Override
     public LedgerManagerFactory initialize(final AbstractConfiguration conf,
-                                           final LayoutManager lm,
+                                           final ZooKeeper zk,
                                            final int factoryVersion)
-            throws IOException {
-        checkArgument(lm instanceof ZkLayoutManager);
-
-        ZkLayoutManager zkLayoutManager = (ZkLayoutManager) lm;
-
+    throws IOException {
         if (CUR_VERSION != factoryVersion) {
             throw new IOException("Incompatible layout version found : "
                                 + factoryVersion);
         }
         this.conf = conf;
-        this.zk = zkLayoutManager.getZk();
+        this.zk = zk;
         return this;
     }
 
     @Override
-    public void close() throws IOException {
+    public void uninitialize() throws IOException {
         // since zookeeper instance is passed from outside
         // we don't need to close it here
     }
@@ -71,16 +68,12 @@ public class LegacyHierarchicalLedgerManagerFactory extends AbstractZkLedgerMana
     @Override
     public LedgerIdGenerator newLedgerIdGenerator() {
         List<ACL> zkAcls = ZkUtils.getACLs(conf);
-        return new ZkLedgerIdGenerator(
-            zk,
-            ZKMetadataDriverBase.resolveZkLedgersRootPath(conf),
-            LegacyHierarchicalLedgerManager.IDGEN_ZNODE,
-            zkAcls);
+        return new ZkLedgerIdGenerator(zk, conf.getZkLedgersRootPath(), LegacyHierarchicalLedgerManager.IDGEN_ZNODE, zkAcls);
     }
 
     @Override
     public LedgerManager newLedgerManager() {
-        return new LegacyHierarchicalLedgerManager(conf, zk);
+        return new HierarchicalLedgerManager(conf, zk);
     }
 
     @Override
@@ -88,4 +81,20 @@ public class LegacyHierarchicalLedgerManagerFactory extends AbstractZkLedgerMana
             throws KeeperException, InterruptedException, ReplicationException.CompatibilityException{
         return new ZkLedgerUnderreplicationManager(conf, zk);
     }
+
+    @Override
+    public void format(AbstractConfiguration conf, ZooKeeper zk)
+            throws InterruptedException, KeeperException, IOException {
+        String ledgersRootPath = conf.getZkLedgersRootPath();
+        List<String> children = zk.getChildren(ledgersRootPath, false);
+        for (String child : children) {
+            if (HierarchicalLedgerManager.isSpecialZnode(child)) {
+                continue;
+            }
+            ZKUtil.deleteRecursive(zk, ledgersRootPath + "/" + child);
+        }
+        // Delete and recreate the LAYOUT information.
+        super.format(conf, zk);
+    }
+
 }

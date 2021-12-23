@@ -60,7 +60,7 @@ page at http://checkstyle.sourceforge.net/config.html -->
         <property name="checkFormat" value="$1"/>
     </module>
     <module name="SuppressionFilter">
-        <property name="file" value="${checkstyle.suppressions.file}" default="./buildtools/src/main/resources/bookkeeper/suppressions.xml" />
+        <property name="file" value="${checkstyle.suppressions.file}" default="suppressions.xml" />
     </module>
 
     <!-- Check that every module has a package-info.java -->
@@ -102,7 +102,7 @@ page at http://checkstyle.sourceforge.net/config.html -->
         </module>
 
         <module name="IllegalImport">
-            <property name="illegalPkgs" value="com.google.common.base.Charsets, autovalue.shaded, avro.shaded, bk-shade, com.google.api.client.repackaged, com.google.appengine.repackaged, io.netty.util.internal"/>
+            <property name="illegalPkgs" value="autovalue.shaded, avro.shaded, bk-shade, com.google.api.client.repackaged, com.google.appengine.repackaged, io.netty.util.internal"/>
         </module>
 
         <module name="RedundantModifier">
@@ -436,9 +436,6 @@ page at http://checkstyle.sourceforge.net/config.html -->
 
         <!-- Required to support SuppressWarningsComment -->
         <module name="FileContentsHolder"/>
-
-        <!-- Enforces Java style array type definition -->
-        <module name="ArrayTypeStyleCheck"/>
 
     </module>
 </module>

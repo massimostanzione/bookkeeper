@@ -109,7 +109,6 @@ public class EntryKeyValue extends EntryKey {
     /**
     * String representation.
     */
-    @Override
     public String toString() {
         return ledgerId + ":" + entryId;
     }

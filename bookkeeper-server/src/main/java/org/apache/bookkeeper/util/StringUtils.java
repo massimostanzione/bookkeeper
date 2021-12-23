@@ -20,8 +20,6 @@ package org.apache.bookkeeper.util;
 
 import java.io.IOException;
 
-import org.apache.bookkeeper.proto.BookkeeperProtocol;
-
 /**
  * Provided utilites for parsing network addresses, ledger-id from node paths
  * etc.
@@ -30,18 +28,10 @@ import org.apache.bookkeeper.proto.BookkeeperProtocol;
 public class StringUtils {
 
     // Ledger Node Prefix
-    public static final String LEDGER_NODE_PREFIX = "L";
-    // Ledger znode in flatledgermanager layout will be "L" (prefix) +"%010d" (id in 10 digits)
-    public static final String FLAT_LEDGER_NODE_REGEX = StringUtils.LEDGER_NODE_PREFIX + "\\d{10}";
-    // top level znode in legacyhierarchicalledgermanger will be just 2 digits
-    public static final String LEGACYHIERARCHICAL_LEDGER_PARENT_NODE_REGEX = "\\d{2}";
-    // top level znode in longhierarchicalledgermanger will be just 3 digits
-    public static final String LONGHIERARCHICAL_LEDGER_PARENT_NODE_REGEX = "\\d{3}";
-    // top level znode in hierarchicalledgermanger will be just 2 digits
-    public static final String HIERARCHICAL_LEDGER_PARENT_NODE_REGEX = "\\d{2,3}";
+    static public final String LEDGER_NODE_PREFIX = "L";
 
     /**
-     * Formats ledger ID according to ZooKeeper rules.
+     * Formats ledger ID according to ZooKeeper rules
      *
      * @param id
      *            znode id
@@ -51,7 +41,7 @@ public class StringUtils {
     }
 
     /**
-     * Formats ledger ID according to ZooKeeper rules.
+     * Formats ledger ID according to ZooKeeper rules
      *
      * @param id
      *            znode id
@@ -59,9 +49,9 @@ public class StringUtils {
     public static String getZKStringIdForLongHierarchical(long id) {
         return String.format("%019d", id);
     }
-
+    
     /**
-     * Get the hierarchical ledger path according to the ledger id.
+     * Get the hierarchical ledger path according to the ledger id
      *
      * @param ledgerId
      *          ledger id
@@ -80,7 +70,7 @@ public class StringUtils {
     }
 
     /**
-     * Get the long hierarchical ledger path according to the ledger id.
+     * Get the long hierarchical ledger path according to the ledger id
      *
      * @param ledgerId
      *          ledger id
@@ -99,16 +89,16 @@ public class StringUtils {
           .append(ledgerIdStr.substring(15, 19));
         return sb.toString();
     }
-
+    
     public static String getHybridHierarchicalLedgerPath(long ledgerId) {
-        if (ledgerId < Integer.MAX_VALUE) {
+        if(ledgerId < Integer.MAX_VALUE) {
             return getShortHierarchicalLedgerPath(ledgerId);
         }
         return getLongHierarchicalLedgerPath(ledgerId);
     }
-
+    
     /**
-     * Parse the hierarchical ledger path to its ledger id.
+     * Parse the hierarchical ledger path to its ledger id
      *
      * @param hierarchicalLedgerPath
      * @return the ledger id
@@ -126,7 +116,7 @@ public class StringUtils {
     }
 
     /**
-     * Parse the long hierarchical ledger path to its ledger id.
+     * Parse the long hierarchical ledger path to its ledger id
      *
      * @param longHierarchicalLedgerPaths
      * @return the ledger id
@@ -142,9 +132,9 @@ public class StringUtils {
                 longHierarchicalParts[4].substring(LEDGER_NODE_PREFIX.length());
         return stringToHierarchicalLedgerId(longHierarchicalParts);
     }
-
+    
     /**
-     * Get ledger id.
+     * Get ledger id
      *
      * @param levelNodes
      *          level of the ledger path
@@ -163,20 +153,4 @@ public class StringUtils {
         }
     }
 
-    /**
-     * Builds string representation of teh request without extra (i.e. binary) data
-     *
-     * @param request
-     * @return string representation of request
-     */
-    public static String requestToString(Object request) {
-        if (request instanceof BookkeeperProtocol.Request) {
-            BookkeeperProtocol.BKPacketHeader header = ((BookkeeperProtocol.Request) request).getHeader();
-            return String.format("Req(txnId=%d,op=%s,version=%s)",
-                    header.getTxnId(), header.getOperation(),
-                    header.getVersion());
-        } else {
-            return request.toString();
-        }
-    }
 }
