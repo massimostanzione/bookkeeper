@@ -96,6 +96,10 @@ public class LedgerHandleReadEntriesTest extends BookKeeperClusterTestCase {
                 {new LedgerHandleReadEntriesTestParams(1, 1, PASS)},
                 {new LedgerHandleReadEntriesTestParams(0, -1, FAIL)},
                 {new LedgerHandleReadEntriesTestParams(-1, 0, FAIL)},
+                // enhance coverace (adequacy)
+                {new LedgerHandleReadEntriesTestParams(0, ENTRIES_NO - 1, PASS)},
+                {new LedgerHandleReadEntriesTestParams(0, ENTRIES_NO, FAIL)},
+                {new LedgerHandleReadEntriesTestParams(0, ENTRIES_NO + 1, FAIL)},
         });
         return args;
     }
@@ -118,8 +122,8 @@ public class LedgerHandleReadEntriesTest extends BookKeeperClusterTestCase {
             assertTrue("Reading something different than what was sent in input.", Arrays.equals(entry.getEntry(), ArrayUtils.subarray(validData, validOffset, validLength)));
             readEntries++;
         }
-        assertEquals("Reading less entries than how much was sent in input.",last-first+1, readEntries);
-        assertTrue(EXPECTED_TO_FAIL, expectedBehavior==PASS);
+        assertEquals("Reading less entries than how much was sent in input.", last - first + 1, readEntries);
+        assertTrue(EXPECTED_TO_FAIL, expectedBehavior == PASS);
     }
 
     /**

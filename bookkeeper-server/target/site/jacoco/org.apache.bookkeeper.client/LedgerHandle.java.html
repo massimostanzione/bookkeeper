@@ -577,11 +577,11 @@ public class LedgerHandle implements WriteHandle {
 <span class="fc" id="L577">            return;</span>
         }
 
-<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        if (lastEntry &gt; lastAddConfirmed) {</span>
-<span class="nc" id="L581">            LOG.error(&quot;ReadException on ledgerId:{} firstEntry:{} lastEntry:{}&quot;,</span>
-<span class="nc" id="L582">                    new Object[] { ledgerId, firstEntry, lastEntry });</span>
-<span class="nc" id="L583">            cb.readComplete(BKException.Code.ReadException, this, null, ctx);</span>
-<span class="nc" id="L584">            return;</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (lastEntry &gt; lastAddConfirmed) {</span>
+<span class="fc" id="L581">            LOG.error(&quot;ReadException on ledgerId:{} firstEntry:{} lastEntry:{}&quot;,</span>
+<span class="fc" id="L582">                    new Object[] { ledgerId, firstEntry, lastEntry });</span>
+<span class="fc" id="L583">            cb.readComplete(BKException.Code.ReadException, this, null, ctx);</span>
+<span class="fc" id="L584">            return;</span>
         }
 
 <span class="fc" id="L587">        asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx);</span>
@@ -1392,11 +1392,11 @@ public class LedgerHandle implements WriteHandle {
 
 <span class="fc bfc" id="L1393" title="All 2 branches covered.">        while ((pendingAddOp = pendingAddOps.peek()) != null</span>
 <span class="pc bpc" id="L1394" title="1 of 2 branches missed.">               &amp;&amp; blockAddCompletions.get() == 0) {</span>
-<span class="pc bpc" id="L1395" title="1 of 2 branches missed.">            if (!pendingAddOp.completed) {</span>
-<span class="nc bnc" id="L1396" title="All 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="fc bfc" id="L1395" title="All 2 branches covered.">            if (!pendingAddOp.completed) {</span>
+<span class="pc bpc" id="L1396" title="1 of 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
 <span class="nc" id="L1397">                    LOG.debug(&quot;pending add not completed: {}&quot;, pendingAddOp);</span>
                 }
-<span class="nc" id="L1399">                return;</span>
+<span class="fc" id="L1399">                return;</span>
             }
             // Check if it is the next entry in the sequence.
 <span class="pc bpc" id="L1402" title="1 of 4 branches missed.">            if (pendingAddOp.entryId != 0 &amp;&amp; pendingAddOp.entryId != lastAddConfirmed + 1) {</span>

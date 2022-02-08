@@ -60,11 +60,11 @@ public abstract class BKException extends Exception {
      * @return the description of the error code
      */
     public static String getMessage(int code) {
-<span class="pc bpc" id="L63" title="32 of 33 branches missed.">        switch (code) {</span>
+<span class="pc bpc" id="L63" title="31 of 33 branches missed.">        switch (code) {</span>
         case Code.OK:
 <span class="nc" id="L65">            return &quot;No problem&quot;;</span>
         case Code.ReadException:
-<span class="nc" id="L67">            return &quot;Error while reading ledger&quot;;</span>
+<span class="fc" id="L67">            return &quot;Error while reading ledger&quot;;</span>
         case Code.QuorumException:
 <span class="nc" id="L69">            return &quot;Invalid quorum size on ensemble size&quot;;</span>
         case Code.NoBookieAvailableException:

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: org.apache.bookkeeper.bookie.FileInfoWriteTest
 -------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.205 s - in org.apache.bookkeeper.bookie.FileInfoWriteTest
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.874 s - in org.apache.bookkeeper.bookie.FileInfoWriteTest

@@ -121,6 +121,12 @@ public class FileInfoReadTest extends BookKeeperClusterTestCase {
 
     @Test
     public void fileInfoWriteThenReadTest() {
+        /* Attempt to enhance coverage
+        try {
+            fInfo.close(true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } */
         int readBytesNo = 0;
         long exp = (VALID_STRING.length() - position);
         try {

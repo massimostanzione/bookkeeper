@@ -156,9 +156,9 @@ public class ScanAndCompareGarbageCollector implements GarbageCollector{
 <span class="fc" id="L156">                }</span>
 <span class="fc" id="L157">                lastEnd = end;</span>
 <span class="fc" id="L158">            }</span>
-<span class="fc" id="L159">        } catch (Throwable t) {</span>
+<span class="nc" id="L159">        } catch (Throwable t) {</span>
             // ignore exception, collecting garbage next time
-<span class="fc" id="L161">            LOG.warn(&quot;Exception when iterating over the metadata {}&quot;, t);</span>
+<span class="nc" id="L161">            LOG.warn(&quot;Exception when iterating over the metadata {}&quot;, t);</span>
         } finally {
 <span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (zk != null) {</span>
                 try {

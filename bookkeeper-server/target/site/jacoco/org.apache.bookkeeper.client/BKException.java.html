@@ -38,9 +38,9 @@ public abstract class BKException extends org.apache.bookkeeper.client.api.BKExc
      * @return corresponding exception
      */
     public static BKException create(int code) {
-<span class="pc bpc" id="L41" title="32 of 33 branches missed.">        switch (code) {</span>
+<span class="pc bpc" id="L41" title="31 of 33 branches missed.">        switch (code) {</span>
         case Code.ReadException:
-<span class="nc" id="L43">            return new BKReadException();</span>
+<span class="fc" id="L43">            return new BKReadException();</span>
         case Code.QuorumException:
 <span class="nc" id="L45">            return new BKQuorumException();</span>
         case Code.NoBookieAvailableException:
@@ -122,8 +122,8 @@ public abstract class BKException extends org.apache.bookkeeper.client.api.BKExc
     }
     public static class BKReadException extends BKException {
         public BKReadException() {
-<span class="nc" id="L125">            super(Code.ReadException);</span>
-<span class="nc" id="L126">        }</span>
+<span class="fc" id="L125">            super(Code.ReadException);</span>
+<span class="fc" id="L126">        }</span>
     }
 
     public static class BKNoSuchEntryException extends BKException {

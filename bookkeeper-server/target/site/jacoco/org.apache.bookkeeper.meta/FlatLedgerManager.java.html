@@ -109,9 +109,9 @@ class FlatLedgerManager extends AbstractZkLedgerManager {
 <span class="fc" id="L109">                    zkActiveLedgers = ledgerListToSet(</span>
 <span class="fc" id="L110">                            ZkUtils.getChildrenInSingleNode(zk, ledgerRootPath), ledgerRootPath);</span>
 <span class="fc" id="L111">                    nextRange = new LedgerRange(zkActiveLedgers);</span>
-<span class="fc" id="L112">                } catch (InterruptedException ie) {</span>
-<span class="fc" id="L113">                    Thread.currentThread().interrupt();</span>
-<span class="fc" id="L114">                    throw new IOException(&quot;Error when get child nodes from zk&quot;, ie);</span>
+<span class="nc" id="L112">                } catch (InterruptedException ie) {</span>
+<span class="nc" id="L113">                    Thread.currentThread().interrupt();</span>
+<span class="nc" id="L114">                    throw new IOException(&quot;Error when get child nodes from zk&quot;, ie);</span>
 <span class="fc" id="L115">                }</span>
 <span class="fc" id="L116">            }</span>
 

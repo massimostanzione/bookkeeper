@@ -92,7 +92,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.replication,AutoRecoveryMain.A
 Apache BookKeeper :: Server,org.apache.bookkeeper.replication,ReplicationWorker,532,0,34,0,166,0,32,0,15,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,Handle,9,0,0,0,3,0,1,0,1,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,WriteAdvHandle,20,0,0,0,3,0,3,0,3,0
-Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,BKException,67,12,32,1,33,5,33,2,1,2
+Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,BKException,65,14,31,2,32,6,32,3,1,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,BookKeeper,5,0,0,0,1,0,1,0,1,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,DigestType,24,0,0,0,3,0,1,0,1,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client.api,WriteHandle,17,0,0,0,3,0,3,0,3,0
@@ -114,7 +114,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.meta,LegacyHierarchicalLedgerM
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,LegacyHierarchicalLedgerManager.new BookkeeperInternalCallbacks.Processor() {...},59,0,2,0,7,0,3,0,2,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,CleanupLedgerManager,163,107,14,4,42,27,16,6,7,6
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,MSLedgerManagerFactory.MsLedgerManager.MSLedgerRangeIterator.new MetastoreCallback() {...},28,0,2,0,6,0,3,0,2,0
-Apache BookKeeper :: Server,org.apache.bookkeeper.meta,FlatLedgerManager.new LedgerManager.LedgerRangeIterator() {...},4,74,2,8,1,19,2,7,0,4
+Apache BookKeeper :: Server,org.apache.bookkeeper.meta,FlatLedgerManager.new LedgerManager.LedgerRangeIterator() {...},13,65,2,8,4,16,2,7,0,4
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,FlatLedgerManager,21,64,4,0,3,15,4,5,2,5
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,ZkLedgerIdGenerator.new AsyncCallback.StringCallback() {...},37,48,3,3,9,8,3,2,0,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.meta,ZkLedgerIdGenerator.1.new AsyncCallback.VoidCallback() {...},13,17,2,2,3,4,2,2,0,2
@@ -213,7 +213,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,LogMark,67,45,6,0,14,15
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,ShortReadException,5,4,0,0,2,2,1,1,1,1
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,EntryLogger,1601,459,132,28,344,121,107,22,30,19
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,Cookie,473,193,39,5,94,46,36,10,15,9
-Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,ScanAndCompareGarbageCollector,143,162,16,16,36,41,14,6,1,3
+Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,ScanAndCompareGarbageCollector,148,157,16,16,38,39,14,6,1,3
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,LedgerDirsManager.NoWritableLedgerDirException,4,0,0,0,2,0,1,0,1,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,BufferedChannelBase,16,9,2,0,4,4,3,2,2,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.bookie,KeyComparator,0,33,1,5,0,5,1,4,0,2
@@ -667,7 +667,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.client,SyncCounter,71,0,4,0,26
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,PendingAddOp.new Recycler() {...},0,9,0,0,0,2,0,2,0,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,PendingAddOp.new SafeRunnable() {...},37,0,2,0,6,0,4,0,3,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,UpdateLedgerOp.ReadLedgerMetadataCb.new BookkeeperInternalCallbacks.GenericCallback() {...},31,0,2,0,7,0,3,0,2,0
-Apache BookKeeper :: Server,org.apache.bookkeeper.client,LedgerHandle,1303,567,105,33,296,123,102,33,40,26
+Apache BookKeeper :: Server,org.apache.bookkeeper.client,LedgerHandle,1271,599,102,36,290,129,100,35,40,26
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,RackawareEnsemblePlacementPolicy,160,58,14,4,33,17,16,6,7,6
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,RoundRobinDistributionSchedule.WriteSetImpl.new Recycler() {...},0,9,0,0,0,2,0,2,0,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException.BKLedgerClosedException,4,0,0,0,2,0,1,0,1,0
@@ -759,7 +759,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.client,LedgerFragmentReplicato
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,LedgerOpenOp,279,0,22,0,70,0,18,0,7,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,TopologyAwareEnsemblePlacementPolicy,14,7,0,0,4,2,2,2,2,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,RoundRobinDistributionSchedule,45,27,2,0,9,7,4,3,3,3
-Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException,128,10,32,1,32,4,32,2,0,2
+Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException,124,14,31,2,31,5,31,3,0,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,LedgerOpenOp.new AsyncCallback.ReadLastConfirmedCallback() {...},36,0,2,0,6,0,3,0,2,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,ExplicitLacFlushPolicy.ExplicitLacFlushPolicyImpl,130,0,4,0,37,0,12,0,10,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,ReadLastConfirmedOp,252,0,32,0,51,0,21,0,5,0
@@ -834,7 +834,7 @@ Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException.BKInterrupt
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,BookKeeperAdmin.new AsyncCallback.VoidCallback() {...},19,0,0,0,5,0,2,0,2,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,DefaultSpeculativeRequestExecutionPolicy.1.new FutureCallback() {...},59,13,2,2,7,4,3,2,1,2
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,SyncCallbackUtils.SyncCloseCallback,0,12,0,0,0,5,0,2,0,2
-Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException.BKReadException,4,0,0,0,2,0,1,0,1,0
+Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException.BKReadException,0,4,0,0,0,2,0,1,0,1
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,BookKeeperAdmin,1531,0,134,0,353,0,121,0,54,0
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,PendingReadOp,151,315,16,20,24,70,16,16,2,12
 Apache BookKeeper :: Server,org.apache.bookkeeper.client,BKException.BKTooManyRequestsException,4,0,0,0,2,0,1,0,1,0

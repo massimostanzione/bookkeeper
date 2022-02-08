@@ -9,6 +9,7 @@ import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
@@ -67,7 +68,20 @@ public class FileInfoWriteTest extends BookKeeperClusterTestCase {
      */
     @Before
     public void setup() {
-        this.f = new File(TESTFILE_PATHNAME);
+        f = new File(TESTFILE_PATHNAME);
+        /* Attempt to deal with short writes
+        try {
+            f.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        RandomAccessFile RAf;
+        try {
+            RAf = new RandomAccessFile(f, "rw");
+            RAf.setLength(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }*/
         try {
             fInfo = new FileInfo(f, PASSWORD.getBytes());
         } catch (IOException e) {
@@ -82,7 +96,7 @@ public class FileInfoWriteTest extends BookKeeperClusterTestCase {
      * @return array containing actual values of the test parameters
      */
     @Parameterized.Parameters
-    public static Collection<FileInfoWriteTestParams[]> getTestParameters() {
+    public static Collection<org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[]> getTestParameters() {
         ByteBuffer[] notPopulatedByteBuf = new ByteBuffer[BYTEBUFFER_DIM];
         ByteBuffer[] outOfBoundsByteBuf = new ByteBuffer[BYTEBUFFER_DIM];
 
@@ -93,13 +107,13 @@ public class FileInfoWriteTest extends BookKeeperClusterTestCase {
         for (int i = 0; i < BYTEBUFFER_DIM; i++) {
             outOfBoundsByteBuf[i] = ByteBuffer.wrap(outOfBoundsByteArr);
         }
-        List<FileInfoWriteTestParams[]> args = Arrays.asList(new FileInfoWriteTestParams[][]{
-                {new FileInfoWriteTestParams(getValidBufferArray(), -1, PASS)},
-                {new FileInfoWriteTestParams(getValidBufferArray(), 0, PASS)},
-                {new FileInfoWriteTestParams(getValidBufferArray(), 1, PASS)},
-                {new FileInfoWriteTestParams(notPopulatedByteBuf, 0, FAIL)},
-                {new FileInfoWriteTestParams(outOfBoundsByteBuf, 0, PASS)},
-                {new FileInfoWriteTestParams(null, 0, FAIL)},
+        List<org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[]> args = Arrays.asList(new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[][]{
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), -1, PASS)},
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), 0, PASS)},
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), 1, PASS)},
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(notPopulatedByteBuf, 0, FAIL)},
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(outOfBoundsByteBuf, 0, PASS)},
+                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(null, 0, FAIL)},
         });
         return args;
     }
