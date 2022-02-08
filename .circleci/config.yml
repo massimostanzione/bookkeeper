@@ -17,6 +17,6 @@ jobs:
 
 # invoking jobs via workflows
 workflows:
-  build-and-test:
+  test-and-analysis:
     jobs:
       - test-and-analysis
