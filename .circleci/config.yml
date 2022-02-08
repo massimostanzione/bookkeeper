@@ -13,7 +13,7 @@ jobs:
 #          command: mvn clean test --projects bookkeeper-server -Pcoverage
       - run:
           name: Analyze on SonarCloud
-          command: mvn sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper --projects bookkeeper-server
+          command: mvn sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper --projects .,bookkeeper-server
 
 # invoking jobs via workflows
 workflows:
