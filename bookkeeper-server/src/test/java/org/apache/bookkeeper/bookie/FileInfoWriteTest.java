@@ -96,7 +96,7 @@ public class FileInfoWriteTest extends BookKeeperClusterTestCase {
      * @return array containing actual values of the test parameters
      */
     @Parameterized.Parameters
-    public static Collection<org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[]> getTestParameters() {
+    public static Collection<FileInfoWriteTestParams[]> getTestParameters() {
         ByteBuffer[] notPopulatedByteBuf = new ByteBuffer[BYTEBUFFER_DIM];
         ByteBuffer[] outOfBoundsByteBuf = new ByteBuffer[BYTEBUFFER_DIM];
 
@@ -107,13 +107,13 @@ public class FileInfoWriteTest extends BookKeeperClusterTestCase {
         for (int i = 0; i < BYTEBUFFER_DIM; i++) {
             outOfBoundsByteBuf[i] = ByteBuffer.wrap(outOfBoundsByteArr);
         }
-        List<org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[]> args = Arrays.asList(new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams[][]{
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), -1, PASS)},
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), 0, PASS)},
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(getValidBufferArray(), 1, PASS)},
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(notPopulatedByteBuf, 0, FAIL)},
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(outOfBoundsByteBuf, 0, PASS)},
-                {new org.apache.bookkeeper.bookie.FileInfoWriteTest.FileInfoWriteTestParams(null, 0, FAIL)},
+        List<FileInfoWriteTestParams[]> args = Arrays.asList(new FileInfoWriteTestParams[][]{
+                {new FileInfoWriteTestParams(getValidBufferArray(), -1, PASS)},
+                {new FileInfoWriteTestParams(getValidBufferArray(), 0, PASS)},
+                {new FileInfoWriteTestParams(getValidBufferArray(), 1, PASS)},
+                {new FileInfoWriteTestParams(notPopulatedByteBuf, 0, FAIL)},
+                {new FileInfoWriteTestParams(outOfBoundsByteBuf, 0, PASS)},
+                {new FileInfoWriteTestParams(null, 0, FAIL)},
         });
         return args;
     }

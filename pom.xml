@@ -125,8 +125,8 @@
         <maven-source-plugin.version>2.2.1</maven-source-plugin.version>
         <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
         <maven-assembly-plugin.version>2.2.1</maven-assembly-plugin.version>
-    <sonar.organization>massimostanzione</sonar.organization>
-    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.organization>massimostanzione</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
     </properties>
 
@@ -417,6 +417,42 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <!-- NOT INCLUDED IN TEST CYCLE - see report for details
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.4.3</version>
+                        <executions>
+                            <execution>
+                                <id>pit-report</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>mutationCoverage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <timeoutConstant>2000</timeoutConstant>
+                            <timeoutFactor>1</timeoutFactor>
+                            <targetClasses>
+                                <param>org.apache.bookkeeper.client.LedgerHandle</param>
+                                <param>org.apache.bookkeeper.bookie.FileInfo</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>org.apache.bookkeeper.bookie.FileInfoReadTest</param>
+                                <param>org.apache.bookkeeper.bookie.FileInfoWriteTest</param>
+                                <param>org.apache.bookkeeper.client.LedgerHandleAddEntryTest</param>
+                                <param>org.apache.bookkeeper.client.LedgerHandleReadEntriesTest</param>
+                            </targetTests>
+                            <avoidCallsTo>
+                                <avoidCallsTo>java.util.logging</avoidCallsTo>
+                                <avoidCallsTo>org.apache.log4j</avoidCallsTo>
+                                <avoidCallsTo>org.slf4j</avoidCallsTo>
+                                <avoidCallsTo>org.apache.commons.logging</avoidCallsTo>
+                            </avoidCallsTo>
+                        </configuration>
+                    </plugin>
+                    -->
                 </plugins>
             </build>
         </profile>
