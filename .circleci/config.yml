@@ -19,4 +19,5 @@ jobs:
 workflows:
   test-and-analysis:
     jobs:
-      - test-and-analysis
+      - test-and-analysis:
+        context: SonarCloud
