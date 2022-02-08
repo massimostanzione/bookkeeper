@@ -20,4 +20,4 @@ workflows:
   main:
     jobs:
       - test-and-analysis:
-        context: SonarCloud
+          context: SonarCloud
