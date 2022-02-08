@@ -8,12 +8,12 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      - run:
-          name: Test
-          command: mvn clean test --projects bookkeeper-server -Pcoverage
+#      - run:
+#          name: Test
+#          command: mvn clean test --projects bookkeeper-server -Pcoverage
       - run:
           name: Analyze on SonarCloud
-          command: mvn sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper
+          command: mvn clean test --projects bookkeeper-server -Pcoverage sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper
 
 # invoking jobs via workflows
 workflows:
