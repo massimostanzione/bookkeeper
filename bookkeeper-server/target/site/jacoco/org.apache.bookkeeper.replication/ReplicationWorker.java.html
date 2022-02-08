@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReplicationWorker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.replication</a> &gt; <span class="el_source">ReplicationWorker.java</span></div><h1>ReplicationWorker.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.apache.bookkeeper.replication;
+
+import com.google.common.base.Stopwatch;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.SortedMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.apache.bookkeeper.bookie.BookieThread;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.BKException.BKBookieHandleNotAvailableException;
+import org.apache.bookkeeper.client.BKException.BKLedgerRecoveryException;
+import org.apache.bookkeeper.client.BKException.BKNoSuchLedgerExistsException;
+import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
+import org.apache.bookkeeper.client.BKException.BKReadException;
+import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.client.BookKeeperAdmin;
+import org.apache.bookkeeper.client.LedgerChecker;
+import org.apache.bookkeeper.client.LedgerFragment;
+import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LedgerManagerFactory;
+import org.apache.bookkeeper.meta.LedgerUnderreplicationManager;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.replication.ReplicationException.CompatibilityException;
+import org.apache.bookkeeper.replication.ReplicationException.UnavailableException;
+import org.apache.bookkeeper.stats.Counter;
+import org.apache.bookkeeper.stats.NullStatsLogger;
+import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.bookkeeper.replication.ReplicationStats.BK_CLIENT_SCOPE;
+import static org.apache.bookkeeper.replication.ReplicationStats.NUM_FULL_OR_PARTIAL_LEDGERS_REPLICATED;
+import static org.apache.bookkeeper.replication.ReplicationStats.REPLICATE_EXCEPTION;
+import static org.apache.bookkeeper.replication.ReplicationStats.REREPLICATE_OP;
+
+/**
+ * ReplicationWorker will take the fragments one by one from
+ * ZKLedgerUnderreplicationManager and replicates to it.
+ */
+public class ReplicationWorker implements Runnable {
+<span class="nc" id="L74">    private static final Logger LOG = LoggerFactory</span>
+<span class="nc" id="L75">            .getLogger(ReplicationWorker.class);</span>
+    private final LedgerUnderreplicationManager underreplicationManager;
+    private final ServerConfiguration conf;
+    private final ZooKeeper zkc;
+<span class="nc" id="L79">    private volatile boolean workerRunning = false;</span>
+    private final BookKeeperAdmin admin;
+    private final LedgerChecker ledgerChecker;
+    private final BookKeeper bkc;
+    private final Thread workerThread;
+    private final long rwRereplicateBackoffMs;
+    private final long openLedgerRereplicationGracePeriod;
+    private final Timer pendingReplicationTimer;
+
+    // Expose Stats
+    private final StatsLogger statsLogger;
+    private final OpStatsLogger rereplicateOpStats;
+    private final Counter numLedgersReplicated;
+    private final Map&lt;String,Counter&gt; exceptionCounters;
+
+    /**
+     * Replication worker for replicating the ledger fragments from
+     * UnderReplicationManager to the targetBookie. This target bookie will be a
+     * local bookie.
+     *
+     * @param zkc
+     *            - ZK instance
+     * @param conf
+     *            - configurations
+     */
+    public ReplicationWorker(final ZooKeeper zkc,
+                             final ServerConfiguration conf)
+            throws CompatibilityException, KeeperException,
+            InterruptedException, IOException {
+<span class="nc" id="L108">        this(zkc, conf, NullStatsLogger.INSTANCE);</span>
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * Replication worker for replicating the ledger fragments from
+     * UnderReplicationManager to the targetBookie. This target bookie will be a
+     * local bookie.
+     *
+     * @param zkc
+     *            - ZK instance
+     * @param conf
+     *            - configurations
+     * @param statsLogger
+     *            - stats logger
+     */
+    public ReplicationWorker(final ZooKeeper zkc,
+                             final ServerConfiguration conf,
+                             StatsLogger statsLogger)
+            throws CompatibilityException, KeeperException,
+<span class="nc" id="L127">            InterruptedException, IOException {</span>
+<span class="nc" id="L128">        this.zkc = zkc;</span>
+<span class="nc" id="L129">        this.conf = conf;</span>
+<span class="nc" id="L130">        LedgerManagerFactory mFactory = LedgerManagerFactory</span>
+<span class="nc" id="L131">                .newLedgerManagerFactory(this.conf, this.zkc);</span>
+<span class="nc" id="L132">        this.underreplicationManager = mFactory</span>
+<span class="nc" id="L133">                .newLedgerUnderreplicationManager();</span>
+        try {
+<span class="nc" id="L135">            this.bkc = BookKeeper.forConfig(new ClientConfiguration(conf))</span>
+<span class="nc" id="L136">                    .zk(zkc)</span>
+<span class="nc" id="L137">                    .statsLogger(statsLogger.scope(BK_CLIENT_SCOPE))</span>
+<span class="nc" id="L138">                    .build();</span>
+<span class="nc" id="L139">        } catch (BKException e) {</span>
+<span class="nc" id="L140">            throw new IOException(&quot;Failed to instantiate replication worker&quot;, e);</span>
+<span class="nc" id="L141">        }</span>
+<span class="nc" id="L142">        this.admin = new BookKeeperAdmin(bkc, statsLogger);</span>
+<span class="nc" id="L143">        this.ledgerChecker = new LedgerChecker(bkc);</span>
+<span class="nc" id="L144">        this.workerThread = new BookieThread(this, &quot;ReplicationWorker&quot;);</span>
+<span class="nc" id="L145">        this.openLedgerRereplicationGracePeriod = conf</span>
+<span class="nc" id="L146">                .getOpenLedgerRereplicationGracePeriod();</span>
+<span class="nc" id="L147">        this.rwRereplicateBackoffMs = conf.getRwRereplicateBackoffMs();</span>
+<span class="nc" id="L148">        this.pendingReplicationTimer = new Timer(&quot;PendingReplicationTimer&quot;);</span>
+
+        // Expose Stats
+<span class="nc" id="L151">        this.statsLogger = statsLogger;</span>
+<span class="nc" id="L152">        this.rereplicateOpStats = this.statsLogger.getOpStatsLogger(REREPLICATE_OP);</span>
+<span class="nc" id="L153">        this.numLedgersReplicated = this.statsLogger.getCounter(NUM_FULL_OR_PARTIAL_LEDGERS_REPLICATED);</span>
+<span class="nc" id="L154">        this.exceptionCounters = new HashMap&lt;String, Counter&gt;();</span>
+<span class="nc" id="L155">    }</span>
+
+    /** Start the replication worker */
+    public void start() {
+<span class="nc" id="L159">        this.workerThread.start();</span>
+<span class="nc" id="L160">    }</span>
+
+    @Override
+    public void run() {
+<span class="nc" id="L164">        workerRunning = true;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        while (workerRunning) {</span>
+            try {
+<span class="nc" id="L167">                rereplicate();</span>
+<span class="nc" id="L168">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L169">                LOG.info(&quot;InterruptedException &quot;</span>
+                        + &quot;while replicating fragments&quot;, e);
+<span class="nc" id="L171">                shutdown();</span>
+<span class="nc" id="L172">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L173">                return;</span>
+<span class="nc" id="L174">            } catch (BKException e) {</span>
+<span class="nc" id="L175">                LOG.error(&quot;BKException while replicating fragments&quot;, e);</span>
+<span class="nc" id="L176">                waitBackOffTime(rwRereplicateBackoffMs);</span>
+<span class="nc" id="L177">            } catch (UnavailableException e) {</span>
+<span class="nc" id="L178">                LOG.error(&quot;UnavailableException &quot;</span>
+                        + &quot;while replicating fragments&quot;, e);
+<span class="nc" id="L180">                waitBackOffTime(rwRereplicateBackoffMs);</span>
+<span class="nc" id="L181">            }</span>
+        }
+<span class="nc" id="L183">        LOG.info(&quot;ReplicationWorker exited loop!&quot;);</span>
+<span class="nc" id="L184">    }</span>
+
+    private static void waitBackOffTime(long backoffMs) {
+        try {
+<span class="nc" id="L188">            Thread.sleep(backoffMs);</span>
+<span class="nc" id="L189">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">    }</span>
+
+    /**
+     * Replicates the under replicated fragments from failed bookie ledger to
+     * targetBookie
+     */
+    private void rereplicate() throws InterruptedException, BKException,
+            UnavailableException {
+<span class="nc" id="L199">        long ledgerIdToReplicate = underreplicationManager</span>
+<span class="nc" id="L200">                .getLedgerToRereplicate();</span>
+
+<span class="nc" id="L202">        Stopwatch stopwatch = Stopwatch.createStarted();</span>
+<span class="nc" id="L203">        boolean success = false;</span>
+        try {
+<span class="nc" id="L205">            success = rereplicate(ledgerIdToReplicate);</span>
+        } finally {
+<span class="nc" id="L207">            long latencyMillis = stopwatch.stop().elapsed(TimeUnit.MILLISECONDS);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L209">                rereplicateOpStats.registerSuccessfulEvent(latencyMillis, TimeUnit.MILLISECONDS);</span>
+            } else {
+<span class="nc" id="L211">                rereplicateOpStats.registerFailedEvent(latencyMillis, TimeUnit.MILLISECONDS);</span>
+            }
+        }
+<span class="nc" id="L214">    }</span>
+
+    private boolean rereplicate(long ledgerIdToReplicate) throws InterruptedException, BKException,
+            UnavailableException {
+
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L220">            LOG.debug(&quot;Going to replicate the fragments of the ledger: {}&quot;, ledgerIdToReplicate);</span>
+        }
+<span class="nc" id="L222">        try (LedgerHandle lh = admin.openLedgerNoRecovery(ledgerIdToReplicate)) {</span>
+<span class="nc" id="L223">            Set&lt;LedgerFragment&gt; fragmentsBeforeReplicate = getUnderreplicatedFragments(lh);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L225">                LOG.debug(&quot;Founds fragments {} for replication from ledger: {}&quot;,</span>
+<span class="nc" id="L226">                    fragmentsBeforeReplicate, ledgerIdToReplicate);</span>
+            }
+
+<span class="nc" id="L229">            boolean foundOpenFragments = false;</span>
+<span class="nc" id="L230">            long numFragsReplicated = 0;</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            for (LedgerFragment ledgerFragment : fragmentsBeforeReplicate) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                if (!ledgerFragment.isClosed()) {</span>
+<span class="nc" id="L233">                    foundOpenFragments = true;</span>
+<span class="nc" id="L234">                    continue;</span>
+                }
+<span class="nc" id="L236">                LOG.info(&quot;Going to replicate the fragments of the ledger: {}&quot;, ledgerIdToReplicate);</span>
+<span class="nc" id="L237">                admin.replicateLedgerFragment(lh, ledgerFragment);</span>
+<span class="nc" id="L238">                numFragsReplicated++;</span>
+<span class="nc" id="L239">            }</span>
+
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (numFragsReplicated &gt; 0) {</span>
+<span class="nc" id="L242">                numLedgersReplicated.inc();</span>
+            }
+
+<span class="nc bnc" id="L245" title="All 4 branches missed.">            if (foundOpenFragments || isLastSegmentOpenAndMissingBookies(lh)) {</span>
+<span class="nc" id="L246">                deferLedgerLockRelease(ledgerIdToReplicate);</span>
+<span class="nc" id="L247">                return false;</span>
+            }
+
+<span class="nc" id="L250">            Set&lt;LedgerFragment&gt; fragmentsAfterReplicate = getUnderreplicatedFragments(lh);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">            if (fragmentsAfterReplicate.size() == 0) {</span>
+<span class="nc" id="L252">                LOG.info(&quot;Ledger {} is replicated successfully.&quot;, ledgerIdToReplicate);</span>
+<span class="nc" id="L253">                underreplicationManager.markLedgerReplicated(ledgerIdToReplicate);</span>
+<span class="nc" id="L254">                return true;</span>
+            } else {
+<span class="nc" id="L256">                LOG.info(&quot;Fail to replicate ledger {}.&quot;, ledgerIdToReplicate);</span>
+                // Releasing the underReplication ledger lock and compete
+                // for the replication again for the pending fragments
+<span class="nc" id="L259">                underreplicationManager</span>
+<span class="nc" id="L260">                        .releaseUnderreplicatedLedger(ledgerIdToReplicate);</span>
+<span class="nc" id="L261">                return false;</span>
+            }
+<span class="nc" id="L263">        } catch (BKNoSuchLedgerExistsException e) {</span>
+            // Ledger might have been deleted by user
+<span class="nc" id="L265">            LOG.info(&quot;BKNoSuchLedgerExistsException while opening &quot;</span>
+                    + &quot;ledger {} for replication. Other clients &quot;
+                    + &quot;might have deleted the ledger. &quot;
+<span class="nc" id="L268">                    + &quot;So, no harm to continue&quot;, ledgerIdToReplicate);</span>
+<span class="nc" id="L269">            underreplicationManager.markLedgerReplicated(ledgerIdToReplicate);</span>
+<span class="nc" id="L270">            getExceptionCounter(&quot;BKNoSuchLedgerExistsException&quot;).inc();</span>
+<span class="nc" id="L271">            return false;</span>
+<span class="nc" id="L272">        } catch (BKNotEnoughBookiesException e) {</span>
+<span class="nc" id="L273">            logBKExceptionAndReleaseLedger(e, ledgerIdToReplicate);</span>
+<span class="nc" id="L274">            throw e;</span>
+<span class="nc" id="L275">        } catch (BKException e) {</span>
+<span class="nc" id="L276">            logBKExceptionAndReleaseLedger(e, ledgerIdToReplicate);</span>
+<span class="nc" id="L277">            return false;</span>
+        }
+    }
+
+    private void logBKExceptionAndReleaseLedger(BKException e, long ledgerIdToReplicate)
+            throws UnavailableException {
+<span class="nc" id="L283">        LOG.info(&quot;{} while&quot;</span>
+                + &quot; rereplicating ledger {}.&quot;
+                + &quot; Enough Bookies might not have available&quot;
+                + &quot; So, no harm to continue&quot;,
+<span class="nc" id="L287">            e.getClass().getSimpleName(),</span>
+<span class="nc" id="L288">            ledgerIdToReplicate);</span>
+<span class="nc" id="L289">        underreplicationManager</span>
+<span class="nc" id="L290">                .releaseUnderreplicatedLedger(ledgerIdToReplicate);</span>
+<span class="nc" id="L291">        getExceptionCounter(e.getClass().getSimpleName()).inc();</span>
+<span class="nc" id="L292">    }</span>
+
+    /**
+     * When checking the fragments of a ledger, there is a corner case
+     * where if the last segment/ensemble is open, but nothing has been written to
+     * some of the quorums in the ensemble, bookies can fail without any action being
+     * taken. This is fine, until enough bookies fail to cause a quorum to become
+     * unavailable, by which time the ledger is unrecoverable.
+     *
+     * For example, if in a E3Q2, only 1 entry is written and the last bookie
+     * in the ensemble fails, nothing has been written to it, so nothing needs to be
+     * recovered. But if the second to last bookie fails, we've now lost quorum for
+     * the second entry, so it's impossible to see if the second has been written or
+     * not.
+     *
+     * To avoid this situation, we need to check if bookies in the final open ensemble
+     * are unavailable, and take action if so. The action to take is to close the ledger,
+     * after a grace period as the writting client may replace the faulty bookie on its
+     * own.
+     *
+     * Missing bookies in closed ledgers are fine, as we know the last confirmed add, so
+     * we can tell which entries are supposed to exist and rereplicate them if necessary.
+     */
+    private boolean isLastSegmentOpenAndMissingBookies(LedgerHandle lh) throws BKException {
+<span class="nc" id="L316">        LedgerMetadata md = admin.getLedgerMetadata(lh);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (md.isClosed()) {</span>
+<span class="nc" id="L318">            return false;</span>
+        }
+
+<span class="nc" id="L321">        SortedMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; ensembles</span>
+<span class="nc" id="L322">            = admin.getLedgerMetadata(lh).getEnsembles();</span>
+<span class="nc" id="L323">        ArrayList&lt;BookieSocketAddress&gt; finalEnsemble = ensembles.get(ensembles.lastKey());</span>
+<span class="nc" id="L324">        Collection&lt;BookieSocketAddress&gt; available = admin.getAvailableBookies();</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        for (BookieSocketAddress b : finalEnsemble) {</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">            if (!available.contains(b)) {</span>
+<span class="nc" id="L327">                return true;</span>
+            }
+<span class="nc" id="L329">        }</span>
+<span class="nc" id="L330">        return false;</span>
+    }
+
+    /** Gets the under replicated fragments */
+    private Set&lt;LedgerFragment&gt; getUnderreplicatedFragments(LedgerHandle lh)
+            throws InterruptedException {
+<span class="nc" id="L336">        CheckerCallback checkerCb = new CheckerCallback();</span>
+<span class="nc" id="L337">        ledgerChecker.checkLedger(lh, checkerCb);</span>
+<span class="nc" id="L338">        Set&lt;LedgerFragment&gt; fragments = checkerCb.waitAndGetResult();</span>
+<span class="nc" id="L339">        return fragments;</span>
+    }
+
+    /**
+     * Schedules a timer task for releasing the lock which will be scheduled
+     * after open ledger fragment replication time. Ledger will be fenced if it
+     * is still in open state when timer task fired
+     */
+    private void deferLedgerLockRelease(final long ledgerId) {
+<span class="nc" id="L348">        long gracePeriod = this.openLedgerRereplicationGracePeriod;</span>
+<span class="nc" id="L349">        TimerTask timerTask = new TimerTask() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L352">                LedgerHandle lh = null;</span>
+                try {
+<span class="nc" id="L354">                    lh = admin.openLedgerNoRecovery(ledgerId);</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    if (isLastSegmentOpenAndMissingBookies(lh)) {</span>
+<span class="nc" id="L356">                        lh = admin.openLedger(ledgerId);</span>
+                    }
+
+<span class="nc" id="L359">                    Set&lt;LedgerFragment&gt; fragments = getUnderreplicatedFragments(lh);</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                    for (LedgerFragment fragment : fragments) {</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                        if (!fragment.isClosed()) {</span>
+<span class="nc" id="L362">                            lh = admin.openLedger(ledgerId);</span>
+<span class="nc" id="L363">                            break;</span>
+                        }
+<span class="nc" id="L365">                    }</span>
+<span class="nc" id="L366">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L367">                    Thread.currentThread().interrupt();</span>
+<span class="nc" id="L368">                    LOG.info(&quot;InterruptedException &quot;</span>
+                            + &quot;while replicating fragments&quot;, e);
+<span class="nc" id="L370">                } catch (BKNoSuchLedgerExistsException bknsle) {</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                    if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L372">                        LOG.debug(&quot;Ledger was deleted, safe to continue&quot;, bknsle);</span>
+                    }
+<span class="nc" id="L374">                } catch (BKException e) {</span>
+<span class="nc" id="L375">                    LOG.error(&quot;BKException while fencing the ledger&quot;</span>
+                            + &quot; for rereplication of postponed ledgers&quot;, e);
+                } finally {
+                    try {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                        if (lh != null) {</span>
+<span class="nc" id="L380">                            lh.close();</span>
+                        }
+<span class="nc" id="L382">                    } catch (InterruptedException e) {</span>
+<span class="nc" id="L383">                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L384">                        LOG.info(&quot;InterruptedException while closing &quot;</span>
+                                + &quot;ledger&quot;, e);
+<span class="nc" id="L386">                    } catch (BKException e) {</span>
+                        // Lets go ahead and release the lock. Catch actual
+                        // exception in normal replication flow and take
+                        // action.
+<span class="nc" id="L390">                        LOG.warn(&quot;BKException while closing ledger &quot;, e);</span>
+                    } finally {
+                        try {
+<span class="nc" id="L393">                            underreplicationManager</span>
+<span class="nc" id="L394">                                    .releaseUnderreplicatedLedger(ledgerId);</span>
+<span class="nc" id="L395">                        } catch (UnavailableException e) {</span>
+<span class="nc" id="L396">                            LOG.error(&quot;UnavailableException &quot;</span>
+                                    + &quot;while replicating fragments&quot;, e);
+<span class="nc" id="L398">                            shutdown();</span>
+<span class="nc" id="L399">                        }</span>
+                    }
+                }
+<span class="nc" id="L402">            }</span>
+        };
+<span class="nc" id="L404">        pendingReplicationTimer.schedule(timerTask, gracePeriod);</span>
+<span class="nc" id="L405">    }</span>
+
+    /**
+     * Stop the replication worker service
+     */
+    public void shutdown() {
+<span class="nc" id="L411">        LOG.info(&quot;Shutting down replication worker&quot;);</span>
+
+<span class="nc" id="L413">        synchronized (this) {</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            if (!workerRunning) {</span>
+<span class="nc" id="L415">                return;</span>
+            }
+<span class="nc" id="L417">            workerRunning = false;</span>
+<span class="nc" id="L418">        }</span>
+<span class="nc" id="L419">        LOG.info(&quot;Shutting down ReplicationWorker&quot;);</span>
+<span class="nc" id="L420">        this.pendingReplicationTimer.cancel();</span>
+        try {
+<span class="nc" id="L422">            this.workerThread.interrupt();</span>
+<span class="nc" id="L423">            this.workerThread.join();</span>
+<span class="nc" id="L424">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L425">            LOG.error(&quot;Interrupted during shutting down replication worker : &quot;,</span>
+                    e);
+<span class="nc" id="L427">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L428">        }</span>
+        try {
+<span class="nc" id="L430">            bkc.close();</span>
+<span class="nc" id="L431">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L432">            LOG.warn(&quot;Interrupted while closing the Bookie client&quot;, e);</span>
+<span class="nc" id="L433">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L434">        } catch (BKException e) {</span>
+<span class="nc" id="L435">            LOG.warn(&quot;Exception while closing the Bookie client&quot;, e);</span>
+<span class="nc" id="L436">        }</span>
+        try {
+<span class="nc" id="L438">            underreplicationManager.close();</span>
+<span class="nc" id="L439">        } catch (UnavailableException e) {</span>
+<span class="nc" id="L440">            LOG.warn(&quot;Exception while closing the &quot;</span>
+                    + &quot;ZkLedgerUnderrepliationManager&quot;, e);
+<span class="nc" id="L442">        }</span>
+<span class="nc" id="L443">    }</span>
+
+    /**
+     * Gives the running status of ReplicationWorker
+     */
+    boolean isRunning() {
+<span class="nc bnc" id="L449" title="All 4 branches missed.">        return workerRunning &amp;&amp; workerThread.isAlive();</span>
+    }
+
+    /** Ledger checker call back */
+<span class="nc" id="L453">    private static class CheckerCallback implements</span>
+            GenericCallback&lt;Set&lt;LedgerFragment&gt;&gt; {
+<span class="nc" id="L455">        private Set&lt;LedgerFragment&gt; result = null;</span>
+<span class="nc" id="L456">        private CountDownLatch latch = new CountDownLatch(1);</span>
+
+        @Override
+        public void operationComplete(int rc, Set&lt;LedgerFragment&gt; result) {
+<span class="nc" id="L460">            this.result = result;</span>
+<span class="nc" id="L461">            latch.countDown();</span>
+<span class="nc" id="L462">        }</span>
+
+        /**
+         * Wait until operation complete call back comes and return the ledger
+         * fragments set
+         */
+        Set&lt;LedgerFragment&gt; waitAndGetResult() throws InterruptedException {
+<span class="nc" id="L469">            latch.await();</span>
+<span class="nc" id="L470">            return result;</span>
+        }
+    }
+
+    private Counter getExceptionCounter(String name) {
+<span class="nc" id="L475">        Counter counter = this.exceptionCounters.get(name);</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">        if (counter == null) {</span>
+<span class="nc" id="L477">            counter = this.statsLogger.scope(REPLICATE_EXCEPTION).getCounter(name);</span>
+<span class="nc" id="L478">            this.exceptionCounters.put(name, counter);</span>
+        }
+<span class="nc" id="L480">        return counter;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

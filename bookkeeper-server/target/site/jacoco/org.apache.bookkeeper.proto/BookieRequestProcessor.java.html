@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BookieRequestProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.proto</a> &gt; <span class="el_source">BookieRequestProcessor.java</span></div><h1>BookieRequestProcessor.java</h1><pre class="source lang-java linenums">/**
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.apache.bookkeeper.proto;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
+import io.netty.channel.Channel;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.HashedWheelTimer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import org.apache.bookkeeper.auth.AuthProviderFactoryFactory;
+import org.apache.bookkeeper.auth.AuthToken;
+import org.apache.bookkeeper.bookie.Bookie;
+import org.apache.bookkeeper.common.util.OrderedScheduler;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.processor.RequestProcessor;
+import org.apache.bookkeeper.stats.Counter;
+import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.tls.SecurityException;
+import org.apache.bookkeeper.tls.SecurityHandlerFactory;
+import org.apache.bookkeeper.tls.SecurityHandlerFactory.NodeType;
+import org.apache.bookkeeper.util.OrderedSafeExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.ADD_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.ADD_ENTRY_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.CHANNEL_WRITE;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.GET_BOOKIE_INFO_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_FENCE_READ;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_FENCE_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_FENCE_WAIT;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_LONG_POLL_PRE_WAIT;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_LONG_POLL_READ;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_LONG_POLL_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_LONG_POLL_WAIT;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_ENTRY_SCHEDULING_DELAY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_LAC_REQUEST;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_LAST_ENTRY_NOENTRY_ERROR;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.WRITE_LAC;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_LAC;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.WRITE_LAC;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.GET_BOOKIE_INFO;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.WRITE_LAC_REQUEST;
+
+public class BookieRequestProcessor implements RequestProcessor {
+
+<span class="fc" id="L73">    private static final Logger LOG = LoggerFactory.getLogger(BookieRequestProcessor.class);</span>
+
+    /**
+     * The server configuration. We use this for getting the number of add and read
+     * worker threads.
+     */
+    private final ServerConfiguration serverCfg;
+
+    /**
+     * This is the Bookie instance that is used to handle all read and write requests.
+     */
+    final Bookie bookie;
+
+    /**
+     * The threadpool used to execute all read entry requests issued to this server.
+     */
+    private final OrderedSafeExecutor readThreadPool;
+
+    /**
+     * The threadpool used to execute all add entry requests issued to this server.
+     */
+    private final OrderedSafeExecutor writeThreadPool;
+
+    /**
+     * TLS management
+     */
+    private final SecurityHandlerFactory shFactory;
+
+    /**
+     * The threadpool used to execute all long poll requests issued to this server
+     * after they are done waiting
+     */
+    private final OrderedSafeExecutor longPollThreadPool;
+
+    /**
+     * The Timer used to time out requests for long polling
+     */
+    private final HashedWheelTimer requestTimer;
+
+    // Expose Stats
+<span class="fc" id="L113">    private final BKStats bkStats = BKStats.getInstance();</span>
+    private final boolean statsEnabled;
+    final OpStatsLogger addRequestStats;
+    final OpStatsLogger addEntryStats;
+    final OpStatsLogger readRequestStats;
+    final OpStatsLogger readEntryStats;
+    final OpStatsLogger fenceReadRequestStats;
+    final OpStatsLogger fenceReadEntryStats;
+    final OpStatsLogger fenceReadWaitStats;
+    final OpStatsLogger readEntrySchedulingDelayStats;
+    final OpStatsLogger longPollPreWaitStats;
+    final OpStatsLogger longPollWaitStats;
+    final OpStatsLogger longPollReadStats;
+    final OpStatsLogger longPollReadRequestStats;
+    final Counter readLastEntryNoEntryErrorCounter;
+    final OpStatsLogger writeLacRequestStats;
+    final OpStatsLogger writeLacStats;
+    final OpStatsLogger readLacRequestStats;
+    final OpStatsLogger readLacStats;
+    final OpStatsLogger getBookieInfoRequestStats;
+    final OpStatsLogger getBookieInfoStats;
+    final OpStatsLogger channelWriteStats;
+
+    public BookieRequestProcessor(ServerConfiguration serverCfg, Bookie bookie,
+<span class="fc" id="L137">            StatsLogger statsLogger, SecurityHandlerFactory shFactory) throws SecurityException {</span>
+<span class="fc" id="L138">        this.serverCfg = serverCfg;</span>
+<span class="fc" id="L139">        this.bookie = bookie;</span>
+<span class="fc" id="L140">        this.readThreadPool = createExecutor(this.serverCfg.getNumReadWorkerThreads(), &quot;BookieReadThread-&quot; + serverCfg.getBookiePort(),</span>
+<span class="fc" id="L141">                serverCfg.getMaxPendingReadRequestPerThread());</span>
+<span class="fc" id="L142">        this.writeThreadPool = createExecutor(this.serverCfg.getNumAddWorkerThreads(), &quot;BookieWriteThread-&quot; + serverCfg.getBookiePort(),</span>
+<span class="fc" id="L143">                serverCfg.getMaxPendingAddRequestPerThread());</span>
+<span class="fc" id="L144">        this.longPollThreadPool =</span>
+<span class="fc" id="L145">            createExecutor(</span>
+<span class="fc" id="L146">                this.serverCfg.getNumLongPollWorkerThreads(),</span>
+<span class="fc" id="L147">                &quot;BookieLongPollThread-&quot; + serverCfg.getBookiePort(), OrderedScheduler.NO_TASK_LIMIT);</span>
+<span class="fc" id="L148">        this.requestTimer = new HashedWheelTimer(</span>
+<span class="fc" id="L149">            new ThreadFactoryBuilder().setNameFormat(&quot;BookieRequestTimer-%d&quot;).build(),</span>
+<span class="fc" id="L150">            this.serverCfg.getRequestTimerTickDurationMs(),</span>
+<span class="fc" id="L151">            TimeUnit.MILLISECONDS, this.serverCfg.getRequestTimerNumTicks());</span>
+<span class="fc" id="L152">        this.shFactory = shFactory;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (shFactory != null) {</span>
+<span class="nc" id="L154">            shFactory.init(NodeType.Server, serverCfg);</span>
+        }
+
+        // Expose Stats
+<span class="fc" id="L158">        this.statsEnabled = serverCfg.isStatisticsEnabled();</span>
+<span class="fc" id="L159">        this.addEntryStats = statsLogger.getOpStatsLogger(ADD_ENTRY);</span>
+<span class="fc" id="L160">        this.addRequestStats = statsLogger.getOpStatsLogger(ADD_ENTRY_REQUEST);</span>
+<span class="fc" id="L161">        this.readEntryStats = statsLogger.getOpStatsLogger(READ_ENTRY);</span>
+<span class="fc" id="L162">        this.readRequestStats = statsLogger.getOpStatsLogger(READ_ENTRY_REQUEST);</span>
+<span class="fc" id="L163">        this.fenceReadEntryStats = statsLogger.getOpStatsLogger(READ_ENTRY_FENCE_READ);</span>
+<span class="fc" id="L164">        this.fenceReadRequestStats = statsLogger.getOpStatsLogger(READ_ENTRY_FENCE_REQUEST);</span>
+<span class="fc" id="L165">        this.fenceReadWaitStats = statsLogger.getOpStatsLogger(READ_ENTRY_FENCE_WAIT);</span>
+<span class="fc" id="L166">        this.readEntrySchedulingDelayStats = statsLogger.getOpStatsLogger(READ_ENTRY_SCHEDULING_DELAY);</span>
+<span class="fc" id="L167">        this.longPollPreWaitStats = statsLogger.getOpStatsLogger(READ_ENTRY_LONG_POLL_PRE_WAIT);</span>
+<span class="fc" id="L168">        this.longPollWaitStats = statsLogger.getOpStatsLogger(READ_ENTRY_LONG_POLL_WAIT);</span>
+<span class="fc" id="L169">        this.longPollReadStats = statsLogger.getOpStatsLogger(READ_ENTRY_LONG_POLL_READ);</span>
+<span class="fc" id="L170">        this.longPollReadRequestStats = statsLogger.getOpStatsLogger(READ_ENTRY_LONG_POLL_REQUEST);</span>
+<span class="fc" id="L171">        this.readLastEntryNoEntryErrorCounter = statsLogger.getCounter(READ_LAST_ENTRY_NOENTRY_ERROR);</span>
+<span class="fc" id="L172">        this.writeLacStats = statsLogger.getOpStatsLogger(WRITE_LAC);</span>
+<span class="fc" id="L173">        this.writeLacRequestStats = statsLogger.getOpStatsLogger(WRITE_LAC_REQUEST);</span>
+<span class="fc" id="L174">        this.readLacStats = statsLogger.getOpStatsLogger(READ_LAC);</span>
+<span class="fc" id="L175">        this.readLacRequestStats = statsLogger.getOpStatsLogger(READ_LAC_REQUEST);</span>
+<span class="fc" id="L176">        this.getBookieInfoStats = statsLogger.getOpStatsLogger(GET_BOOKIE_INFO);</span>
+<span class="fc" id="L177">        this.getBookieInfoRequestStats = statsLogger.getOpStatsLogger(GET_BOOKIE_INFO_REQUEST);</span>
+<span class="fc" id="L178">        this.channelWriteStats = statsLogger.getOpStatsLogger(CHANNEL_WRITE);</span>
+<span class="fc" id="L179">    }</span>
+
+    @Override
+    public void close() {
+<span class="fc" id="L183">        shutdownExecutor(writeThreadPool);</span>
+<span class="fc" id="L184">        shutdownExecutor(readThreadPool);</span>
+<span class="fc" id="L185">    }</span>
+
+    private OrderedSafeExecutor createExecutor(int numThreads, String nameFormat, int maxTasksInQueue) {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (numThreads &lt;= 0) {</span>
+<span class="nc" id="L189">            return null;</span>
+        } else {
+<span class="fc" id="L191">            return OrderedSafeExecutor.newBuilder().numThreads(numThreads).name(nameFormat).maxTasksInQueue(maxTasksInQueue).build();</span>
+        }
+    }
+
+    private void shutdownExecutor(OrderedSafeExecutor service) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (null != service) {</span>
+<span class="fc" id="L197">            service.shutdown();</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    @Override
+    public void processRequest(Object msg, Channel c) {
+        // If we can decode this packet as a Request protobuf packet, process
+        // it as a version 3 packet. Else, just use the old protocol.
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (msg instanceof BookkeeperProtocol.Request) {</span>
+<span class="fc" id="L206">            BookkeeperProtocol.Request r = (BookkeeperProtocol.Request) msg;</span>
+<span class="fc" id="L207">            BookkeeperProtocol.BKPacketHeader header = r.getHeader();</span>
+<span class="pc bpc" id="L208" title="6 of 8 branches missed.">            switch (header.getOperation()) {</span>
+                case ADD_ENTRY:
+<span class="fc" id="L210">                    processAddRequestV3(r, c);</span>
+<span class="fc" id="L211">                    break;</span>
+                case READ_ENTRY:
+<span class="fc" id="L213">                    processReadRequestV3(r, c);</span>
+<span class="fc" id="L214">                    break;</span>
+                case AUTH:
+<span class="nc" id="L216">                    LOG.info(&quot;Ignoring auth operation from client {}&quot;,c.remoteAddress());</span>
+                    BookkeeperProtocol.AuthMessage message = BookkeeperProtocol.AuthMessage
+<span class="nc" id="L218">                        .newBuilder()</span>
+<span class="nc" id="L219">                        .setAuthPluginName(AuthProviderFactoryFactory.AUTHENTICATION_DISABLED_PLUGIN_NAME)</span>
+<span class="nc" id="L220">                        .setPayload(ByteString.copyFrom(AuthToken.NULL.getData()))</span>
+<span class="nc" id="L221">                        .build();</span>
+                    BookkeeperProtocol.Response.Builder authResponse =
+<span class="nc" id="L223">                            BookkeeperProtocol.Response.newBuilder().setHeader(r.getHeader())</span>
+<span class="nc" id="L224">                            .setStatus(BookkeeperProtocol.StatusCode.EOK)</span>
+<span class="nc" id="L225">                            .setAuthResponse(message);</span>
+<span class="nc" id="L226">                    c.writeAndFlush(authResponse.build());</span>
+<span class="nc" id="L227">                    break;</span>
+                case WRITE_LAC:
+<span class="nc" id="L229">                    processWriteLacRequestV3(r,c);</span>
+<span class="nc" id="L230">                    break;</span>
+                case READ_LAC:
+<span class="nc" id="L232">                    processReadLacRequestV3(r,c);</span>
+<span class="nc" id="L233">                    break;</span>
+                case GET_BOOKIE_INFO:
+<span class="nc" id="L235">                    processGetBookieInfoRequestV3(r,c);</span>
+<span class="nc" id="L236">                    break;</span>
+                case START_TLS:
+<span class="nc" id="L238">                    processStartTLSRequestV3(r, c);</span>
+<span class="nc" id="L239">                    break;</span>
+                default:
+<span class="nc" id="L241">                    LOG.info(&quot;Unknown operation type {}&quot;, header.getOperation());</span>
+                    BookkeeperProtocol.Response.Builder response =
+<span class="nc" id="L243">                            BookkeeperProtocol.Response.newBuilder().setHeader(r.getHeader())</span>
+<span class="nc" id="L244">                            .setStatus(BookkeeperProtocol.StatusCode.EBADREQ);</span>
+<span class="nc" id="L245">                    c.writeAndFlush(response.build());</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    if (statsEnabled) {</span>
+<span class="nc" id="L247">                        bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();</span>
+                    }
+                    break;
+            }
+<span class="fc" id="L251">        } else {</span>
+<span class="nc" id="L252">            BookieProtocol.Request r = (BookieProtocol.Request) msg;</span>
+            // process packet
+<span class="nc bnc" id="L254" title="All 3 branches missed.">            switch (r.getOpCode()) {</span>
+                case BookieProtocol.ADDENTRY:
+<span class="nc" id="L256">                    processAddRequest(r, c);</span>
+<span class="nc" id="L257">                    break;</span>
+                case BookieProtocol.READENTRY:
+<span class="nc" id="L259">                    processReadRequest(r, c);</span>
+<span class="nc" id="L260">                    break;</span>
+                default:
+<span class="nc" id="L262">                    LOG.error(&quot;Unknown op type {}, sending error&quot;, r.getOpCode());</span>
+<span class="nc" id="L263">                    c.writeAndFlush(ResponseBuilder.buildErrorResponse(BookieProtocol.EBADREQ, r));</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                    if (statsEnabled) {</span>
+<span class="nc" id="L265">                        bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();</span>
+                    }
+                    break;
+            }
+        }
+<span class="fc" id="L270">    }</span>
+
+     private void processWriteLacRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="nc" id="L273">        WriteLacProcessorV3 writeLac = new WriteLacProcessorV3(r, c, this);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (null == writeThreadPool) {</span>
+<span class="nc" id="L275">            writeLac.run();</span>
+        } else {
+<span class="nc" id="L277">            writeThreadPool.submitOrdered(r.getAddRequest().getLedgerId(), writeLac);</span>
+        }
+<span class="nc" id="L279">    }</span>
+
+    private void processReadLacRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="nc" id="L282">        ReadLacProcessorV3 readLac = new ReadLacProcessorV3(r, c, this);</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (null == readThreadPool) {</span>
+<span class="nc" id="L284">            readLac.run();</span>
+        } else {
+<span class="nc" id="L286">            readThreadPool.submitOrdered(r.getAddRequest().getLedgerId(), readLac);</span>
+        }
+<span class="nc" id="L288">    }</span>
+
+    private void processAddRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="fc" id="L291">        WriteEntryProcessorV3 write = new WriteEntryProcessorV3(r, c, this);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (null == writeThreadPool) {</span>
+<span class="nc" id="L293">            write.run();</span>
+        } else {
+            try {
+<span class="fc" id="L296">                writeThreadPool.submitOrdered(r.getAddRequest().getLedgerId(), write);</span>
+<span class="nc" id="L297">            } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L299">                    LOG.debug(&quot;Failed to process request to add entry at {}:{}. Too many pending requests&quot;,</span>
+<span class="nc" id="L300">                            r.getAddRequest().getLedgerId(), r.getAddRequest().getEntryId());</span>
+                }
+<span class="nc" id="L302">                BookkeeperProtocol.AddResponse.Builder addResponse = BookkeeperProtocol.AddResponse.newBuilder()</span>
+<span class="nc" id="L303">                        .setLedgerId(r.getAddRequest().getLedgerId())</span>
+<span class="nc" id="L304">                        .setEntryId(r.getAddRequest().getEntryId())</span>
+<span class="nc" id="L305">                        .setStatus(BookkeeperProtocol.StatusCode.ETOOMANYREQUESTS);</span>
+<span class="nc" id="L306">                BookkeeperProtocol.Response.Builder response = BookkeeperProtocol.Response.newBuilder()</span>
+<span class="nc" id="L307">                        .setHeader(write.getHeader())</span>
+<span class="nc" id="L308">                        .setStatus(addResponse.getStatus())</span>
+<span class="nc" id="L309">                        .setAddResponse(addResponse);</span>
+<span class="nc" id="L310">                BookkeeperProtocol.Response resp = response.build();</span>
+<span class="nc" id="L311">                write.sendResponse(addResponse.getStatus(), resp, addRequestStats);</span>
+<span class="fc" id="L312">            }</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    private void processReadRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        ExecutorService fenceThreadPool =</span>
+<span class="fc" id="L318">          null == readThreadPool ? null : readThreadPool.chooseThread(c);</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        ExecutorService lpThreadPool =</span>
+<span class="fc" id="L320">          null == longPollThreadPool ? null : longPollThreadPool.chooseThread(c);</span>
+        ReadEntryProcessorV3 read;
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (RequestUtils.isLongPollReadRequest(r.getReadRequest())) {</span>
+<span class="nc" id="L323">            read = new LongPollReadEntryProcessorV3(</span>
+                r,
+                c,
+                this,
+                fenceThreadPool,
+                lpThreadPool,
+                requestTimer);
+<span class="nc bnc" id="L330" title="All 2 branches missed.">            if (null == longPollThreadPool) {</span>
+<span class="nc" id="L331">                read.run();</span>
+            } else {
+<span class="nc" id="L333">                longPollThreadPool.submitOrdered(r.getReadRequest().getLedgerId(), read);</span>
+            }
+        } else {
+<span class="fc" id="L336">            read = new ReadEntryProcessorV3(r, c, this, fenceThreadPool);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (null == readThreadPool) {</span>
+<span class="nc" id="L338">                read.run();</span>
+            } else {
+                try {
+<span class="fc" id="L341">                    readThreadPool.submitOrdered(r.getReadRequest().getLedgerId(), read);</span>
+<span class="nc" id="L342">                } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                    if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L344">                        LOG.debug(&quot;Failed to process request to read entry at {}:{}. Too many pending requests&quot;,</span>
+<span class="nc" id="L345">                                r.getReadRequest().getLedgerId(), r.getReadRequest().getEntryId());</span>
+                    }
+                    BookkeeperProtocol.ReadResponse.Builder readResponse =
+<span class="nc" id="L348">                            BookkeeperProtocol.ReadResponse.newBuilder()</span>
+<span class="nc" id="L349">                                    .setLedgerId(r.getAddRequest().getLedgerId())</span>
+<span class="nc" id="L350">                                    .setEntryId(r.getAddRequest().getEntryId())</span>
+<span class="nc" id="L351">                                    .setStatus(BookkeeperProtocol.StatusCode.ETOOMANYREQUESTS);</span>
+<span class="nc" id="L352">                    BookkeeperProtocol.Response.Builder response = BookkeeperProtocol.Response.newBuilder()</span>
+<span class="nc" id="L353">                            .setHeader(read.getHeader())</span>
+<span class="nc" id="L354">                            .setStatus(readResponse.getStatus())</span>
+<span class="nc" id="L355">                            .setReadResponse(readResponse);</span>
+<span class="nc" id="L356">                    BookkeeperProtocol.Response resp = response.build();</span>
+<span class="nc" id="L357">                    read.sendResponse(readResponse.getStatus(), resp, readRequestStats);</span>
+<span class="fc" id="L358">                }</span>
+            }
+        }
+<span class="fc" id="L361">    }</span>
+
+    private void processStartTLSRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="nc" id="L364">        BookkeeperProtocol.Response.Builder response = BookkeeperProtocol.Response.newBuilder();</span>
+<span class="nc" id="L365">        BookkeeperProtocol.BKPacketHeader.Builder header = BookkeeperProtocol.BKPacketHeader.newBuilder();</span>
+<span class="nc" id="L366">        header.setVersion(BookkeeperProtocol.ProtocolVersion.VERSION_THREE);</span>
+<span class="nc" id="L367">        header.setOperation(r.getHeader().getOperation());</span>
+<span class="nc" id="L368">        header.setTxnId(r.getHeader().getTxnId());</span>
+<span class="nc" id="L369">        response.setHeader(header.build());</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (shFactory == null) {</span>
+<span class="nc" id="L371">            LOG.error(&quot;Got StartTLS request but TLS not configured&quot;);</span>
+<span class="nc" id="L372">            response.setStatus(BookkeeperProtocol.StatusCode.EBADREQ);</span>
+<span class="nc" id="L373">            c.writeAndFlush(response.build());</span>
+        } else {
+            // there is no need to execute in a different thread as this operation is light
+<span class="nc" id="L376">            SslHandler sslHandler = shFactory.newTLSHandler();</span>
+<span class="nc" id="L377">            c.pipeline().addFirst(&quot;tls&quot;, sslHandler);</span>
+
+<span class="nc" id="L379">            response.setStatus(BookkeeperProtocol.StatusCode.EOK);</span>
+<span class="nc" id="L380">            BookkeeperProtocol.StartTLSResponse.Builder builder = BookkeeperProtocol.StartTLSResponse.newBuilder();</span>
+<span class="nc" id="L381">            response.setStartTLSResponse(builder.build());</span>
+<span class="nc" id="L382">            sslHandler.handshakeFuture().addListener(new GenericFutureListener&lt;Future&lt;Channel&gt;&gt;() {</span>
+                @Override
+                public void operationComplete(Future&lt;Channel&gt; future) throws Exception {
+                    // notify the AuthPlugin the completion of the handshake, even in case of failure
+<span class="nc" id="L386">                    AuthHandler.ServerSideHandler authHandler = c.pipeline()</span>
+<span class="nc" id="L387">                            .get(AuthHandler.ServerSideHandler.class);</span>
+<span class="nc" id="L388">                    authHandler.authProvider.onProtocolUpgrade();</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">                    if (future.isSuccess()) {</span>
+<span class="nc" id="L390">                        LOG.info(&quot;Session is protected by: {}&quot;, sslHandler.engine().getSession().getCipherSuite());</span>
+                    } else {
+<span class="nc" id="L392">                        LOG.error(&quot;TLS Handshake failure: {}&quot;, future.cause());</span>
+<span class="nc" id="L393">                        BookkeeperProtocol.Response.Builder errResponse = BookkeeperProtocol.Response.newBuilder()</span>
+<span class="nc" id="L394">                                .setHeader(r.getHeader()).setStatus(BookkeeperProtocol.StatusCode.EIO);</span>
+<span class="nc" id="L395">                        c.writeAndFlush(errResponse.build());</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                        if (statsEnabled) {</span>
+<span class="nc" id="L397">                            bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();</span>
+                        }
+                    }
+<span class="nc" id="L400">                }</span>
+            });
+<span class="nc" id="L402">            c.writeAndFlush(response.build());</span>
+        }
+<span class="nc" id="L404">    }</span>
+
+    private void processGetBookieInfoRequestV3(final BookkeeperProtocol.Request r, final Channel c) {
+<span class="nc" id="L407">        GetBookieInfoProcessorV3 getBookieInfo = new GetBookieInfoProcessorV3(r, c, this);</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">        if (null == readThreadPool) {</span>
+<span class="nc" id="L409">            getBookieInfo.run();</span>
+        } else {
+<span class="nc" id="L411">            readThreadPool.submit(getBookieInfo);</span>
+        }
+<span class="nc" id="L413">    }</span>
+
+    private void processAddRequest(final BookieProtocol.Request r, final Channel c) {
+<span class="nc" id="L416">        WriteEntryProcessor write = WriteEntryProcessor.create(r, c, this);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (null == writeThreadPool) {</span>
+<span class="nc" id="L418">            write.run();</span>
+        } else {
+            try {
+<span class="nc" id="L421">                writeThreadPool.submitOrdered(r.getLedgerId(), write);</span>
+<span class="nc" id="L422">            } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L424">                    LOG.debug(&quot;Failed to process request to add entry at {}:{}. Too many pending requests&quot;, r.ledgerId,</span>
+<span class="nc" id="L425">                            r.entryId);</span>
+                }
+
+<span class="nc" id="L428">                write.sendResponse(BookieProtocol.ETOOMANYREQUESTS,</span>
+<span class="nc" id="L429">                        ResponseBuilder.buildErrorResponse(BookieProtocol.ETOOMANYREQUESTS, r), addRequestStats);</span>
+<span class="nc" id="L430">            }</span>
+        }
+<span class="nc" id="L432">    }</span>
+
+    private void processReadRequest(final BookieProtocol.Request r, final Channel c) {
+<span class="nc" id="L435">        ReadEntryProcessor read = ReadEntryProcessor.create(r, c, this);</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        if (null == readThreadPool) {</span>
+<span class="nc" id="L437">            read.run();</span>
+        } else {
+            try {
+<span class="nc" id="L440">                readThreadPool.submitOrdered(r.getLedgerId(), read);</span>
+<span class="nc" id="L441">            } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L443">                    LOG.debug(&quot;Failed to process request to read entry at {}:{}. Too many pending requests&quot;, r.ledgerId,</span>
+<span class="nc" id="L444">                            r.entryId);</span>
+                }
+
+<span class="nc" id="L447">                read.sendResponse(BookieProtocol.ETOOMANYREQUESTS,</span>
+<span class="nc" id="L448">                        ResponseBuilder.buildErrorResponse(BookieProtocol.ETOOMANYREQUESTS, r), readRequestStats);</span>
+<span class="nc" id="L449">            }</span>
+        }
+<span class="nc" id="L451">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

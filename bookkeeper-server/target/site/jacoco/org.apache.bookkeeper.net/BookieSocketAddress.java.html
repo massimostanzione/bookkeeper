@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BookieSocketAddress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.net</a> &gt; <span class="el_source">BookieSocketAddress.java</span></div><h1>BookieSocketAddress.java</h1><pre class="source lang-java linenums">/**
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.apache.bookkeeper.net;
+
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+
+import io.netty.channel.local.LocalAddress;
+
+import static org.apache.bookkeeper.util.BookKeeperConstants.COLON;
+
+/**
+ * This is a data wrapper class that is an InetSocketAddress, it would use the hostname
+ * provided in constructors directly.
+ * &lt;p&gt;
+ * The string representation of a BookieSocketAddress is : &lt;hostname&gt;:&lt;port&gt;
+ */
+public class BookieSocketAddress {
+
+    // Member fields that make up this class.
+    private final String hostname;
+    private final int port;
+
+    private final InetSocketAddress socketAddress;
+
+    // Constructor that takes in both a port.
+<span class="fc" id="L45">    public BookieSocketAddress(String hostname, int port) {</span>
+<span class="fc" id="L46">        this.hostname = hostname;</span>
+<span class="fc" id="L47">        this.port = port;</span>
+<span class="fc" id="L48">        socketAddress = new InetSocketAddress(hostname, port);</span>
+<span class="fc" id="L49">    }</span>
+
+    // Constructor from a String &quot;serialized&quot; version of this class.
+<span class="fc" id="L52">    public BookieSocketAddress(String addr) throws UnknownHostException {</span>
+<span class="fc" id="L53">        String[] parts = addr.split(COLON);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (parts.length &lt; 2) {</span>
+<span class="nc" id="L55">            throw new UnknownHostException(addr);</span>
+        }
+<span class="fc" id="L57">        this.hostname = parts[0];</span>
+        try {
+<span class="fc" id="L59">            this.port = Integer.parseInt(parts[1]);</span>
+<span class="nc" id="L60">        } catch (NumberFormatException nfe) {</span>
+<span class="nc" id="L61">            throw new UnknownHostException(addr);</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        socketAddress = new InetSocketAddress(hostname, port);</span>
+<span class="fc" id="L64">    }</span>
+
+    // Public getters
+    public String getHostName() {
+<span class="fc" id="L68">        return hostname;</span>
+    }
+
+    public int getPort() {
+<span class="fc" id="L72">        return port;</span>
+    }
+
+    // Method to return an InetSocketAddress for the regular port.
+    public InetSocketAddress getSocketAddress() {
+<span class="fc" id="L77">        return socketAddress;</span>
+    }
+
+    /**
+     * Maps the socketAddress to a &quot;local&quot; address
+     */
+    public LocalAddress getLocalAddress() {
+<span class="nc" id="L84">        return new LocalAddress(socketAddress.toString());</span>
+    }
+
+    // Return the String &quot;serialized&quot; version of this object.
+    @Override
+    public String toString() {
+<span class="fc" id="L90">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L91">        sb.append(hostname).append(COLON).append(port);</span>
+<span class="fc" id="L92">        return sb.toString();</span>
+    }
+
+    // Implement an equals method comparing two BookiSocketAddress objects.
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!(obj instanceof BookieSocketAddress))</span>
+<span class="nc" id="L99">            return false;</span>
+<span class="fc" id="L100">        BookieSocketAddress that = (BookieSocketAddress) obj;</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        return this.hostname.equals(that.hostname) &amp;&amp; (this.port == that.port);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L106">        return this.hostname.hashCode() + 13 * this.port;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

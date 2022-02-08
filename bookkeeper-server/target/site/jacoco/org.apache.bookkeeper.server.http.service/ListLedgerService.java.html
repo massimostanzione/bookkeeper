@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ListLedgerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.server.http.service</a> &gt; <span class="el_source">ListLedgerService.java</span></div><h1>ListLedgerService.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.bookkeeper.server.http.service;
+
+import static com.google.common.base.Charsets.UTF_8;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.AbstractFuture;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.http.HttpServer;
+import org.apache.bookkeeper.http.service.HttpEndpointService;
+import org.apache.bookkeeper.http.service.HttpServiceRequest;
+import org.apache.bookkeeper.http.service.HttpServiceResponse;
+import org.apache.bookkeeper.meta.LedgerManager;
+import org.apache.bookkeeper.meta.LedgerManagerFactory;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.apache.bookkeeper.util.JsonUtil;
+import org.apache.zookeeper.ZooKeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * HttpEndpointService that handle Bookkeeper list ledger related http request.
+ *
+ * The GET method will list all ledger_ids in this bookkeeper cluster.
+ * User can choose print metadata of each ledger or not by set parameter &quot;print_metadata&quot;
+ */
+public class ListLedgerService implements HttpEndpointService {
+
+<span class="nc" id="L53">    static final Logger LOG = LoggerFactory.getLogger(ListLedgerService.class);</span>
+
+    protected ServerConfiguration conf;
+    protected ZooKeeper zk;
+
+<span class="nc" id="L58">    public ListLedgerService(ServerConfiguration conf, ZooKeeper zk) {</span>
+<span class="nc" id="L59">        Preconditions.checkNotNull(conf);</span>
+<span class="nc" id="L60">        this.conf = conf;</span>
+<span class="nc" id="L61">        this.zk = zk;</span>
+<span class="nc" id="L62">    }</span>
+
+    // Number of LedgerMetadata contains in each page
+    static final int LIST_LEDGER_BATCH_SIZE = 100;
+
+    public static class ReadLedgerMetadataCallback extends AbstractFuture&lt;LedgerMetadata&gt;
+      implements BookkeeperInternalCallbacks.GenericCallback&lt;LedgerMetadata&gt; {
+        final long ledgerId;
+
+<span class="nc" id="L71">        ReadLedgerMetadataCallback(long ledgerId) {</span>
+<span class="nc" id="L72">            this.ledgerId = ledgerId;</span>
+<span class="nc" id="L73">        }</span>
+
+        long getLedgerId() {
+<span class="nc" id="L76">            return ledgerId;</span>
+        }
+
+        public void operationComplete(int rc, LedgerMetadata result) {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (rc != 0) {</span>
+<span class="nc" id="L81">                setException(BKException.create(rc));</span>
+            } else {
+<span class="nc" id="L83">                set(result);</span>
+            }
+<span class="nc" id="L85">        }</span>
+    }
+    static void keepLedgerMetadata(ReadLedgerMetadataCallback cb, LinkedHashMap&lt;String, String&gt; output) throws Exception {
+<span class="nc" id="L88">        LedgerMetadata md = cb.get();</span>
+<span class="nc" id="L89">        output.put(Long.valueOf(cb.getLedgerId()).toString(), new String(md.serialize(), UTF_8));</span>
+<span class="nc" id="L90">    }</span>
+
+    @Override
+    public HttpServiceResponse handle(HttpServiceRequest request) throws Exception {
+<span class="nc" id="L94">        HttpServiceResponse response = new HttpServiceResponse();</span>
+        // GET
+        // parameter could be like: print_metadata=true&amp;page=PageIndex
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (HttpServer.Method.GET == request.getMethod()) {</span>
+<span class="nc" id="L98">            Map&lt;String, String&gt; params = request.getParams();</span>
+            // default not print metadata
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            boolean printMeta = (params != null) &amp;&amp;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">              params.containsKey(&quot;print_metadata&quot;) &amp;&amp;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">              params.get(&quot;print_metadata&quot;).equals(&quot;true&quot;);</span>
+
+            // Page index should start from 1;
+<span class="nc bnc" id="L105" title="All 4 branches missed.">            int pageIndex = (printMeta &amp;&amp; params.containsKey(&quot;page&quot;)) ?</span>
+<span class="nc" id="L106">              Integer.parseInt(params.get(&quot;page&quot;)) :</span>
+              -1;
+
+<span class="nc" id="L109">            LedgerManagerFactory mFactory = LedgerManagerFactory.newLedgerManagerFactory(conf, zk);</span>
+<span class="nc" id="L110">            LedgerManager manager = mFactory.newLedgerManager();</span>
+<span class="nc" id="L111">            LedgerManager.LedgerRangeIterator iter = manager.getLedgerRanges();</span>
+
+            // output &lt;ledgerId: ledgerMetadata&gt;
+<span class="nc" id="L114">            LinkedHashMap&lt;String, String&gt; output = Maps.newLinkedHashMap();</span>
+            // futures for readLedgerMetadata for each page.
+<span class="nc" id="L116">            List&lt;ReadLedgerMetadataCallback&gt; futures = Lists.newArrayListWithExpectedSize(LIST_LEDGER_BATCH_SIZE);</span>
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (printMeta) {</span>
+<span class="nc" id="L119">                int ledgerIndex = 0;</span>
+
+                // start and end ledger index for wanted page.
+<span class="nc" id="L122">                int startLedgerIndex = 0;</span>
+<span class="nc" id="L123">                int endLedgerIndex = 0;</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                if(pageIndex &gt; 0) {</span>
+<span class="nc" id="L125">                    startLedgerIndex = (pageIndex - 1) * LIST_LEDGER_BATCH_SIZE;</span>
+<span class="nc" id="L126">                    endLedgerIndex = startLedgerIndex + LIST_LEDGER_BATCH_SIZE - 1;</span>
+                }
+
+                // get metadata
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                while (iter.hasNext()) {</span>
+<span class="nc" id="L131">                    LedgerManager.LedgerRange r = iter.next();</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                    for (Long lid : r.getLedgers()) {</span>
+<span class="nc" id="L133">                        ledgerIndex ++;</span>
+<span class="nc bnc" id="L134" title="All 6 branches missed.">                        if (endLedgerIndex == 0 ||       // no actual page parameter provided</span>
+                          (ledgerIndex &gt;= startLedgerIndex &amp;&amp; ledgerIndex &lt;= endLedgerIndex)) {
+<span class="nc" id="L136">                            ReadLedgerMetadataCallback cb = new ReadLedgerMetadataCallback(lid);</span>
+<span class="nc" id="L137">                            manager.readLedgerMetadata(lid, cb);</span>
+<span class="nc" id="L138">                            futures.add(cb);</span>
+                        }
+<span class="nc" id="L140">                    }</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                    if (futures.size() &gt;= LIST_LEDGER_BATCH_SIZE) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                        while (futures.size() &gt; 0) {</span>
+<span class="nc" id="L143">                            ReadLedgerMetadataCallback cb = futures.remove(0);</span>
+<span class="nc" id="L144">                            keepLedgerMetadata(cb, output);</span>
+<span class="nc" id="L145">                        }</span>
+                    }
+<span class="nc" id="L147">                }</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                while (futures.size() &gt; 0) {</span>
+<span class="nc" id="L149">                    ReadLedgerMetadataCallback cb = futures.remove(0);</span>
+<span class="nc" id="L150">                    keepLedgerMetadata(cb, output);</span>
+<span class="nc" id="L151">                }</span>
+<span class="nc" id="L152">            } else {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                while (iter.hasNext()) {</span>
+<span class="nc" id="L154">                    LedgerManager.LedgerRange r = iter.next();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    for (Long lid : r.getLedgers()) {</span>
+<span class="nc" id="L156">                        output.put(lid.toString(), null);</span>
+<span class="nc" id="L157">                    }</span>
+<span class="nc" id="L158">                }</span>
+            }
+
+<span class="nc" id="L161">            manager.close();</span>
+<span class="nc" id="L162">            mFactory.uninitialize();</span>
+
+<span class="nc" id="L164">            String jsonResponse = JsonUtil.toJson(output);</span>
+<span class="nc" id="L165">            LOG.debug(&quot;output body:&quot; + jsonResponse);</span>
+<span class="nc" id="L166">            response.setBody(jsonResponse);</span>
+<span class="nc" id="L167">            response.setCode(HttpServer.StatusCode.OK);</span>
+<span class="nc" id="L168">            return response;</span>
+        } else {
+<span class="nc" id="L170">            response.setCode(HttpServer.StatusCode.NOT_FOUND);</span>
+<span class="nc" id="L171">            response.setBody(&quot;Not found method. Should be GET method&quot;);</span>
+<span class="nc" id="L172">            return response;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

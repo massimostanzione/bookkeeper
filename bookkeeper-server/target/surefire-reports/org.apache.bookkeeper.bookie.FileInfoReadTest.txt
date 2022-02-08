@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.apache.bookkeeper.bookie.FileInfoReadTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 25.438 s - in org.apache.bookkeeper.bookie.FileInfoReadTest

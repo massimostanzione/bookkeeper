@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CleanupLedgerManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.meta</a> &gt; <span class="el_source">CleanupLedgerManager.java</span></div><h1>CleanupLedgerManager.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.bookkeeper.meta;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
+import org.apache.bookkeeper.versioning.Version;
+import org.apache.zookeeper.AsyncCallback;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+public class CleanupLedgerManager implements LedgerManager {
+
+    private class CleanupGenericCallback&lt;T&gt; implements GenericCallback&lt;T&gt; {
+
+        private final GenericCallback&lt;T&gt; cb;
+
+<span class="fc" id="L42">        CleanupGenericCallback(GenericCallback&lt;T&gt; cb) {</span>
+<span class="fc" id="L43">            this.cb = cb;</span>
+<span class="fc" id="L44">            addCallback(cb);</span>
+<span class="fc" id="L45">        }</span>
+
+        @Override
+        public void operationComplete(int rc, T result) {
+<span class="fc" id="L49">            closeLock.readLock().lock();</span>
+            try {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">                if (!closed &amp;&amp; null != removeCallback(cb)) {</span>
+<span class="fc" id="L52">                    cb.operationComplete(rc, result);</span>
+                }
+            } finally {
+<span class="fc" id="L55">                closeLock.readLock().unlock();</span>
+            }
+<span class="fc" id="L57">        }</span>
+    }
+
+    private static class ClosedLedgerRangeIterator implements LedgerRangeIterator {
+
+        @Override
+        public boolean hasNext() throws IOException {
+<span class="nc" id="L64">            throw new IOException(&quot;Ledger manager is closed.&quot;);</span>
+        }
+
+        @Override
+        public LedgerRange next() throws IOException {
+<span class="nc" id="L69">            throw new IOException(&quot;Ledger manager is closed.&quot;);</span>
+        }
+    }
+
+    private final LedgerManager underlying;
+<span class="fc" id="L74">    private final ConcurrentMap&lt;GenericCallback, GenericCallback&gt; callbacks =</span>
+        new ConcurrentHashMap&lt;GenericCallback, GenericCallback&gt;();
+<span class="fc" id="L76">    private boolean closed = false;</span>
+<span class="fc" id="L77">    private final ReentrantReadWriteLock closeLock = new ReentrantReadWriteLock();</span>
+
+<span class="fc" id="L79">    public CleanupLedgerManager(LedgerManager lm) {</span>
+<span class="fc" id="L80">        this.underlying = lm;</span>
+<span class="fc" id="L81">    }</span>
+
+    @VisibleForTesting
+    public LedgerManager getUnderlying() {
+<span class="nc" id="L85">        return underlying;</span>
+    }
+
+    private void addCallback(GenericCallback callback) {
+<span class="fc" id="L89">        callbacks.put(callback, callback);</span>
+<span class="fc" id="L90">    }</span>
+
+    @Override
+    public void registerLedgerMetadataListener(long ledgerId, LedgerMetadataListener listener) {
+<span class="nc" id="L94">        underlying.registerLedgerMetadataListener(ledgerId, listener);</span>
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public void unregisterLedgerMetadataListener(long ledgerId, LedgerMetadataListener listener) {
+<span class="nc" id="L99">        underlying.unregisterLedgerMetadataListener(ledgerId, listener);</span>
+<span class="nc" id="L100">    }</span>
+
+    private GenericCallback removeCallback(GenericCallback callback) {
+<span class="fc" id="L103">        return callbacks.remove(callback);</span>
+    }
+
+    @Override
+    public void createLedgerMetadata(long lid, LedgerMetadata metadata,
+                                     GenericCallback&lt;Void&gt; cb) {
+<span class="fc" id="L109">        closeLock.readLock().lock();</span>
+        try {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L112">                cb.operationComplete(BKException.Code.ClientClosedException, null);</span>
+<span class="nc" id="L113">                return;</span>
+            }
+<span class="fc" id="L115">            underlying.createLedgerMetadata(lid, metadata, new CleanupGenericCallback&lt;Void&gt;(cb));</span>
+        } finally {
+<span class="fc" id="L117">            closeLock.readLock().unlock();</span>
+        }
+<span class="fc" id="L119">    }</span>
+
+    @Override
+    public void removeLedgerMetadata(long ledgerId, Version version,
+                                     GenericCallback&lt;Void&gt; vb) {
+<span class="nc" id="L124">        closeLock.readLock().lock();</span>
+        try {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L127">                vb.operationComplete(BKException.Code.ClientClosedException, null);</span>
+<span class="nc" id="L128">                return;</span>
+            }
+<span class="nc" id="L130">            underlying.removeLedgerMetadata(ledgerId, version,</span>
+                    new CleanupGenericCallback&lt;Void&gt;(vb));
+        } finally {
+<span class="nc" id="L133">            closeLock.readLock().unlock();</span>
+        }
+<span class="nc" id="L135">    }</span>
+
+    @Override
+    public void readLedgerMetadata(long ledgerId,
+                                   GenericCallback&lt;LedgerMetadata&gt; readCb) {
+<span class="nc" id="L140">        closeLock.readLock().lock();</span>
+        try {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L143">                readCb.operationComplete(BKException.Code.ClientClosedException, null);</span>
+<span class="nc" id="L144">                return;</span>
+            }
+<span class="nc" id="L146">            underlying.readLedgerMetadata(ledgerId, new CleanupGenericCallback&lt;LedgerMetadata&gt;(readCb));</span>
+        } finally {
+<span class="nc" id="L148">            closeLock.readLock().unlock();</span>
+        }
+<span class="nc" id="L150">    }</span>
+
+    @Override
+    public void writeLedgerMetadata(long ledgerId, LedgerMetadata metadata,
+                                    GenericCallback&lt;Void&gt; cb) {
+<span class="fc" id="L155">        closeLock.readLock().lock();</span>
+        try {
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L158">                cb.operationComplete(BKException.Code.ClientClosedException, null);</span>
+<span class="nc" id="L159">                return;</span>
+            }
+<span class="fc" id="L161">            underlying.writeLedgerMetadata(ledgerId, metadata,</span>
+                    new CleanupGenericCallback&lt;Void&gt;(cb));
+        } finally {
+<span class="fc" id="L164">            closeLock.readLock().unlock();</span>
+        }
+<span class="fc" id="L166">    }</span>
+
+    @Override
+    public void asyncProcessLedgers(Processor&lt;Long&gt; processor,
+                                    final AsyncCallback.VoidCallback finalCb, final Object context,
+                                    final int successRc, final int failureRc) {
+<span class="nc" id="L172">        closeLock.readLock().lock();</span>
+        try {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L175">                finalCb.processResult(failureRc, null, context);</span>
+<span class="nc" id="L176">                return;</span>
+            }
+<span class="nc" id="L178">            final GenericCallback&lt;Void&gt; stub = new GenericCallback&lt;Void&gt;() {</span>
+                @Override
+                public void operationComplete(int rc, Void result) {
+<span class="nc" id="L181">                    finalCb.processResult(failureRc, null, context);</span>
+<span class="nc" id="L182">                }</span>
+            };
+<span class="nc" id="L184">            addCallback(stub);</span>
+<span class="nc" id="L185">            underlying.asyncProcessLedgers(processor, new AsyncCallback.VoidCallback() {</span>
+                @Override
+                public void processResult(int rc, String path, Object ctx) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                    if (null != removeCallback(stub)) {</span>
+<span class="nc" id="L189">                        finalCb.processResult(rc, path, ctx);</span>
+                    }
+<span class="nc" id="L191">                }</span>
+            }, context, successRc, failureRc);
+        } finally {
+<span class="nc" id="L194">            closeLock.readLock().unlock();</span>
+        }
+<span class="nc" id="L196">    }</span>
+
+    @Override
+    public LedgerRangeIterator getLedgerRanges() {
+<span class="nc" id="L200">        closeLock.readLock().lock();</span>
+        try {
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L203">                return new ClosedLedgerRangeIterator();</span>
+            }
+<span class="nc" id="L205">            return underlying.getLedgerRanges();</span>
+        } finally {
+<span class="nc" id="L207">            closeLock.readLock().unlock();</span>
+        }
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public void close() throws IOException {
+        Set&lt;GenericCallback&gt; keys;
+<span class="fc" id="L215">        closeLock.writeLock().lock();</span>
+        try {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L218">                return;</span>
+            }
+<span class="fc" id="L220">            closed = true;</span>
+<span class="fc" id="L221">            keys = new HashSet&lt;GenericCallback&gt;(callbacks.keySet());</span>
+        } finally {
+<span class="fc" id="L223">            closeLock.writeLock().unlock();</span>
+        }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        for (GenericCallback key : keys) {</span>
+<span class="nc" id="L226">            GenericCallback callback = callbacks.remove(key);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (null != callback) {</span>
+<span class="nc" id="L228">                callback.operationComplete(BKException.Code.ClientClosedException, null);</span>
+            }
+<span class="nc" id="L230">        }</span>
+<span class="fc" id="L231">        underlying.close();</span>
+<span class="fc" id="L232">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

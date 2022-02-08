@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZKRegistrationManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.discover</a> &gt; <span class="el_source">ZKRegistrationManager.java</span></div><h1>ZKRegistrationManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.bookkeeper.discover;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
+import static org.apache.bookkeeper.util.BookKeeperConstants.COOKIE_NODE;
+import static org.apache.bookkeeper.util.BookKeeperConstants.INSTANCEID;
+import static org.apache.bookkeeper.util.BookKeeperConstants.READONLY;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.bookie.BookieException;
+import org.apache.bookkeeper.bookie.BookieException.BookieIllegalOpException;
+import org.apache.bookkeeper.bookie.BookieException.CookieNotFoundException;
+import org.apache.bookkeeper.bookie.BookieException.MetadataStoreException;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.util.ZkUtils;
+import org.apache.bookkeeper.versioning.LongVersion;
+import org.apache.bookkeeper.versioning.Version;
+import org.apache.bookkeeper.versioning.Versioned;
+import org.apache.bookkeeper.zookeeper.BoundExponentialBackoffRetryPolicy;
+import org.apache.bookkeeper.zookeeper.ZooKeeperClient;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.EventType;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Stat;
+
+/**
+ * ZooKeeper Based {@link RegistrationManager}.
+ */
+<span class="fc" id="L62">@Slf4j</span>
+<span class="fc" id="L63">public class ZKRegistrationManager implements RegistrationManager {</span>
+
+    private ServerConfiguration conf;
+    private ZooKeeper zk;
+    private List&lt;ACL&gt; zkAcls;
+<span class="fc" id="L68">    private volatile boolean running = false;</span>
+
+    // cookie path
+    private String cookiePath;
+    // registration paths
+    protected String bookieRegistrationPath;
+    protected String bookieReadonlyRegistrationPath;
+
+    private StatsLogger statsLogger;
+
+    @Override
+    public RegistrationManager initialize(ServerConfiguration conf,
+                                          RegistrationListener listener,
+                                          StatsLogger statsLogger)
+            throws BookieException {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (null == conf.getZkServers()) {</span>
+<span class="nc" id="L84">            log.warn(&quot;No ZK servers passed to Bookie constructor so BookKeeper clients won't know about this server!&quot;);</span>
+<span class="nc" id="L85">            return null;</span>
+        }
+
+<span class="fc" id="L88">        this.conf = conf;</span>
+<span class="fc" id="L89">        this.zkAcls = ZkUtils.getACLs(conf);</span>
+<span class="fc" id="L90">        this.statsLogger = statsLogger;</span>
+
+<span class="fc" id="L92">        this.cookiePath = conf.getZkLedgersRootPath() + &quot;/&quot; + COOKIE_NODE;</span>
+<span class="fc" id="L93">        this.bookieRegistrationPath = conf.getZkAvailableBookiesPath();</span>
+<span class="fc" id="L94">        this.bookieReadonlyRegistrationPath = this.bookieRegistrationPath + &quot;/&quot; + READONLY;</span>
+
+        try {
+<span class="fc" id="L97">            this.zk = newZookeeper(conf, listener);</span>
+<span class="nc" id="L98">        } catch (InterruptedException | KeeperException | IOException e) {</span>
+<span class="nc" id="L99">            throw new MetadataStoreException(e);</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        return this;</span>
+    }
+
+    @VisibleForTesting
+    public void setZk(ZooKeeper zk) {
+<span class="nc" id="L106">        this.zk = zk;</span>
+<span class="nc" id="L107">    }</span>
+
+    @VisibleForTesting
+    public ZooKeeper getZk() {
+<span class="fc" id="L111">        return this.zk;</span>
+    }
+
+    /**
+     * Create a new zookeeper client to zk cluster.
+     *
+     * &lt;p&gt;
+     * Bookie Server just used zk client when syncing ledgers for garbage collection.
+     * So when zk client is expired, it means this bookie server is not available in
+     * bookie server list. The bookie client will be notified for its expiration. No
+     * more bookie request will be sent to this server. So it's better to exit when zk
+     * expired.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * Since there are lots of bk operations cached in queue, so we wait for all the operations
+     * are processed and quit. It is done by calling &lt;b&gt;shutdown&lt;/b&gt;.
+     * &lt;/p&gt;
+     *
+     * @param conf server configuration
+     *
+     * @return zk client instance
+     */
+    private ZooKeeper newZookeeper(final ServerConfiguration conf, RegistrationListener listener)
+        throws InterruptedException, KeeperException, IOException {
+<span class="fc" id="L135">        Set&lt;Watcher&gt; watchers = new HashSet&lt;Watcher&gt;();</span>
+<span class="fc" id="L136">        watchers.add(event -&gt; {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (!running) {</span>
+                // do nothing until first registration
+<span class="fc" id="L139">                return;</span>
+            }
+            // Check for expired connection.
+<span class="nc bnc" id="L142" title="All 4 branches missed.">            if (event.getType().equals(EventType.None) &amp;&amp; event.getState().equals(KeeperState.Expired)) {</span>
+<span class="nc" id="L143">                listener.onRegistrationExpired();</span>
+            }
+<span class="nc" id="L145">        });</span>
+<span class="fc" id="L146">        return ZooKeeperClient.newBuilder()</span>
+<span class="fc" id="L147">                .connectString(conf.getZkServers())</span>
+<span class="fc" id="L148">                .sessionTimeoutMs(conf.getZkTimeout())</span>
+<span class="fc" id="L149">                .watchers(watchers)</span>
+<span class="fc" id="L150">                .operationRetryPolicy(new BoundExponentialBackoffRetryPolicy(conf.getZkRetryBackoffStartMs(),</span>
+<span class="fc" id="L151">                        conf.getZkRetryBackoffMaxMs(), Integer.MAX_VALUE))</span>
+<span class="fc" id="L152">                .requestRateLimit(conf.getZkRequestRateLimit())</span>
+<span class="fc" id="L153">                .statsLogger(this.statsLogger.scope(BOOKIE_SCOPE))</span>
+<span class="fc" id="L154">                .build();</span>
+    }
+
+    @Override
+    public void close() {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (null != zk) {</span>
+            try {
+<span class="fc" id="L161">                zk.close();</span>
+<span class="nc" id="L162">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L163">                log.warn(&quot;Interrupted on closing zookeeper client&quot;, e);</span>
+<span class="fc" id="L164">            }</span>
+        }
+<span class="fc" id="L166">    }</span>
+
+    private String getCookiePath(String bookieId) {
+<span class="fc" id="L169">        return this.cookiePath + &quot;/&quot; + bookieId;</span>
+    }
+
+    //
+    // Registration Management
+    //
+
+    /**
+     * Check existence of &lt;i&gt;regPath&lt;/i&gt; and wait it expired if possible.
+     *
+     * @param regPath reg node path.
+     * @return true if regPath exists, otherwise return false
+     * @throws IOException if can't create reg path
+     */
+    protected boolean checkRegNodeAndWaitExpired(String regPath) throws IOException {
+<span class="fc" id="L184">        final CountDownLatch prevNodeLatch = new CountDownLatch(1);</span>
+<span class="fc" id="L185">        Watcher zkPrevRegNodewatcher = new Watcher() {</span>
+            @Override
+            public void process(WatchedEvent event) {
+                // Check for prev znode deletion. Connection expiration is
+                // not handling, since bookie has logic to shutdown.
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                if (EventType.NodeDeleted == event.getType()) {</span>
+<span class="nc" id="L191">                    prevNodeLatch.countDown();</span>
+                }
+<span class="fc" id="L193">            }</span>
+        };
+        try {
+<span class="fc" id="L196">            Stat stat = zk.exists(regPath, zkPrevRegNodewatcher);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (null != stat) {</span>
+                // if the ephemeral owner isn't current zookeeper client
+                // wait for it to be expired.
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (stat.getEphemeralOwner() != zk.getSessionId()) {</span>
+<span class="nc" id="L201">                    log.info(&quot;Previous bookie registration znode: {} exists, so waiting zk sessiontimeout:&quot;</span>
+<span class="nc" id="L202">                            + &quot; {} ms for znode deletion&quot;, regPath, conf.getZkTimeout());</span>
+                    // waiting for the previous bookie reg znode deletion
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                    if (!prevNodeLatch.await(conf.getZkTimeout(), TimeUnit.MILLISECONDS)) {</span>
+<span class="nc" id="L205">                        throw new NodeExistsException(regPath);</span>
+                    } else {
+<span class="nc" id="L207">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L210">                return true;</span>
+            } else {
+<span class="fc" id="L212">                return false;</span>
+            }
+<span class="nc" id="L214">        } catch (KeeperException ke) {</span>
+<span class="nc" id="L215">            log.error(&quot;ZK exception checking and wait ephemeral znode {} expired : &quot;, regPath, ke);</span>
+<span class="nc" id="L216">            throw new IOException(&quot;ZK exception checking and wait ephemeral znode &quot;</span>
+                    + regPath + &quot; expired&quot;, ke);
+<span class="nc" id="L218">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L219">            log.error(&quot;Interrupted checking and wait ephemeral znode {} expired : &quot;, regPath, ie);</span>
+<span class="nc" id="L220">            throw new IOException(&quot;Interrupted checking and wait ephemeral znode &quot;</span>
+                    + regPath + &quot; expired&quot;, ie);
+        }
+    }
+
+    @Override
+    public void registerBookie(String bookieId, boolean readOnly) throws BookieException {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!readOnly) {</span>
+<span class="fc" id="L228">            String regPath = bookieRegistrationPath + &quot;/&quot; + bookieId;</span>
+<span class="fc" id="L229">            doRegisterBookie(regPath);</span>
+<span class="fc" id="L230">        } else {</span>
+<span class="nc" id="L231">            doRegisterReadOnlyBookie(bookieId);</span>
+        }
+<span class="fc" id="L233">    }</span>
+
+    private void doRegisterBookie(String regPath) throws BookieException {
+        // ZK ephemeral node for this Bookie.
+        try {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (!checkRegNodeAndWaitExpired(regPath)) {</span>
+                // Create the ZK ephemeral node for this Bookie.
+<span class="fc" id="L240">                zk.create(regPath, new byte[0], zkAcls, CreateMode.EPHEMERAL);</span>
+            }
+<span class="nc" id="L242">        } catch (KeeperException ke) {</span>
+<span class="nc" id="L243">            log.error(&quot;ZK exception registering ephemeral Znode for Bookie!&quot;, ke);</span>
+            // Throw an IOException back up. This will cause the Bookie
+            // constructor to error out. Alternatively, we could do a System
+            // exit here as this is a fatal error.
+<span class="nc" id="L247">            throw new MetadataStoreException(ke);</span>
+<span class="nc" id="L248">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L249">            log.error(&quot;Interrupted exception registering ephemeral Znode for Bookie!&quot;, ie);</span>
+            // Throw an IOException back up. This will cause the Bookie
+            // constructor to error out. Alternatively, we could do a System
+            // exit here as this is a fatal error.
+<span class="nc" id="L253">            throw new MetadataStoreException(ie);</span>
+<span class="nc" id="L254">        } catch (IOException e) {</span>
+<span class="nc" id="L255">            throw new MetadataStoreException(e);</span>
+<span class="fc" id="L256">        }</span>
+<span class="fc" id="L257">    }</span>
+
+    private void doRegisterReadOnlyBookie(String bookieId) throws BookieException {
+        try {
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (null == zk.exists(this.bookieReadonlyRegistrationPath, false)) {</span>
+                try {
+<span class="nc" id="L263">                    zk.create(this.bookieReadonlyRegistrationPath, new byte[0],</span>
+                              zkAcls, CreateMode.PERSISTENT);
+<span class="nc" id="L265">                } catch (NodeExistsException e) {</span>
+                    // this node is just now created by someone.
+<span class="nc" id="L267">                }</span>
+            }
+
+<span class="nc" id="L270">            String regPath = bookieReadonlyRegistrationPath + &quot;/&quot; + bookieId;</span>
+<span class="nc" id="L271">            doRegisterBookie(regPath);</span>
+            // clear the write state
+<span class="nc" id="L273">            regPath = bookieRegistrationPath + &quot;/&quot; + bookieId;</span>
+            try {
+                // Clear the current registered node
+<span class="nc" id="L276">                zk.delete(regPath, -1);</span>
+<span class="nc" id="L277">            } catch (KeeperException.NoNodeException nne) {</span>
+<span class="nc" id="L278">                log.warn(&quot;No writable bookie registered node {} when transitioning to readonly&quot;,</span>
+                    regPath, nne);
+<span class="nc" id="L280">            }</span>
+<span class="nc" id="L281">        } catch (KeeperException | InterruptedException e) {</span>
+<span class="nc" id="L282">            throw new MetadataStoreException(e);</span>
+<span class="nc" id="L283">        }</span>
+<span class="nc" id="L284">    }</span>
+
+    @Override
+    public void unregisterBookie(String bookieId, boolean readOnly) throws BookieException {
+        String regPath;
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (!readOnly) {</span>
+<span class="nc" id="L290">            regPath = bookieRegistrationPath + &quot;/&quot; + bookieId;</span>
+        } else {
+<span class="nc" id="L292">            regPath = bookieReadonlyRegistrationPath + &quot;/&quot; + bookieId;</span>
+        }
+<span class="nc" id="L294">        doUnregisterBookie(regPath);</span>
+<span class="nc" id="L295">    }</span>
+
+    private void doUnregisterBookie(String regPath) throws BookieException {
+        try {
+<span class="nc" id="L299">            zk.delete(regPath, -1);</span>
+<span class="nc" id="L300">        } catch (InterruptedException | KeeperException e) {</span>
+<span class="nc" id="L301">            throw new MetadataStoreException(e);</span>
+<span class="nc" id="L302">        }</span>
+<span class="nc" id="L303">    }</span>
+
+    //
+    // Cookie Management
+    //
+
+    @Override
+    public void writeCookie(String bookieId,
+                            Versioned&lt;byte[]&gt; cookieData) throws BookieException {
+<span class="fc" id="L312">        String zkPath = getCookiePath(bookieId);</span>
+        try {
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            if (Version.NEW == cookieData.getVersion()) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                if (zk.exists(cookiePath, false) == null) {</span>
+                    try {
+<span class="fc" id="L317">                        zk.create(cookiePath, new byte[0], zkAcls, CreateMode.PERSISTENT);</span>
+<span class="nc" id="L318">                    } catch (NodeExistsException nne) {</span>
+<span class="nc" id="L319">                        log.info(&quot;More than one bookie tried to create {} at once. Safe to ignore.&quot;,</span>
+                            cookiePath);
+<span class="fc" id="L321">                    }</span>
+                }
+<span class="fc" id="L323">                zk.create(zkPath, cookieData.getValue(), zkAcls, CreateMode.PERSISTENT);</span>
+            } else {
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                if (!(cookieData.getVersion() instanceof LongVersion)) {</span>
+<span class="nc" id="L326">                    throw new BookieIllegalOpException(&quot;Invalid version type, expected it to be LongVersion&quot;);</span>
+                }
+<span class="nc" id="L328">                zk.setData(</span>
+                    zkPath,
+<span class="nc" id="L330">                    cookieData.getValue(),</span>
+<span class="nc" id="L331">                    (int) ((LongVersion) cookieData.getVersion()).getLongVersion());</span>
+            }
+<span class="nc" id="L333">        } catch (InterruptedException | KeeperException e) {</span>
+<span class="nc" id="L334">            throw new MetadataStoreException(&quot;Failed to write cookie for bookie &quot; + bookieId);</span>
+<span class="fc" id="L335">        }</span>
+<span class="fc" id="L336">    }</span>
+
+    @Override
+    public Versioned&lt;byte[]&gt; readCookie(String bookieId) throws BookieException {
+<span class="fc" id="L340">        String zkPath = getCookiePath(bookieId);</span>
+        try {
+<span class="fc" id="L342">            Stat stat = zk.exists(zkPath, false);</span>
+<span class="nc" id="L343">            byte[] data = zk.getData(zkPath, false, stat);</span>
+            // sets stat version from ZooKeeper
+<span class="nc" id="L345">            LongVersion version = new LongVersion(stat.getVersion());</span>
+<span class="nc" id="L346">            return new Versioned&lt;&gt;(data, version);</span>
+<span class="fc" id="L347">        } catch (NoNodeException nne) {</span>
+<span class="fc" id="L348">            throw new CookieNotFoundException(bookieId);</span>
+<span class="nc" id="L349">        } catch (KeeperException | InterruptedException e) {</span>
+<span class="nc" id="L350">            throw new MetadataStoreException(&quot;Failed to read cookie for bookie &quot; + bookieId);</span>
+        }
+    }
+
+    @Override
+    public void removeCookie(String bookieId, Version version) throws BookieException {
+<span class="nc" id="L356">        String zkPath = getCookiePath(bookieId);</span>
+        try {
+<span class="nc" id="L358">            zk.delete(zkPath, (int) ((LongVersion) version).getLongVersion());</span>
+<span class="nc" id="L359">        } catch (NoNodeException e) {</span>
+<span class="nc" id="L360">            throw new CookieNotFoundException(bookieId);</span>
+<span class="nc" id="L361">        } catch (InterruptedException | KeeperException e) {</span>
+<span class="nc" id="L362">            throw new MetadataStoreException(&quot;Failed to delete cookie for bookie &quot; + bookieId);</span>
+<span class="nc" id="L363">        }</span>
+
+<span class="nc" id="L365">        log.info(&quot;Removed cookie from {} for bookie {}.&quot;, cookiePath, bookieId);</span>
+<span class="nc" id="L366">    }</span>
+
+
+    @Override
+    public String getClusterInstanceId() throws BookieException {
+<span class="fc" id="L371">        String instanceId = null;</span>
+        try {
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (zk.exists(conf.getZkLedgersRootPath(), null) == null) {</span>
+<span class="nc" id="L374">                log.error(&quot;BookKeeper metadata doesn't exist in zookeeper. &quot;</span>
+                    + &quot;Has the cluster been initialized? &quot;
+                    + &quot;Try running bin/bookkeeper shell metaformat&quot;);
+<span class="nc" id="L377">                throw new KeeperException.NoNodeException(&quot;BookKeeper metadata&quot;);</span>
+            }
+            try {
+<span class="nc" id="L380">                byte[] data = zk.getData(conf.getZkLedgersRootPath() + &quot;/&quot;</span>
+                    + INSTANCEID, false, null);
+<span class="nc" id="L382">                instanceId = new String(data, UTF_8);</span>
+<span class="fc" id="L383">            } catch (KeeperException.NoNodeException e) {</span>
+<span class="fc" id="L384">                log.info(&quot;INSTANCEID not exists in zookeeper. Not considering it for data verification&quot;);</span>
+<span class="nc" id="L385">            }</span>
+<span class="nc" id="L386">        } catch (KeeperException | InterruptedException e) {</span>
+<span class="nc" id="L387">            throw new MetadataStoreException(&quot;Failed to get cluster instance id&quot;, e);</span>
+<span class="fc" id="L388">        }</span>
+<span class="fc" id="L389">        return instanceId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,701 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LedgerMetadata.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.client</a> &gt; <span class="el_source">LedgerMetadata.java</span></div><h1>LedgerMetadata.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.bookkeeper.client;
+
+import static com.google.common.base.Charsets.UTF_8;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
+import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.CharBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.bookkeeper.client.api.DigestType;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat;
+import org.apache.bookkeeper.versioning.Version;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class encapsulates all the ledger metadata that is persistently stored
+ * in metadata store.
+ *
+ * &lt;p&gt;It provides parsing and serialization methods of such metadata.
+ */
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">public class LedgerMetadata implements org.apache.bookkeeper.client.api.LedgerMetadata {</span>
+<span class="fc" id="L56">    static final Logger LOG = LoggerFactory.getLogger(LedgerMetadata.class);</span>
+
+    private static final String closed = &quot;CLOSED&quot;;
+    private static final String lSplitter = &quot;\n&quot;;
+    private static final String tSplitter = &quot;\t&quot;;
+
+    // can't use -1 for NOTCLOSED because that is reserved for a closed, empty
+    // ledger
+    private static final int NOTCLOSED = -101;
+    private static final int IN_RECOVERY = -102;
+
+    public static final int LOWEST_COMPAT_METADATA_FORMAT_VERSION = 0;
+    public static final int CURRENT_METADATA_FORMAT_VERSION = 2;
+    public static final String VERSION_KEY = &quot;BookieMetadataFormatVersion&quot;;
+
+<span class="pc" id="L71">    private int metadataFormatVersion = 0;</span>
+
+    private int ensembleSize;
+    private int writeQuorumSize;
+    private int ackQuorumSize;
+    private long length;
+    private long lastEntryId;
+    private long ctime;
+    private boolean storeSystemtimeAsLedgerCreationTime;
+
+    private LedgerMetadataFormat.State state;
+<span class="pc" id="L82">    private TreeMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; ensembles =</span>
+        new TreeMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt;();
+    ArrayList&lt;BookieSocketAddress&gt; currentEnsemble;
+<span class="pc" id="L85">    volatile Version version = Version.NEW;</span>
+
+<span class="pc" id="L87">    private boolean hasPassword = false;</span>
+    private LedgerMetadataFormat.DigestType digestType;
+    private byte[] password;
+
+<span class="pc" id="L91">    private Map&lt;String, byte[]&gt; customMetadata = Maps.newHashMap();</span>
+
+    public LedgerMetadata(int ensembleSize,
+                          int writeQuorumSize,
+                          int ackQuorumSize,
+                          BookKeeper.DigestType digestType,
+                          byte[] password,
+                          Map&lt;String, byte[]&gt; customMetadata,
+<span class="fc" id="L99">                          boolean storeSystemtimeAsLedgerCreationTime) {</span>
+<span class="fc" id="L100">        this.ensembleSize = ensembleSize;</span>
+<span class="fc" id="L101">        this.writeQuorumSize = writeQuorumSize;</span>
+<span class="fc" id="L102">        this.ackQuorumSize = ackQuorumSize;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (storeSystemtimeAsLedgerCreationTime) {</span>
+<span class="nc" id="L104">            this.ctime = System.currentTimeMillis();</span>
+        } else {
+            // if client disables storing its system time as ledger creation time, there should be no ctime at this
+            // moment.
+<span class="fc" id="L108">            this.ctime = -1L;</span>
+        }
+<span class="fc" id="L110">        this.storeSystemtimeAsLedgerCreationTime = storeSystemtimeAsLedgerCreationTime;</span>
+
+        /*
+         * It is set in PendingReadOp.readEntryComplete, and
+         * we read it in LedgerRecoveryOp.readComplete.
+         */
+<span class="fc" id="L116">        this.length = 0;</span>
+<span class="fc" id="L117">        this.state = LedgerMetadataFormat.State.OPEN;</span>
+<span class="fc" id="L118">        this.lastEntryId = LedgerHandle.INVALID_ENTRY_ID;</span>
+<span class="fc" id="L119">        this.metadataFormatVersion = CURRENT_METADATA_FORMAT_VERSION;</span>
+
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        this.digestType = digestType.equals(BookKeeper.DigestType.MAC) ?</span>
+            LedgerMetadataFormat.DigestType.HMAC : LedgerMetadataFormat.DigestType.CRC32;
+<span class="fc" id="L123">        this.password = Arrays.copyOf(password, password.length);</span>
+<span class="fc" id="L124">        this.hasPassword = true;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (customMetadata != null) {</span>
+<span class="nc" id="L126">            this.customMetadata = customMetadata;</span>
+        }
+<span class="fc" id="L128">    }</span>
+
+    /**
+     * Used for testing purpose only.
+     */
+    @VisibleForTesting
+    public LedgerMetadata(int ensembleSize, int writeQuorumSize, int ackQuorumSize,
+            BookKeeper.DigestType digestType, byte[] password) {
+<span class="nc" id="L136">        this(ensembleSize, writeQuorumSize, ackQuorumSize, digestType, password, null, false);</span>
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Copy Constructor.
+     */
+<span class="nc" id="L142">    LedgerMetadata(LedgerMetadata other) {</span>
+<span class="nc" id="L143">        this.ensembleSize = other.ensembleSize;</span>
+<span class="nc" id="L144">        this.writeQuorumSize = other.writeQuorumSize;</span>
+<span class="nc" id="L145">        this.ackQuorumSize = other.ackQuorumSize;</span>
+<span class="nc" id="L146">        this.length = other.length;</span>
+<span class="nc" id="L147">        this.lastEntryId = other.lastEntryId;</span>
+<span class="nc" id="L148">        this.metadataFormatVersion = other.metadataFormatVersion;</span>
+<span class="nc" id="L149">        this.state = other.state;</span>
+<span class="nc" id="L150">        this.version = other.version;</span>
+<span class="nc" id="L151">        this.hasPassword = other.hasPassword;</span>
+<span class="nc" id="L152">        this.digestType = other.digestType;</span>
+<span class="nc" id="L153">        this.ctime = other.ctime;</span>
+<span class="nc" id="L154">        this.storeSystemtimeAsLedgerCreationTime = other.storeSystemtimeAsLedgerCreationTime;</span>
+<span class="nc" id="L155">        this.password = new byte[other.password.length];</span>
+<span class="nc" id="L156">        System.arraycopy(other.password, 0, this.password, 0, other.password.length);</span>
+        // copy the ensembles
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        for (Entry&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; entry : other.ensembles.entrySet()) {</span>
+<span class="nc" id="L159">            long startEntryId = entry.getKey();</span>
+<span class="nc" id="L160">            ArrayList&lt;BookieSocketAddress&gt; newEnsemble = new ArrayList&lt;BookieSocketAddress&gt;(entry.getValue());</span>
+<span class="nc" id="L161">            this.addEnsemble(startEntryId, newEnsemble);</span>
+<span class="nc" id="L162">        }</span>
+<span class="nc" id="L163">        this.customMetadata = other.customMetadata;</span>
+<span class="nc" id="L164">    }</span>
+
+    private LedgerMetadata() {
+<span class="nc" id="L167">        this(0, 0, 0, BookKeeper.DigestType.MAC, new byte[] {});</span>
+<span class="nc" id="L168">        this.hasPassword = false;</span>
+<span class="nc" id="L169">    }</span>
+
+    /**
+     * Get the Map of bookie ensembles for the various ledger fragments
+     * that make up the ledger.
+     *
+     * @return SortedMap of Ledger Fragments and the corresponding
+     * bookie ensembles that store the entries.
+     */
+    public TreeMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; getEnsembles() {
+<span class="nc" id="L179">        return ensembles;</span>
+    }
+
+    @Override
+    public NavigableMap&lt;Long, ? extends List&lt;BookieSocketAddress&gt;&gt; getAllEnsembles() {
+<span class="nc" id="L184">        return ensembles;</span>
+    }
+
+    void setEnsembles(TreeMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; ensembles) {
+<span class="nc" id="L188">        this.ensembles = ensembles;</span>
+<span class="nc" id="L189">    }</span>
+
+    @Override
+    public int getEnsembleSize() {
+<span class="fc" id="L193">        return ensembleSize;</span>
+    }
+
+    @Override
+    public int getWriteQuorumSize() {
+<span class="fc" id="L198">        return writeQuorumSize;</span>
+    }
+
+    @Override
+    public int getAckQuorumSize() {
+<span class="fc" id="L203">        return ackQuorumSize;</span>
+    }
+
+    @Override
+    public long getCtime() {
+<span class="nc" id="L208">        return ctime;</span>
+    }
+
+    @VisibleForTesting
+    void setCtime(long ctime) {
+<span class="nc" id="L213">        this.ctime = ctime;</span>
+<span class="nc" id="L214">    }</span>
+
+    /**
+     * In versions 4.1.0 and below, the digest type and password were not
+     * stored in the metadata.
+     *
+     * @return whether the password has been stored in the metadata
+     */
+    boolean hasPassword() {
+<span class="nc" id="L223">        return hasPassword;</span>
+    }
+
+    @VisibleForTesting
+    public byte[] getPassword() {
+<span class="nc" id="L228">        return Arrays.copyOf(password, password.length);</span>
+    }
+
+    @Override
+    public DigestType getDigestType() {
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (digestType.equals(LedgerMetadataFormat.DigestType.HMAC)) {</span>
+<span class="nc" id="L234">            return DigestType.MAC;</span>
+        } else {
+<span class="nc" id="L236">            return DigestType.CRC32;</span>
+        }
+    }
+
+    @Override
+    public long getLastEntryId() {
+<span class="fc" id="L242">        return lastEntryId;</span>
+    }
+
+    @Override
+    public long getLength() {
+<span class="fc" id="L247">        return length;</span>
+    }
+
+    void setLength(long length) {
+<span class="fc" id="L251">        this.length = length;</span>
+<span class="fc" id="L252">    }</span>
+
+    @Override
+    public boolean isClosed() {
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        return state == LedgerMetadataFormat.State.CLOSED;</span>
+    }
+
+    public boolean isInRecovery() {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        return state == LedgerMetadataFormat.State.IN_RECOVERY;</span>
+    }
+
+    public LedgerMetadataFormat.State getState() {
+<span class="fc" id="L264">        return state;</span>
+    }
+
+    void setState(LedgerMetadataFormat.State state) {
+<span class="nc" id="L268">        this.state = state;</span>
+<span class="nc" id="L269">    }</span>
+
+    void markLedgerInRecovery() {
+<span class="nc" id="L272">        state = LedgerMetadataFormat.State.IN_RECOVERY;</span>
+<span class="nc" id="L273">    }</span>
+
+    void close(long entryId) {
+<span class="fc" id="L276">        lastEntryId = entryId;</span>
+<span class="fc" id="L277">        state = LedgerMetadataFormat.State.CLOSED;</span>
+<span class="fc" id="L278">    }</span>
+
+    public void addEnsemble(long startEntryId, ArrayList&lt;BookieSocketAddress&gt; ensemble) {
+<span class="pc bpc" id="L281" title="4 of 6 branches missed.">        assert ensembles.isEmpty() || startEntryId &gt;= ensembles.lastKey();</span>
+
+<span class="fc" id="L283">        ensembles.put(startEntryId, ensemble);</span>
+<span class="fc" id="L284">        currentEnsemble = ensemble;</span>
+<span class="fc" id="L285">    }</span>
+
+    ArrayList&lt;BookieSocketAddress&gt; getEnsemble(long entryId) {
+        // the head map cannot be empty, since we insert an ensemble for
+        // entry-id 0, right when we start
+<span class="fc" id="L290">        return ensembles.get(ensembles.headMap(entryId + 1).lastKey());</span>
+    }
+
+    @Override
+    public List&lt;BookieSocketAddress&gt; getEnsembleAt(long entryId) {
+<span class="nc" id="L295">        return getEnsemble(entryId);</span>
+    }
+
+    /**
+     * the entry id greater than the given entry-id at which the next ensemble change takes
+     * place
+     *
+     * @param entryId
+     * @return the entry id of the next ensemble change (-1 if no further ensemble changes)
+     */
+    long getNextEnsembleChange(long entryId) {
+<span class="fc" id="L306">        SortedMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; tailMap = ensembles.tailMap(entryId + 1);</span>
+
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (tailMap.isEmpty()) {</span>
+<span class="fc" id="L309">            return -1;</span>
+        } else {
+<span class="nc" id="L311">            return tailMap.firstKey();</span>
+        }
+    }
+
+    @Override
+    public Map&lt;String, byte[]&gt; getCustomMetadata() {
+<span class="fc" id="L317">        return this.customMetadata;</span>
+    }
+
+    void setCustomMetadata(Map&lt;String, byte[]&gt; customMetadata) {
+<span class="nc" id="L321">        this.customMetadata = customMetadata;</span>
+<span class="nc" id="L322">    }</span>
+
+    LedgerMetadataFormat buildProtoFormat() {
+<span class="fc" id="L325">        LedgerMetadataFormat.Builder builder = LedgerMetadataFormat.newBuilder();</span>
+<span class="fc" id="L326">        builder.setQuorumSize(writeQuorumSize).setAckQuorumSize(ackQuorumSize)</span>
+<span class="fc" id="L327">            .setEnsembleSize(ensembleSize).setLength(length)</span>
+<span class="fc" id="L328">            .setState(state).setLastEntryId(lastEntryId);</span>
+
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (storeSystemtimeAsLedgerCreationTime) {</span>
+<span class="nc" id="L331">            builder.setCtime(ctime);</span>
+        }
+
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (hasPassword) {</span>
+<span class="fc" id="L335">            builder.setDigestType(digestType).setPassword(ByteString.copyFrom(password));</span>
+        }
+
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (customMetadata != null) {</span>
+<span class="fc" id="L339">            LedgerMetadataFormat.cMetadataMapEntry.Builder cMetadataBuilder = LedgerMetadataFormat.cMetadataMapEntry.newBuilder();</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">            for (Map.Entry&lt;String,byte[]&gt; entry : customMetadata.entrySet()) {</span>
+<span class="nc" id="L341">                cMetadataBuilder.setKey(entry.getKey()).setValue(ByteString.copyFrom(entry.getValue()));</span>
+<span class="nc" id="L342">                builder.addCustomMetadata(cMetadataBuilder.build());</span>
+<span class="nc" id="L343">            }</span>
+        }
+
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (Map.Entry&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; entry : ensembles.entrySet()) {</span>
+<span class="fc" id="L347">            LedgerMetadataFormat.Segment.Builder segmentBuilder = LedgerMetadataFormat.Segment.newBuilder();</span>
+<span class="fc" id="L348">            segmentBuilder.setFirstEntryId(entry.getKey());</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            for (BookieSocketAddress addr : entry.getValue()) {</span>
+<span class="fc" id="L350">                segmentBuilder.addEnsembleMember(addr.toString());</span>
+<span class="fc" id="L351">            }</span>
+<span class="fc" id="L352">            builder.addSegment(segmentBuilder.build());</span>
+<span class="fc" id="L353">        }</span>
+<span class="fc" id="L354">        return builder.build();</span>
+    }
+
+    /**
+     * Generates a byte array of this object
+     *
+     * @return the metadata serialized into a byte array
+     */
+    public byte[] serialize() {
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (metadataFormatVersion == 1) {</span>
+<span class="nc" id="L364">            return serializeVersion1();</span>
+        }
+
+<span class="fc" id="L367">        StringBuilder s = new StringBuilder();</span>
+<span class="fc" id="L368">        s.append(VERSION_KEY).append(tSplitter).append(CURRENT_METADATA_FORMAT_VERSION).append(lSplitter);</span>
+<span class="fc" id="L369">        s.append(TextFormat.printToString(buildProtoFormat()));</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L371">            LOG.debug(&quot;Serialized config: {}&quot;, s);</span>
+        }
+<span class="fc" id="L373">        return s.toString().getBytes(UTF_8);</span>
+    }
+
+    private byte[] serializeVersion1() {
+<span class="nc" id="L377">        StringBuilder s = new StringBuilder();</span>
+<span class="nc" id="L378">        s.append(VERSION_KEY).append(tSplitter).append(metadataFormatVersion).append(lSplitter);</span>
+<span class="nc" id="L379">        s.append(writeQuorumSize).append(lSplitter).append(ensembleSize).append(lSplitter).append(length);</span>
+
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        for (Map.Entry&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; entry : ensembles.entrySet()) {</span>
+<span class="nc" id="L382">            s.append(lSplitter).append(entry.getKey());</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            for (BookieSocketAddress addr : entry.getValue()) {</span>
+<span class="nc" id="L384">                s.append(tSplitter);</span>
+<span class="nc" id="L385">                s.append(addr.toString());</span>
+<span class="nc" id="L386">            }</span>
+<span class="nc" id="L387">        }</span>
+
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        if (state == LedgerMetadataFormat.State.IN_RECOVERY) {</span>
+<span class="nc" id="L390">            s.append(lSplitter).append(IN_RECOVERY).append(tSplitter).append(closed);</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        } else if (state == LedgerMetadataFormat.State.CLOSED) {</span>
+<span class="nc" id="L392">            s.append(lSplitter).append(getLastEntryId()).append(tSplitter).append(closed);</span>
+        }
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L396">            LOG.debug(&quot;Serialized config: {}&quot;, s);</span>
+        }
+
+<span class="nc" id="L399">        return s.toString().getBytes(UTF_8);</span>
+    }
+
+    /**
+     * Parses a given byte array and transforms into a LedgerConfig object
+     *
+     * @param bytes
+     *            byte array to parse
+     * @param version
+     *            version of the ledger metadata
+     * @param msCtime
+     *            metadata store creation time, used for legacy ledgers
+     * @return LedgerConfig
+     * @throws IOException
+     *             if the given byte[] cannot be parsed
+     */
+    public static LedgerMetadata parseConfig(byte[] bytes, Version version, Optional&lt;Long&gt; msCtime) throws IOException {
+<span class="nc" id="L416">        LedgerMetadata lc = new LedgerMetadata();</span>
+<span class="nc" id="L417">        lc.version = version;</span>
+
+<span class="nc" id="L419">        String config = new String(bytes, UTF_8);</span>
+
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L422">            LOG.debug(&quot;Parsing Config: {}&quot;, config);</span>
+        }
+<span class="nc" id="L424">        BufferedReader reader = new BufferedReader(new StringReader(config));</span>
+<span class="nc" id="L425">        String versionLine = reader.readLine();</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (versionLine == null) {</span>
+<span class="nc" id="L427">            throw new IOException(&quot;Invalid metadata. Content missing&quot;);</span>
+        }
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (versionLine.startsWith(VERSION_KEY)) {</span>
+<span class="nc" id="L430">            String parts[] = versionLine.split(tSplitter);</span>
+<span class="nc" id="L431">            lc.metadataFormatVersion = Integer.parseInt(parts[1]);</span>
+<span class="nc" id="L432">        } else {</span>
+            // if no version is set, take it to be version 1
+            // as the parsing is the same as what we had before
+            // we introduce versions
+<span class="nc" id="L436">            lc.metadataFormatVersion = 1;</span>
+            // reset the reader
+<span class="nc" id="L438">            reader.close();</span>
+<span class="nc" id="L439">            reader = new BufferedReader(new StringReader(config));</span>
+        }
+
+<span class="nc bnc" id="L442" title="All 4 branches missed.">        if (lc.metadataFormatVersion &lt; LOWEST_COMPAT_METADATA_FORMAT_VERSION</span>
+            || lc.metadataFormatVersion &gt; CURRENT_METADATA_FORMAT_VERSION) {
+<span class="nc" id="L444">            throw new IOException(&quot;Metadata version not compatible. Expected between &quot;</span>
+                    + LOWEST_COMPAT_METADATA_FORMAT_VERSION + &quot; and &quot; + CURRENT_METADATA_FORMAT_VERSION
+                                  + &quot;, but got &quot; + lc.metadataFormatVersion);
+        }
+
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        if (lc.metadataFormatVersion == 1) {</span>
+<span class="nc" id="L450">            return parseVersion1Config(lc, reader);</span>
+        }
+
+        // remaining size is total minus the length of the version line and '\n'
+<span class="nc" id="L454">        char[] configBuffer = new char[config.length() - (versionLine.length() + 1)];</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (configBuffer.length != reader.read(configBuffer, 0, configBuffer.length)) {</span>
+<span class="nc" id="L456">            throw new IOException(&quot;Invalid metadata buffer&quot;);</span>
+        }
+
+<span class="nc" id="L459">        LedgerMetadataFormat.Builder builder = LedgerMetadataFormat.newBuilder();</span>
+
+<span class="nc" id="L461">        TextFormat.merge((CharSequence) CharBuffer.wrap(configBuffer), builder);</span>
+<span class="nc" id="L462">        LedgerMetadataFormat data = builder.build();</span>
+<span class="nc" id="L463">        lc.writeQuorumSize = data.getQuorumSize();</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (data.hasCtime()) {</span>
+<span class="nc" id="L465">            lc.ctime = data.getCtime();</span>
+<span class="nc" id="L466">            lc.storeSystemtimeAsLedgerCreationTime = true;</span>
+<span class="nc bnc" id="L467" title="All 2 branches missed.">        } else if (msCtime.isPresent()) {</span>
+<span class="nc" id="L468">            lc.ctime = msCtime.get();</span>
+<span class="nc" id="L469">            lc.storeSystemtimeAsLedgerCreationTime = false;</span>
+        }
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        if (data.hasAckQuorumSize()) {</span>
+<span class="nc" id="L472">            lc.ackQuorumSize = data.getAckQuorumSize();</span>
+        } else {
+<span class="nc" id="L474">            lc.ackQuorumSize = lc.writeQuorumSize;</span>
+        }
+
+<span class="nc" id="L477">        lc.ensembleSize = data.getEnsembleSize();</span>
+<span class="nc" id="L478">        lc.length = data.getLength();</span>
+<span class="nc" id="L479">        lc.state = data.getState();</span>
+<span class="nc" id="L480">        lc.lastEntryId = data.getLastEntryId();</span>
+
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (data.hasPassword()) {</span>
+<span class="nc" id="L483">            lc.digestType = data.getDigestType();</span>
+<span class="nc" id="L484">            lc.password = data.getPassword().toByteArray();</span>
+<span class="nc" id="L485">            lc.hasPassword = true;</span>
+        }
+
+<span class="nc bnc" id="L488" title="All 2 branches missed.">        for (LedgerMetadataFormat.Segment s : data.getSegmentList()) {</span>
+<span class="nc" id="L489">            ArrayList&lt;BookieSocketAddress&gt; addrs = new ArrayList&lt;BookieSocketAddress&gt;();</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            for (String member : s.getEnsembleMemberList()) {</span>
+<span class="nc" id="L491">                addrs.add(new BookieSocketAddress(member));</span>
+<span class="nc" id="L492">            }</span>
+<span class="nc" id="L493">            lc.addEnsemble(s.getFirstEntryId(), addrs);</span>
+<span class="nc" id="L494">        }</span>
+
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        if (data.getCustomMetadataCount() &gt; 0) {</span>
+<span class="nc" id="L497">            List&lt;LedgerMetadataFormat.cMetadataMapEntry&gt; cMetadataList = data.getCustomMetadataList();</span>
+<span class="nc" id="L498">            lc.customMetadata = Maps.newHashMap();</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            for (LedgerMetadataFormat.cMetadataMapEntry ent : cMetadataList) {</span>
+<span class="nc" id="L500">                lc.customMetadata.put(ent.getKey(), ent.getValue().toByteArray());</span>
+<span class="nc" id="L501">            }</span>
+        }
+<span class="nc" id="L503">        return lc;</span>
+    }
+
+    static LedgerMetadata parseVersion1Config(LedgerMetadata lc,
+                                              BufferedReader reader) throws IOException {
+        try {
+<span class="nc" id="L509">            lc.writeQuorumSize = lc.ackQuorumSize = Integer.parseInt(reader.readLine());</span>
+<span class="nc" id="L510">            lc.ensembleSize = Integer.parseInt(reader.readLine());</span>
+<span class="nc" id="L511">            lc.length = Long.parseLong(reader.readLine());</span>
+
+<span class="nc" id="L513">            String line = reader.readLine();</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">            while (line != null) {</span>
+<span class="nc" id="L515">                String parts[] = line.split(tSplitter);</span>
+
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                if (parts[1].equals(closed)) {</span>
+<span class="nc" id="L518">                    Long l = Long.parseLong(parts[0]);</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                    if (l == IN_RECOVERY) {</span>
+<span class="nc" id="L520">                        lc.state = LedgerMetadataFormat.State.IN_RECOVERY;</span>
+                    } else {
+<span class="nc" id="L522">                        lc.state = LedgerMetadataFormat.State.CLOSED;</span>
+<span class="nc" id="L523">                        lc.lastEntryId = l;</span>
+                    }
+<span class="nc" id="L525">                    break;</span>
+                } else {
+<span class="nc" id="L527">                    lc.state = LedgerMetadataFormat.State.OPEN;</span>
+                }
+
+<span class="nc" id="L530">                ArrayList&lt;BookieSocketAddress&gt; addrs = new ArrayList&lt;BookieSocketAddress&gt;();</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                for (int j = 1; j &lt; parts.length; j++) {</span>
+<span class="nc" id="L532">                    addrs.add(new BookieSocketAddress(parts[j]));</span>
+                }
+<span class="nc" id="L534">                lc.addEnsemble(Long.parseLong(parts[0]), addrs);</span>
+<span class="nc" id="L535">                line = reader.readLine();</span>
+<span class="nc" id="L536">            }</span>
+<span class="nc" id="L537">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L538">            throw new IOException(e);</span>
+<span class="nc" id="L539">        }</span>
+<span class="nc" id="L540">        return lc;</span>
+    }
+
+    /**
+     * Updates the version of this metadata.
+     *
+     * @param v Version
+     */
+    public void setVersion(Version v) {
+<span class="fc" id="L549">        this.version = v;</span>
+<span class="fc" id="L550">    }</span>
+
+    /**
+     * Returns the last version.
+     *
+     * @return version
+     */
+    public Version getVersion() {
+<span class="fc" id="L558">        return this.version;</span>
+    }
+
+    /**
+     * Is the metadata newer than given &lt;i&gt;newMeta&lt;/i&gt;.
+     *
+     * @param newMeta the metadata to compare
+     * @return true if &lt;i&gt;this&lt;/i&gt; is newer than &lt;i&gt;newMeta&lt;/i&gt;, false otherwise
+     */
+    boolean isNewerThan(LedgerMetadata newMeta) {
+<span class="nc bnc" id="L568" title="All 2 branches missed.">        if (null == version) {</span>
+<span class="nc" id="L569">            return false;</span>
+        }
+<span class="nc bnc" id="L571" title="All 2 branches missed.">        return Version.Occurred.AFTER == version.compare(newMeta.version);</span>
+    }
+
+    /**
+     * Routine to compare two Map&lt;String, byte[]&gt;; Since the values in the map are byte[], we can't use Map.equals
+     * @param first
+     *          The first map
+     * @param second
+     *          The second map to compare with
+     * @return true if the 2 maps contain the exact set of &lt;K,V&gt; pairs.
+     */
+    public static boolean areByteArrayValMapsEqual(Map&lt;String, byte[]&gt; first, Map&lt;String, byte[]&gt; second) {
+<span class="nc bnc" id="L583" title="All 4 branches missed.">        if(first == null &amp;&amp; second == null) {</span>
+<span class="nc" id="L584">            return true;</span>
+        }
+
+        // above check confirms that both are not null;
+        // if one is null the other isn't; so they must
+        // be different
+<span class="nc bnc" id="L590" title="All 4 branches missed.">        if (first == null || second == null) {</span>
+<span class="nc" id="L591">            return false;</span>
+        }
+
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        if (first.size() != second.size()) {</span>
+<span class="nc" id="L595">            return false;</span>
+        }
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        for (Map.Entry&lt;String, byte[]&gt; entry : first.entrySet()) {</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">            if (!Arrays.equals(entry.getValue(), second.get(entry.getKey()))) {</span>
+<span class="nc" id="L599">                return false;</span>
+            }
+<span class="nc" id="L601">        }</span>
+<span class="nc" id="L602">        return true;</span>
+    }
+
+    /**
+     * Is the metadata conflict with new updated metadata.
+     *
+     * @param newMeta
+     *          Re-read metadata
+     * @return true if the metadata is conflict.
+     */
+    boolean isConflictWith(LedgerMetadata newMeta) {
+        /*
+         *  if length &amp; close have changed, then another client has
+         *  opened the ledger, can't resolve this conflict.
+         */
+
+<span class="nc bnc" id="L618" title="All 12 branches missed.">        if (metadataFormatVersion != newMeta.metadataFormatVersion ||</span>
+            ensembleSize != newMeta.ensembleSize ||
+            writeQuorumSize != newMeta.writeQuorumSize ||
+            ackQuorumSize != newMeta.ackQuorumSize ||
+            length != newMeta.length ||
+            state != newMeta.state ||
+<span class="nc bnc" id="L624" title="All 2 branches missed.">            !digestType.equals(newMeta.digestType) ||</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">            !Arrays.equals(password, newMeta.password) ||</span>
+<span class="nc bnc" id="L626" title="All 2 branches missed.">            !LedgerMetadata.areByteArrayValMapsEqual(customMetadata, newMeta.customMetadata)) {</span>
+<span class="nc" id="L627">            return true;</span>
+        }
+
+        // verify the ctime
+<span class="nc bnc" id="L631" title="All 2 branches missed.">        if (storeSystemtimeAsLedgerCreationTime != newMeta.storeSystemtimeAsLedgerCreationTime) {</span>
+<span class="nc" id="L632">            return true;</span>
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        } else if (storeSystemtimeAsLedgerCreationTime) {</span>
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            return ctime != newMeta.ctime;</span>
+        }
+
+<span class="nc bnc" id="L637" title="All 4 branches missed.">        if (state == LedgerMetadataFormat.State.CLOSED</span>
+            &amp;&amp; lastEntryId != newMeta.lastEntryId) {
+<span class="nc" id="L639">            return true;</span>
+        }
+        // if ledger is closed, we can just take the new ensembles
+<span class="nc bnc" id="L642" title="All 2 branches missed.">        if (newMeta.state != LedgerMetadataFormat.State.CLOSED) {</span>
+            // allow new metadata to be one ensemble less than current metadata
+            // since ensemble change might kick in when recovery changed metadata
+<span class="nc" id="L645">            int diff = ensembles.size() - newMeta.ensembles.size();</span>
+<span class="nc bnc" id="L646" title="All 4 branches missed.">            if (0 != diff &amp;&amp; 1 != diff) {</span>
+<span class="nc" id="L647">                return true;</span>
+            }
+            // ensemble distribution should be same
+            // we don't check the detail ensemble, since new bookie will be set
+            // using recovery tool.
+<span class="nc" id="L652">            Iterator&lt;Long&gt; keyIter = ensembles.keySet().iterator();</span>
+<span class="nc" id="L653">            Iterator&lt;Long&gt; newMetaKeyIter = newMeta.ensembles.keySet().iterator();</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">            for (int i=0; i&lt;newMeta.ensembles.size(); i++) {</span>
+<span class="nc" id="L655">                Long curKey = keyIter.next();</span>
+<span class="nc" id="L656">                Long newMetaKey = newMetaKeyIter.next();</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">                if (!curKey.equals(newMetaKey)) {</span>
+<span class="nc" id="L658">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L662">        return false;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L667">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L668">        sb.append(&quot;(meta:&quot;).append(new String(serialize(), UTF_8)).append(&quot;, version:&quot;).append(version).append(&quot;)&quot;);</span>
+<span class="nc" id="L669">        return sb.toString();</span>
+    }
+
+    void mergeEnsembles(SortedMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; newEnsembles) {
+        // allow new metadata to be one ensemble less than current metadata
+        // since ensemble change might kick in when recovery changed metadata
+<span class="nc" id="L675">        int diff = ensembles.size() - newEnsembles.size();</span>
+<span class="nc bnc" id="L676" title="All 4 branches missed.">        if (0 != diff &amp;&amp; 1 != diff) {</span>
+<span class="nc" id="L677">            return;</span>
+        }
+<span class="nc" id="L679">        int i = 0;</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">        for (Entry&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; entry : newEnsembles.entrySet()) {</span>
+<span class="nc" id="L681">            ++i;</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">            if (ensembles.size() != i) {</span>
+                // we should use last ensemble from current metadata
+                // not the new metadata read from zookeeper
+<span class="nc" id="L685">                long key = entry.getKey();</span>
+<span class="nc" id="L686">                ArrayList&lt;BookieSocketAddress&gt; ensemble = entry.getValue();</span>
+<span class="nc" id="L687">                ensembles.put(key, ensemble);</span>
+            }
+<span class="nc" id="L689">        }</span>
+<span class="nc" id="L690">    }</span>
+
+    Set&lt;BookieSocketAddress&gt; getBookiesInThisLedger() {
+<span class="nc" id="L693">        Set&lt;BookieSocketAddress&gt; bookies = new HashSet&lt;BookieSocketAddress&gt;();</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">        for (ArrayList&lt;BookieSocketAddress&gt; ensemble : ensembles.values()) {</span>
+<span class="nc" id="L695">            bookies.addAll(ensemble);</span>
+<span class="nc" id="L696">        }</span>
+<span class="nc" id="L697">        return bookies;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

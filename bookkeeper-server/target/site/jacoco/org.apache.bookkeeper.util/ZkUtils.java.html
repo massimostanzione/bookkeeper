@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZkUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.util</a> &gt; <span class="el_source">ZkUtils.java</span></div><h1>ZkUtils.java</h1><pre class="source lang-java linenums">/*
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+
+package org.apache.bookkeeper.util;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.bookkeeper.conf.AbstractConfiguration;
+
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.zookeeper.AsyncCallback;
+import org.apache.zookeeper.AsyncCallback.StringCallback;
+import org.apache.zookeeper.AsyncCallback.VoidCallback;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.Code;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.ZooKeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Provided utilites for zookeeper access, etc.
+ */
+<span class="nc" id="L47">public class ZkUtils {</span>
+<span class="fc" id="L48">    private static final Logger LOG = LoggerFactory.getLogger(ZkUtils.class);</span>
+
+    /**
+     * Asynchronously create zookeeper path recursively and optimistically.
+     *
+     * @see #createFullPathOptimistic(ZooKeeper,String,byte[],List&lt;ACL&gt;,CreateMode)
+     *
+     * @param zk
+     *          Zookeeper client
+     * @param originalPath
+     *          Zookeeper full path
+     * @param data
+     *          Zookeeper data
+     * @param acl
+     *          Acl of the zk path
+     * @param createMode
+     *          Create mode of zk path
+     * @param callback
+     *          Callback
+     * @param ctx
+     *          Context object
+     */
+    public static void asyncCreateFullPathOptimistic(
+        final ZooKeeper zk, final String originalPath, final byte[] data,
+        final List&lt;ACL&gt; acl, final CreateMode createMode,
+        final AsyncCallback.StringCallback callback, final Object ctx) {
+
+<span class="fc" id="L75">        zk.create(originalPath, data, acl, createMode, new StringCallback() {</span>
+            @Override
+            public void processResult(int rc, String path, Object ctx, String name) {
+
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (rc != Code.NONODE.intValue()) {</span>
+<span class="fc" id="L80">                    callback.processResult(rc, path, ctx, name);</span>
+<span class="fc" id="L81">                    return;</span>
+                }
+
+                // Since I got a nonode, it means that my parents don't exist
+                // create mode is persistent since ephemeral nodes can't be
+                // parents
+<span class="nc" id="L87">                String parent = new File(originalPath).getParent().replace(&quot;\\&quot;, &quot;/&quot;);</span>
+<span class="nc" id="L88">                asyncCreateFullPathOptimistic(zk, parent, new byte[0], acl,</span>
+<span class="nc" id="L89">                        CreateMode.PERSISTENT, new StringCallback() {</span>
+
+                            @Override
+                            public void processResult(int rc, String path, Object ctx, String name) {
+<span class="nc bnc" id="L93" title="All 4 branches missed.">                                if (rc == Code.OK.intValue() || rc == Code.NODEEXISTS.intValue()) {</span>
+                                    // succeeded in creating the parent, now
+                                    // create the original path
+<span class="nc" id="L96">                                    asyncCreateFullPathOptimistic(zk, originalPath, data,</span>
+                                            acl, createMode, callback, ctx);
+                                } else {
+<span class="nc" id="L99">                                    callback.processResult(rc, path, ctx, name);</span>
+                                }
+<span class="nc" id="L101">                            }</span>
+                        }, ctx);
+<span class="nc" id="L103">            }</span>
+        }, ctx);
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Asynchronously deletes zookeeper path recursively and optimistically.
+     * This method is used for deleting the leaf nodes and its corresponding
+     * parents if they don't have anymore children after deleting the child
+     * node. For this to work as expected, provided znodeVersion should be -1,
+     * so that there wont be version mismatches with any of the parent nodes. If
+     * it fails to delete the leafnode then it will callback with the received
+     * error code, but it fails to delete the parent node for whatsoever reason
+     * it stops proceeding further and it will callback with ok error code.
+     * 
+     * @param zk
+     *            Zookeeper client
+     * @param originalPath
+     *            Zookeeper full path
+     * @param znodeVersion
+     *            version of the node
+     * @param callback
+     *            callback
+     * @param leafNodePath
+     *            for actual caller this leafNodePath should be same as the
+     *            originalPath. But when it is called recursively leafNodePath
+     *            remains the same, but the originalPath will be internal nodes.
+     */
+    public static void asyncDeleteFullPathOptimistic(final ZooKeeper zk, final String originalPath,
+            int znodeVersion, final AsyncCallback.VoidCallback callback, final String leafNodePath) {
+<span class="nc" id="L132">        zk.delete(originalPath, znodeVersion, new VoidCallback() {</span>
+            @Override
+            public void processResult(int rc, String path, Object ctx) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (rc == Code.OK.intValue()) {</span>
+<span class="nc" id="L136">                    String parent = new File(originalPath).getParent().replace(&quot;\\&quot;, &quot;/&quot;);</span>
+<span class="nc" id="L137">                    asyncDeleteFullPathOptimistic(zk, parent, znodeVersion, callback, leafNodePath);</span>
+<span class="nc" id="L138">                } else {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                    if (path.equals(leafNodePath)) {</span>
+<span class="nc" id="L140">                        callback.processResult(rc, path, leafNodePath);</span>
+                    } else {
+<span class="nc" id="L142">                        callback.processResult(Code.OK.intValue(), path, leafNodePath);</span>
+                    }
+                }
+<span class="nc" id="L145">            }</span>
+        }, leafNodePath);
+<span class="nc" id="L147">    }</span>
+    
+    /**
+     * Create zookeeper path recursively and optimistically. This method can throw
+     * any of the KeeperExceptions which can be thrown by ZooKeeper#create.
+     * KeeperException.NodeExistsException will only be thrown if the full path specified
+     * by _path_ already exists. The existence of any parent znodes is not an error
+     * condition.
+     *
+     * @param zkc
+     *            - ZK instance
+     * @param path
+     *            - znode path
+     * @param data
+     *            - znode data
+     * @param acl
+     *            - Acl of the zk path
+     * @param createMode
+     *            - Create mode of zk path
+     * @throws KeeperException
+     *             if the server returns a non-zero error code, or invalid ACL
+     * @throws InterruptedException
+     *             if the transaction is interrupted
+     */
+    public static void createFullPathOptimistic(ZooKeeper zkc, String path,
+            byte[] data, final List&lt;ACL&gt; acl, final CreateMode createMode)
+            throws KeeperException, InterruptedException {
+<span class="nc" id="L174">        final CountDownLatch latch = new CountDownLatch(1);</span>
+<span class="nc" id="L175">        final AtomicInteger rc = new AtomicInteger(Code.OK.intValue());</span>
+<span class="nc" id="L176">        asyncCreateFullPathOptimistic(zkc, path, data, acl, createMode,</span>
+<span class="nc" id="L177">                                      new StringCallback() {</span>
+                                          @Override
+                                          public void processResult(int rc2, String path,
+                                                                    Object ctx, String name) {
+<span class="nc" id="L181">                                              rc.set(rc2);</span>
+<span class="nc" id="L182">                                              latch.countDown();</span>
+<span class="nc" id="L183">                                          }</span>
+                                      }, null);
+<span class="nc" id="L185">        latch.await();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (rc.get() != Code.OK.intValue()) {</span>
+<span class="nc" id="L187">            throw KeeperException.create(Code.get(rc.get()));</span>
+        }
+<span class="nc" id="L189">    }</span>
+
+    public static void deleteFullPathOptimistic(ZooKeeper zkc, String path, int znodeVersion)
+            throws KeeperException, InterruptedException {
+<span class="nc" id="L193">        final CountDownLatch latch = new CountDownLatch(1);</span>
+<span class="nc" id="L194">        final AtomicInteger rc = new AtomicInteger(Code.OK.intValue());</span>
+<span class="nc" id="L195">        asyncDeleteFullPathOptimistic(zkc, path, znodeVersion, new VoidCallback() {</span>
+            @Override
+            public void processResult(int rc2, String path, Object ctx) {
+<span class="nc" id="L198">                rc.set(rc2);</span>
+<span class="nc" id="L199">                latch.countDown();</span>
+<span class="nc" id="L200">            }</span>
+        }, path);
+<span class="nc" id="L202">        latch.await();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (rc.get() != Code.OK.intValue()) {</span>
+<span class="nc" id="L204">            throw KeeperException.create(Code.get(rc.get()));</span>
+        }
+<span class="nc" id="L206">    }</span>
+    
+<span class="fc" id="L208">    private static class GetChildrenCtx {</span>
+        int rc;
+<span class="fc" id="L210">        boolean done = false;</span>
+<span class="fc" id="L211">        List&lt;String&gt; children = null;</span>
+    }
+
+    /**
+     * Sync get all children under single zk node
+     *
+     * @param zk
+     *          zookeeper client
+     * @param node
+     *          node path
+     * @return direct children
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public static List&lt;String&gt; getChildrenInSingleNode(final ZooKeeper zk, final String node)
+            throws InterruptedException, IOException {
+<span class="fc" id="L227">        final GetChildrenCtx ctx = new GetChildrenCtx();</span>
+<span class="fc" id="L228">        getChildrenInSingleNode(zk, node, new GenericCallback&lt;List&lt;String&gt;&gt;() {</span>
+            @Override
+            public void operationComplete(int rc, List&lt;String&gt; ledgers) {
+<span class="fc" id="L231">                synchronized (ctx) {</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                    if (Code.OK.intValue() == rc) {</span>
+<span class="fc" id="L233">                        ctx.children = ledgers;</span>
+                    }
+<span class="fc" id="L235">                    ctx.rc = rc;</span>
+<span class="fc" id="L236">                    ctx.done = true;</span>
+<span class="fc" id="L237">                    ctx.notifyAll();</span>
+<span class="fc" id="L238">                }</span>
+<span class="fc" id="L239">            }</span>
+        });
+
+<span class="fc" id="L242">        synchronized (ctx) {</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            while (!ctx.done) {</span>
+<span class="fc" id="L244">                ctx.wait();</span>
+            }
+<span class="fc" id="L246">        }</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (Code.OK.intValue() != ctx.rc) {</span>
+<span class="nc" id="L248">            throw new IOException(&quot;Error on getting children from node &quot; + node);</span>
+        }
+<span class="fc" id="L250">        return ctx.children;</span>
+
+    }
+
+    /**
+     * Async get direct children under single node
+     *
+     * @param zk
+     *          zookeeper client
+     * @param node
+     *          node path
+     * @param cb
+     *          callback function
+     */
+    public static void getChildrenInSingleNode(final ZooKeeper zk, final String node,
+            final GenericCallback&lt;List&lt;String&gt;&gt; cb) {
+<span class="fc" id="L266">        zk.sync(node, new AsyncCallback.VoidCallback() {</span>
+            @Override
+            public void processResult(int rc, String path, Object ctx) {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (rc != Code.OK.intValue()) {</span>
+<span class="nc" id="L270">                    LOG.error(&quot;ZK error syncing nodes when getting children: &quot;, KeeperException</span>
+<span class="nc" id="L271">                            .create(KeeperException.Code.get(rc), path));</span>
+<span class="nc" id="L272">                    cb.operationComplete(rc, null);</span>
+<span class="nc" id="L273">                    return;</span>
+                }
+<span class="fc" id="L275">                zk.getChildren(node, false, new AsyncCallback.ChildrenCallback() {</span>
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, List&lt;String&gt; nodes) {
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                        if (rc != Code.OK.intValue()) {</span>
+<span class="nc" id="L279">                            LOG.error(&quot;Error polling ZK for the available nodes: &quot;, KeeperException</span>
+<span class="nc" id="L280">                                    .create(KeeperException.Code.get(rc), path));</span>
+<span class="nc" id="L281">                            cb.operationComplete(rc, null);</span>
+<span class="nc" id="L282">                            return;</span>
+                        }
+
+<span class="fc" id="L285">                        cb.operationComplete(rc, nodes);</span>
+
+<span class="fc" id="L287">                    }</span>
+                }, null);
+<span class="fc" id="L289">            }</span>
+        }, null);
+<span class="fc" id="L291">    }</span>
+
+    /**
+     * Compute ZooKeeper ACLs using actual configuration
+     *
+     * @param conf Bookie or BookKeeper configuration
+     */
+    public static List&lt;ACL&gt; getACLs(AbstractConfiguration conf) {
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        return conf.isZkEnableSecurity() ? ZooDefs.Ids.CREATOR_ALL_ACL: ZooDefs.Ids.OPEN_ACL_UNSAFE;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

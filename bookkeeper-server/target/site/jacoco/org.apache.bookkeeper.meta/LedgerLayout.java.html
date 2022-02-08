@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LedgerLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.meta</a> &gt; <span class="el_source">LedgerLayout.java</span></div><h1>LedgerLayout.java</h1><pre class="source lang-java linenums">package org.apache.bookkeeper.meta;
+
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.bookkeeper.util.BookKeeperConstants;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This class encapsulates ledger layout information that is persistently stored
+ * in zookeeper. It provides parsing and serialization methods of such information.
+ *
+ */
+class LedgerLayout {
+<span class="fc" id="L39">    static final Logger LOG = LoggerFactory.getLogger(LedgerLayout.class);</span>
+
+
+    // version of compability layout version
+    public static final int LAYOUT_MIN_COMPAT_VERSION = 1;
+    // version of ledger layout metadata
+    public static final int LAYOUT_FORMAT_VERSION = 2;
+
+    /**
+     * Read ledger layout from zookeeper
+     *
+     * @param zk            ZooKeeper Client
+     * @param ledgersRoot   Root of the ledger namespace to check
+     * @return ledger layout, or null if none set in zookeeper
+     */
+    public static LedgerLayout readLayout(final ZooKeeper zk, final String ledgersRoot)
+            throws IOException, KeeperException {
+<span class="fc" id="L56">        String ledgersLayout = ledgersRoot + &quot;/&quot; + BookKeeperConstants.LAYOUT_ZNODE;</span>
+
+        try {
+            LedgerLayout layout;
+
+            try {
+<span class="fc" id="L62">                byte[] layoutData = zk.getData(ledgersLayout, false, null);</span>
+<span class="fc" id="L63">                layout = parseLayout(layoutData);</span>
+<span class="fc" id="L64">            } catch (KeeperException.NoNodeException nne) {</span>
+<span class="fc" id="L65">                return null;</span>
+<span class="fc" id="L66">            }</span>
+
+<span class="fc" id="L68">            return layout;</span>
+<span class="nc" id="L69">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L70">            throw new IOException(ie);</span>
+        }
+    }
+
+    static final String splitter = &quot;:&quot;;
+    static final String lSplitter = &quot;\n&quot;;
+
+    // ledger manager factory class
+    private String managerFactoryCls;
+    // ledger manager version
+    private int managerVersion;
+
+    // layout version of how to store layout information
+<span class="fc" id="L83">    private int layoutFormatVersion = LAYOUT_FORMAT_VERSION;</span>
+
+    /**
+     * Ledger Layout Constructor
+     *
+     * @param managerFactoryCls
+     *          Ledger Manager Factory Class
+     * @param managerVersion
+     *          Ledger Manager Version
+     * @param layoutFormatVersion
+     *          Ledger Layout Format Version
+     */
+    public LedgerLayout(String managerFactoryCls, int managerVersion) {
+<span class="fc" id="L96">        this(managerFactoryCls, managerVersion, LAYOUT_FORMAT_VERSION);</span>
+<span class="fc" id="L97">    }</span>
+
+    LedgerLayout(String managerFactoryCls, int managerVersion,
+<span class="fc" id="L100">                 int layoutVersion) {</span>
+<span class="fc" id="L101">        this.managerFactoryCls = managerFactoryCls;</span>
+<span class="fc" id="L102">        this.managerVersion = managerVersion;</span>
+<span class="fc" id="L103">        this.layoutFormatVersion = layoutVersion;</span>
+<span class="fc" id="L104">    }</span>
+
+    /**
+     * Get Ledger Manager Type
+     *
+     * @return ledger manager type
+     * @deprecated replaced by {@link #getManagerFactoryClass()}
+     */
+    @Deprecated
+    public String getManagerType() {
+        // pre V2 layout store as manager type
+<span class="nc" id="L115">        return this.managerFactoryCls;</span>
+    }
+
+    /**
+     * Get ledger manager factory class
+     *
+     * @return ledger manager factory class
+     */
+    public String getManagerFactoryClass() {
+<span class="fc" id="L124">        return this.managerFactoryCls;</span>
+    }
+
+    public int getManagerVersion() {
+<span class="fc" id="L128">        return this.managerVersion;</span>
+    }
+
+    /**
+     * Return layout format version
+     *
+     * @return layout format version
+     */
+    public int getLayoutFormatVersion() {
+<span class="fc" id="L137">        return this.layoutFormatVersion;</span>
+    }
+
+    /**
+     * Store the ledger layout into zookeeper
+     */
+    public void store(final ZooKeeper zk, String ledgersRoot, List&lt;ACL&gt; zkAcls)
+            throws IOException, KeeperException, InterruptedException {
+<span class="fc" id="L145">        String ledgersLayout = ledgersRoot + &quot;/&quot;</span>
+                + BookKeeperConstants.LAYOUT_ZNODE;
+<span class="fc" id="L147">        zk.create(ledgersLayout, serialize(), zkAcls,</span>
+                CreateMode.PERSISTENT);
+<span class="fc" id="L149">    }</span>
+
+    /**
+     * Delete the LAYOUT from zookeeper
+     */
+    public void delete(final ZooKeeper zk, String ledgersRoot)
+            throws KeeperException, InterruptedException {
+<span class="nc" id="L156">        String ledgersLayout = ledgersRoot + &quot;/&quot;</span>
+                + BookKeeperConstants.LAYOUT_ZNODE;
+<span class="nc" id="L158">        zk.delete(ledgersLayout, -1);</span>
+<span class="nc" id="L159">    }</span>
+
+    /**
+     * Generates a byte array based on the LedgerLayout object.
+     *
+     * @return byte[]
+     */
+    private byte[] serialize() throws IOException {
+<span class="fc" id="L167">        String s =</span>
+<span class="fc" id="L168">          new StringBuilder().append(layoutFormatVersion).append(lSplitter)</span>
+<span class="fc" id="L169">              .append(managerFactoryCls).append(splitter).append(managerVersion).toString();</span>
+
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L172">            LOG.debug(&quot;Serialized layout info: {}&quot;, s);</span>
+        }
+<span class="fc" id="L174">        return s.getBytes(&quot;UTF-8&quot;);</span>
+    }
+
+    /**
+     * Parses a given byte array and transforms into a LedgerLayout object
+     *
+     * @param bytes
+     *          byte array to parse
+     * @param znodeVersion
+     *          version of znode
+     * @return LedgerLayout
+     * @throws IOException
+     *             if the given byte[] cannot be parsed
+     */
+    private static LedgerLayout parseLayout(byte[] bytes) throws IOException {
+<span class="fc" id="L189">        String layout = new String(bytes, &quot;UTF-8&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L191">            LOG.debug(&quot;Parsing Layout: {}&quot;, layout);</span>
+        }
+
+<span class="fc" id="L194">        String lines[] = layout.split(lSplitter);</span>
+
+        try {
+<span class="fc" id="L197">            int layoutFormatVersion = Integer.parseInt(lines[0]);</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">            if (LAYOUT_FORMAT_VERSION &lt; layoutFormatVersion ||</span>
+                LAYOUT_MIN_COMPAT_VERSION &gt; layoutFormatVersion) {
+<span class="nc" id="L200">                throw new IOException(&quot;Metadata version not compatible. Expected &quot;</span>
+                        + LAYOUT_FORMAT_VERSION + &quot;, but got &quot; + layoutFormatVersion);
+            }
+
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (lines.length &lt; 2) {</span>
+<span class="nc" id="L205">                throw new IOException(&quot;Ledger manager and its version absent from layout: &quot; + layout);</span>
+            }
+
+<span class="fc" id="L208">            String[] parts = lines[1].split(splitter);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (parts.length != 2) {</span>
+<span class="nc" id="L210">                throw new IOException(&quot;Invalid Ledger Manager defined in layout : &quot; + layout);</span>
+            }
+            // ledger manager factory class
+<span class="fc" id="L213">            String managerFactoryCls = parts[0];</span>
+            // ledger manager version
+<span class="fc" id="L215">            int managerVersion = Integer.parseInt(parts[1]);</span>
+<span class="fc" id="L216">            return new LedgerLayout(managerFactoryCls, managerVersion, layoutFormatVersion);</span>
+<span class="nc" id="L217">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L218">            throw new IOException(&quot;Could not parse layout '&quot; + layout + &quot;'&quot;, e);</span>
+        }
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (null == obj) {</span>
+<span class="nc" id="L225">            return false;</span>
+        }
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (!(obj instanceof LedgerLayout)) {</span>
+<span class="nc" id="L228">            return false;</span>
+        }
+<span class="nc" id="L230">        LedgerLayout other = (LedgerLayout)obj;</span>
+<span class="nc bnc" id="L231" title="All 4 branches missed.">        return managerFactoryCls.equals(other.managerFactoryCls)</span>
+            &amp;&amp; managerVersion == other.managerVersion;
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L237">        return (managerFactoryCls + managerVersion).hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L242">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L243">        sb.append(&quot;LV&quot;).append(layoutFormatVersion).append(&quot;:&quot;)</span>
+<span class="nc" id="L244">            .append(&quot;,Type:&quot;).append(managerFactoryCls).append(&quot;:&quot;)</span>
+<span class="nc" id="L245">            .append(managerVersion);</span>
+<span class="nc" id="L246">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

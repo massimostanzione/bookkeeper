@@ -1,0 +1,12 @@
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/util/ISW2TestUtils.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/test/BookKeeperClusterTestCase.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/client/LedgerHandleAddEntryTest.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/bookie/FileInfoWriteTest.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/test/PortManager.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/conf/TestBKConfiguration.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/test/annotations/FlakyTest.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/bookie/FileInfoReadTest.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/client/BookKeeperTestClient.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/client/LedgerHandleReadEntriesTest.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/test/ZooKeeperUtil.java
+/media/massimo/Dati/Documenti/Università/1-Magistrale/iswii/working-copies-GITHUB/bookkeeper/bookkeeper-server/src/test/java/org/apache/bookkeeper/util/TestUtils.java

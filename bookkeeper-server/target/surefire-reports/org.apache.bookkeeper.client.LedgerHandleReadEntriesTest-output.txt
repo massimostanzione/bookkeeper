@@ -1,0 +1,1785 @@
+2022-02-08 23:09:10,477 INFO  BookKeeperClusterTestCase - Setting up test class org.apache.bookkeeper.client.LedgerHandleReadEntriesTest
+2022-02-08 23:09:10,478 INFO  ZooKeeperServer - minSessionTimeout set to 6000
+2022-02-08 23:09:10,478 INFO  ZooKeeperServer - maxSessionTimeout set to 60000
+2022-02-08 23:09:10,478 INFO  ZooKeeperServer - Created server with tickTime 3000 minSessionTimeout 6000 maxSessionTimeout 60000 datadir /tmp/zookeeper6192167896710474889test/version-2 snapdir /tmp/zookeeper6192167896710474889test/version-2
+2022-02-08 23:09:10,482 INFO  NIOServerCnxnFactory - Configuring NIO connection handler with 10s sessionless connection timeout, 1 selector thread(s), 8 worker threads, and 64 kB direct buffers.
+2022-02-08 23:09:10,482 INFO  NIOServerCnxnFactory - binding to port /127.0.0.1:0
+2022-02-08 23:09:10,503 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper6192167896710474889test/version-2/snapshot.0
+2022-02-08 23:09:10,504 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper6192167896710474889test/version-2/snapshot.0
+2022-02-08 23:09:10,528 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:10,529 INFO  FourLetterWordMain - connecting to localhost 38219
+2022-02-08 23:09:10,529 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59242
+2022-02-08 23:09:10,530 INFO  NIOServerCnxn - Processing stat command from /127.0.0.1:59242
+2022-02-08 23:09:10,530 INFO  AbstractFourLetterCommand - Stat command output
+2022-02-08 23:09:10,531 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59242 (no session established for client)
+2022-02-08 23:09:10,531 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@6cd77cf7
+2022-02-08 23:09:10,532 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:10,532 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:10,533 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59244
+2022-02-08 23:09:10,533 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59244, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:10,538 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59244
+2022-02-08 23:09:10,542 INFO  FileTxnLog - Creating new log file: log.1
+2022-02-08 23:09:10,553 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:10,553 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:10,553 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:10,605 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0000 with negotiated timeout 10000 for client /127.0.0.1:59244
+2022-02-08 23:09:10,606 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0000, negotiated timeout = 10000
+2022-02-08 23:09:10,606 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:10,654 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@39a1a0aa
+2022-02-08 23:09:10,654 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:10,655 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:10,656 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59246
+2022-02-08 23:09:10,656 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59246, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:10,656 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59246
+2022-02-08 23:09:10,662 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0001 with negotiated timeout 10000 for client /127.0.0.1:59246
+2022-02-08 23:09:10,663 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0001, negotiated timeout = 10000
+2022-02-08 23:09:10,664 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:10,676 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:10,676 INFO  RackawareEnsemblePlacementPolicyImpl - Initialize rackaware ensemble placement policy @ <Bookie:127.0.1.1:0> @ /default-rack : org.apache.bookkeeper.net.ScriptBasedMapping.
+2022-02-08 23:09:10,676 INFO  RackawareEnsemblePlacementPolicyImpl - Not weighted
+2022-02-08 23:09:10,676 INFO  BookKeeper - Weighted ledger placement is not enabled
+2022-02-08 23:09:10,708 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:10,712 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@eef1266
+2022-02-08 23:09:10,713 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:10,714 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:10,715 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59248
+2022-02-08 23:09:10,715 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59248, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:10,715 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59248
+2022-02-08 23:09:10,729 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0002 with negotiated timeout 10000 for client /127.0.0.1:59248
+2022-02-08 23:09:10,729 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0002, negotiated timeout = 10000
+2022-02-08 23:09:10,729 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:10,731 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:10,735 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie1907817464755544694test/current] [/tmp/bookie1907817464755544694test/current]
+2022-02-08 23:09:10,759 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:10,759 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:10,759 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:10,788 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:10,790 ERROR Journal - Problems reading from /tmp/bookie1907817464755544694test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:10,790 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:10,791 INFO  EntryLogger - Created new entry log file /tmp/bookie1907817464755544694test/current/0.log for logId 0.
+2022-02-08 23:09:10,791 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:10,792 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:10,792 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:10,792 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:10,792 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:10,801 INFO  BookKeeperTestClient - Wait for 127.0.1.1:46729 to become writable
+2022-02-08 23:09:10,803 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:10,807 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@e1171f03.
+2022-02-08 23:09:10,859 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:10,860 INFO  Journal - Starting journal on /tmp/bookie1907817464755544694test/current
+2022-02-08 23:09:11,136 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:11,137 INFO  JournalChannel - Opening journal /tmp/bookie1907817464755544694test/current/17edb622be1.txn
+2022-02-08 23:09:11,207 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:11,207 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:46729
+2022-02-08 23:09:11,207 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:46729' has been created.
+2022-02-08 23:09:11,208 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:11,213 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@78a43b32
+2022-02-08 23:09:11,213 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:11,214 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:11,214 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59250, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:11,214 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59250
+2022-02-08 23:09:11,215 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59250
+2022-02-08 23:09:11,228 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0003 with negotiated timeout 10000 for client /127.0.0.1:59250
+2022-02-08 23:09:11,228 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0003, negotiated timeout = 10000
+2022-02-08 23:09:11,229 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:11,230 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:11,234 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie8038148831078449294test/current] [/tmp/bookie8038148831078449294test/current]
+2022-02-08 23:09:11,260 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:11,261 ERROR Journal - Problems reading from /tmp/bookie8038148831078449294test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:11,261 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:11,262 INFO  EntryLogger - Created new entry log file /tmp/bookie8038148831078449294test/current/0.log for logId 0.
+2022-02-08 23:09:11,262 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:11,263 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:11,263 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:11,263 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:11,263 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:11,272 INFO  BookKeeperTestClient - Wait for 127.0.1.1:45791 to become writable
+2022-02-08 23:09:11,273 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:11,273 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@24e679dd.
+2022-02-08 23:09:11,315 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:11,316 INFO  Journal - Starting journal on /tmp/bookie8038148831078449294test/current
+2022-02-08 23:09:11,317 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:11,317 INFO  JournalChannel - Opening journal /tmp/bookie8038148831078449294test/current/17edb622c96.txn
+2022-02-08 23:09:11,374 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:11,375 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:45791
+2022-02-08 23:09:11,375 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:45791' has been created.
+2022-02-08 23:09:11,376 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:11,380 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@1f3f32fb
+2022-02-08 23:09:11,380 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:11,381 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:11,382 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59252, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:11,382 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59252
+2022-02-08 23:09:11,382 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59252
+2022-02-08 23:09:11,406 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0004 with negotiated timeout 10000 for client /127.0.0.1:59252
+2022-02-08 23:09:11,406 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0004, negotiated timeout = 10000
+2022-02-08 23:09:11,407 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:11,409 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:11,413 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie668246520170985test/current] [/tmp/bookie668246520170985test/current]
+2022-02-08 23:09:11,448 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:11,449 ERROR Journal - Problems reading from /tmp/bookie668246520170985test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:11,449 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:11,450 INFO  EntryLogger - Created new entry log file /tmp/bookie668246520170985test/current/0.log for logId 0.
+2022-02-08 23:09:11,450 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:11,450 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:11,451 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:11,451 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:11,451 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:11,459 INFO  BookKeeperTestClient - Wait for 127.0.1.1:39989 to become writable
+2022-02-08 23:09:11,460 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:11,460 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@589bc6b2.
+2022-02-08 23:09:11,497 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:11,498 INFO  Journal - Starting journal on /tmp/bookie668246520170985test/current
+2022-02-08 23:09:11,498 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:11,499 INFO  JournalChannel - Opening journal /tmp/bookie668246520170985test/current/17edb622d4c.txn
+2022-02-08 23:09:11,563 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:11,564 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:39989
+2022-02-08 23:09:11,564 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:39989' has been created.
+2022-02-08 23:09:11,565 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:11,569 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@1bc8b73d
+2022-02-08 23:09:11,569 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:11,570 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:11,571 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59254
+2022-02-08 23:09:11,571 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59254, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:11,571 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59254
+2022-02-08 23:09:11,594 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0005 with negotiated timeout 10000 for client /127.0.0.1:59254
+2022-02-08 23:09:11,595 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0005, negotiated timeout = 10000
+2022-02-08 23:09:11,595 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:11,597 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:11,600 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie2293867683579048405test/current] [/tmp/bookie2293867683579048405test/current]
+2022-02-08 23:09:11,631 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:11,632 ERROR Journal - Problems reading from /tmp/bookie2293867683579048405test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:11,632 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:11,633 INFO  EntryLogger - Created new entry log file /tmp/bookie2293867683579048405test/current/0.log for logId 0.
+2022-02-08 23:09:11,633 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:11,633 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:11,633 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:11,634 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:11,634 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:11,642 INFO  BookKeeperTestClient - Wait for 127.0.1.1:41617 to become writable
+2022-02-08 23:09:11,642 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:11,643 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@ea80f019.
+2022-02-08 23:09:11,694 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:11,696 INFO  Journal - Starting journal on /tmp/bookie2293867683579048405test/current
+2022-02-08 23:09:11,696 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:11,696 INFO  JournalChannel - Opening journal /tmp/bookie2293867683579048405test/current/17edb622e11.txn
+2022-02-08 23:09:11,753 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:11,753 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:41617
+2022-02-08 23:09:11,753 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:41617' has been created.
+2022-02-08 23:09:11,754 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:11,758 INFO  ZooKeeper - Initiating client connection, connectString=localhost:38219 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@60674e35
+2022-02-08 23:09:11,758 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:11,759 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:38219. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:11,760 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:59256, server: localhost/127.0.0.1:38219
+2022-02-08 23:09:11,760 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:59256
+2022-02-08 23:09:11,760 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:59256
+2022-02-08 23:09:11,783 INFO  ZooKeeperServer - Established session 0x10001a0fe5f0006 with negotiated timeout 10000 for client /127.0.0.1:59256
+2022-02-08 23:09:11,784 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:38219, sessionid = 0x10001a0fe5f0006, negotiated timeout = 10000
+2022-02-08 23:09:11,784 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:11,788 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:11,793 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie4609661173364204580test/current] [/tmp/bookie4609661173364204580test/current]
+2022-02-08 23:09:11,820 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:11,820 ERROR Journal - Problems reading from /tmp/bookie4609661173364204580test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:11,820 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:11,821 INFO  EntryLogger - Created new entry log file /tmp/bookie4609661173364204580test/current/0.log for logId 0.
+2022-02-08 23:09:11,821 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:11,821 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:11,822 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:11,822 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:11,822 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:11,834 INFO  BookKeeperTestClient - Wait for 127.0.1.1:36981 to become writable
+2022-02-08 23:09:11,834 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:11,835 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@2fe560de.
+2022-02-08 23:09:11,873 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:11,874 INFO  Journal - Starting journal on /tmp/bookie4609661173364204580test/current
+2022-02-08 23:09:11,875 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:11,875 INFO  JournalChannel - Opening journal /tmp/bookie4609661173364204580test/current/17edb622ec4.txn
+2022-02-08 23:09:11,932 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:11,932 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:36981
+2022-02-08 23:09:11,932 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:36981' has been created.
+2022-02-08 23:09:11,932 INFO  BookKeeperClusterTestCase - Setup testcase ledgerReadEntriesTest[0] in 1455 ms.
+2022-02-08 23:09:11,973 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x19fa0043, L:/127.0.0.1:53854 - R:127.0.1.1/127.0.1.1:46729]
+2022-02-08 23:09:11,973 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:46729
+2022-02-08 23:09:11,979 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:11,980 INFO  BookieRequestHandler - Channel connected  [id: 0x33e975ca, L:/127.0.1.1:46729 - R:/127.0.0.1:53854]
+2022-02-08 23:09:11,980 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x31e47b02, L:/127.0.0.1:48186 - R:127.0.1.1/127.0.1.1:36981]
+2022-02-08 23:09:11,980 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:36981
+2022-02-08 23:09:11,980 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:11,981 INFO  BookieRequestHandler - Channel connected  [id: 0xc4d04124, L:/127.0.1.1:36981 - R:/127.0.0.1:48186]
+2022-02-08 23:09:11,981 INFO  PerChannelBookieClient - connection [id: 0x31e47b02, L:/127.0.0.1:48186 - R:127.0.1.1/127.0.1.1:36981] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:11,981 INFO  PerChannelBookieClient - connection [id: 0x19fa0043, L:/127.0.0.1:53854 - R:127.0.1.1/127.0.1.1:46729] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:12,160 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x61dcae4e, L:/127.0.0.1:54798 - R:127.0.1.1/127.0.1.1:41617]
+2022-02-08 23:09:12,160 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:41617
+2022-02-08 23:09:12,161 INFO  PerChannelBookieClient - connection [id: 0x61dcae4e, L:/127.0.0.1:54798 - R:127.0.1.1/127.0.1.1:41617] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:12,161 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:12,162 INFO  BookieRequestHandler - Channel connected  [id: 0x9e86521f, L:/127.0.1.1:41617 - R:/127.0.0.1:54798]
+2022-02-08 23:09:12,410 INFO  SessionTrackerImpl - SessionTrackerImpl exited loop!
+2022-02-08 23:09:12,526 INFO  BookKeeperClusterTestCase - TearDown
+2022-02-08 23:09:12,527 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:41617
+2022-02-08 23:09:12,527 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:36981
+2022-02-08 23:09:12,527 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x61dcae4e, L:/127.0.0.1:54798 ! R:127.0.1.1/127.0.1.1:41617]
+2022-02-08 23:09:12,528 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x31e47b02, L:/127.0.0.1:48186 ! R:127.0.1.1/127.0.1.1:36981]
+2022-02-08 23:09:12,528 INFO  BookieRequestHandler - Channels disconnected: [id: 0x9e86521f, L:/127.0.1.1:41617 ! R:/127.0.0.1:54798]
+2022-02-08 23:09:12,528 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:46729
+2022-02-08 23:09:12,529 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x19fa0043, L:/127.0.0.1:53854 ! R:127.0.1.1/127.0.1.1:46729]
+2022-02-08 23:09:12,529 INFO  BookieRequestHandler - Channels disconnected: [id: 0xc4d04124, L:/127.0.1.1:36981 ! R:/127.0.0.1:48186]
+2022-02-08 23:09:12,530 INFO  BookieRequestHandler - Channels disconnected: [id: 0x33e975ca, L:/127.0.1.1:46729 ! R:/127.0.0.1:53854]
+2022-02-08 23:09:14,486 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0001
+2022-02-08 23:09:14,605 INFO  ZooKeeper - Session: 0x10001a0fe5f0001 closed
+2022-02-08 23:09:14,605 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0001]
+2022-02-08 23:09:14,606 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:14,606 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:14,606 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59246 which had sessionid 0x10001a0fe5f0001
+2022-02-08 23:09:14,606 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0001
+2022-02-08 23:09:14,609 INFO  Bookie - Shutting down Bookie-46729 with exitCode 0
+2022-02-08 23:09:14,609 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:14,609 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:14,750 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@e4e48fb0.
+2022-02-08 23:09:14,806 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:14,807 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:14,809 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:14,809 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:14,810 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:14,812 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:14,812 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:14,812 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:14,812 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:14,812 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:14,812 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:14,813 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:14,819 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:14,820 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:14,820 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:14,820 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:14,822 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0002
+2022-02-08 23:09:14,845 INFO  ZooKeeper - Session: 0x10001a0fe5f0002 closed
+2022-02-08 23:09:14,845 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0002]
+2022-02-08 23:09:14,846 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:14,846 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:14,845 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0002
+2022-02-08 23:09:14,846 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59248 which had sessionid 0x10001a0fe5f0002
+2022-02-08 23:09:14,849 INFO  Bookie - Shutting down Bookie-45791 with exitCode 0
+2022-02-08 23:09:14,849 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:14,849 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:14,849 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@20a8f2d0.
+2022-02-08 23:09:14,895 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:14,895 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:14,896 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:14,896 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:14,896 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:14,897 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:14,897 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:14,897 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:14,897 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:14,897 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:14,897 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:14,962 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:14,962 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:14,962 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:14,962 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:14,962 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:14,963 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0003
+2022-02-08 23:09:14,988 INFO  ZooKeeper - Session: 0x10001a0fe5f0003 closed
+2022-02-08 23:09:14,988 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0003]
+2022-02-08 23:09:14,988 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0003
+2022-02-08 23:09:14,988 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59250 which had sessionid 0x10001a0fe5f0003
+2022-02-08 23:09:14,989 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:14,989 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:14,991 INFO  Bookie - Shutting down Bookie-39989 with exitCode 0
+2022-02-08 23:09:14,991 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:14,991 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:14,991 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@54714570.
+2022-02-08 23:09:15,028 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:15,029 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:15,029 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:15,029 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:15,030 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:15,030 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:15,030 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:15,030 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:15,030 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:15,030 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:15,030 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:15,062 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:15,062 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:15,062 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:15,062 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:15,062 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:15,063 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0004
+2022-02-08 23:09:15,078 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0004]
+2022-02-08 23:09:15,078 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0004
+2022-02-08 23:09:15,078 INFO  ZooKeeper - Session: 0x10001a0fe5f0004 closed
+2022-02-08 23:09:15,078 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59252 which had sessionid 0x10001a0fe5f0004
+2022-02-08 23:09:15,079 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,079 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,082 INFO  Bookie - Shutting down Bookie-41617 with exitCode 0
+2022-02-08 23:09:15,082 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:15,082 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:15,206 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,206 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,206 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:15,207 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@eea46c30.
+2022-02-08 23:09:15,251 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:15,252 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:15,252 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:15,252 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:15,253 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:15,253 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:15,253 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:15,253 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:15,253 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:15,253 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:15,253 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:15,254 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:15,261 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:15,261 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:15,261 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:15,261 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:15,262 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0005
+2022-02-08 23:09:15,278 INFO  ZooKeeper - Session: 0x10001a0fe5f0005 closed
+2022-02-08 23:09:15,278 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0005
+2022-02-08 23:09:15,278 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0005]
+2022-02-08 23:09:15,278 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,278 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,279 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59254 which had sessionid 0x10001a0fe5f0005
+2022-02-08 23:09:15,284 INFO  Bookie - Shutting down Bookie-36981 with exitCode 0
+2022-02-08 23:09:15,284 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:15,284 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:15,373 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,373 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,373 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:15,385 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@2bf6dd10.
+2022-02-08 23:09:15,430 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:15,430 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:15,430 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:15,431 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:15,431 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:15,431 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:15,431 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:15,431 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:15,431 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:15,431 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:15,431 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:15,432 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:15,439 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:15,439 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:15,439 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:15,439 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:15,440 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0006
+2022-02-08 23:09:15,455 INFO  ZooKeeper - Session: 0x10001a0fe5f0006 closed
+2022-02-08 23:09:15,455 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0006
+2022-02-08 23:09:15,455 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0006]
+2022-02-08 23:09:15,456 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59256 which had sessionid 0x10001a0fe5f0006
+2022-02-08 23:09:15,457 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a0fe5f0000
+2022-02-08 23:09:15,466 INFO  ZooKeeper - Session: 0x10001a0fe5f0000 closed
+2022-02-08 23:09:15,466 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=Connections,name2=127.0.0.1,name3=0x10001a0fe5f0000]
+2022-02-08 23:09:15,466 INFO  ClientCnxn - EventThread shut down for session: 0x10001a0fe5f0000
+2022-02-08 23:09:15,466 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:59244 which had sessionid 0x10001a0fe5f0000
+2022-02-08 23:09:15,466 INFO  NIOServerCnxnFactory - ConnnectionExpirerThread interrupted
+2022-02-08 23:09:15,467 INFO  NIOServerCnxnFactory - selector thread exitted run method
+2022-02-08 23:09:15,471 INFO  NIOServerCnxnFactory - accept thread exitted run method
+2022-02-08 23:09:15,471 INFO  ZooKeeperServer - shutting down
+2022-02-08 23:09:15,471 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:15,471 INFO  SessionTrackerImpl - Shutting down
+2022-02-08 23:09:15,471 INFO  PrepRequestProcessor - Shutting down
+2022-02-08 23:09:15,471 INFO  SyncRequestProcessor - Shutting down
+2022-02-08 23:09:15,471 INFO  PrepRequestProcessor - PrepRequestProcessor exited loop!
+2022-02-08 23:09:15,471 INFO  SyncRequestProcessor - SyncRequestProcessor exited!
+2022-02-08 23:09:15,475 INFO  FinalRequestProcessor - shutdown of request processor complete
+2022-02-08 23:09:15,476 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219,name1=InMemoryDataTree]
+2022-02-08 23:09:15,476 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port38219]
+2022-02-08 23:09:15,476 INFO  FourLetterWordMain - connecting to localhost 38219
+2022-02-08 23:09:15,490 INFO  BookKeeperClusterTestCase - Tearing down test ledgerReadEntriesTest[0] in 2963 ms.
+2022-02-08 23:09:15,492 INFO  BookKeeperClusterTestCase - Setting up test class org.apache.bookkeeper.client.LedgerHandleReadEntriesTest
+2022-02-08 23:09:15,493 INFO  ZooKeeperServer - minSessionTimeout set to 6000
+2022-02-08 23:09:15,493 INFO  ZooKeeperServer - maxSessionTimeout set to 60000
+2022-02-08 23:09:15,493 INFO  ZooKeeperServer - Created server with tickTime 3000 minSessionTimeout 6000 maxSessionTimeout 60000 datadir /tmp/zookeeper7035112854006190170test/version-2 snapdir /tmp/zookeeper7035112854006190170test/version-2
+2022-02-08 23:09:15,497 INFO  NIOServerCnxnFactory - Configuring NIO connection handler with 10s sessionless connection timeout, 1 selector thread(s), 8 worker threads, and 64 kB direct buffers.
+2022-02-08 23:09:15,497 INFO  NIOServerCnxnFactory - binding to port /127.0.0.1:0
+2022-02-08 23:09:15,499 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7035112854006190170test/version-2/snapshot.0
+2022-02-08 23:09:15,505 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7035112854006190170test/version-2/snapshot.0
+2022-02-08 23:09:15,506 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:15,507 INFO  FourLetterWordMain - connecting to localhost 46781
+2022-02-08 23:09:15,507 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56480
+2022-02-08 23:09:15,509 INFO  NIOServerCnxn - Processing stat command from /127.0.0.1:56480
+2022-02-08 23:09:15,510 INFO  AbstractFourLetterCommand - Stat command output
+2022-02-08 23:09:15,510 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56480 (no session established for client)
+2022-02-08 23:09:15,510 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@53671ba3
+2022-02-08 23:09:15,511 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:15,512 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:15,512 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56482, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:15,512 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56482
+2022-02-08 23:09:15,517 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56482
+2022-02-08 23:09:15,522 INFO  FileTxnLog - Creating new log file: log.1
+2022-02-08 23:09:15,563 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,563 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,563 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:15,564 INFO  ZooKeeperServer - Established session 0x10001a111e80000 with negotiated timeout 10000 for client /127.0.0.1:56482
+2022-02-08 23:09:15,565 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80000, negotiated timeout = 10000
+2022-02-08 23:09:15,566 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:15,604 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@6aed82e
+2022-02-08 23:09:15,604 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:15,605 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:15,605 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56484
+2022-02-08 23:09:15,605 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56484, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:15,606 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56484
+2022-02-08 23:09:15,614 INFO  ZooKeeperServer - Established session 0x10001a111e80001 with negotiated timeout 10000 for client /127.0.0.1:56484
+2022-02-08 23:09:15,615 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80001, negotiated timeout = 10000
+2022-02-08 23:09:15,615 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:15,627 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:15,627 INFO  RackawareEnsemblePlacementPolicyImpl - Initialize rackaware ensemble placement policy @ <Bookie:127.0.1.1:0> @ /default-rack : org.apache.bookkeeper.net.ScriptBasedMapping.
+2022-02-08 23:09:15,627 INFO  RackawareEnsemblePlacementPolicyImpl - Not weighted
+2022-02-08 23:09:15,627 INFO  BookKeeper - Weighted ledger placement is not enabled
+2022-02-08 23:09:15,660 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:15,664 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@1328f7cb
+2022-02-08 23:09:15,664 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:15,665 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:15,665 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56486
+2022-02-08 23:09:15,665 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56486, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:15,666 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56486
+2022-02-08 23:09:15,669 INFO  ZooKeeperServer - Established session 0x10001a111e80002 with negotiated timeout 10000 for client /127.0.0.1:56486
+2022-02-08 23:09:15,670 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80002, negotiated timeout = 10000
+2022-02-08 23:09:15,670 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:15,672 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:15,675 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie7316645069506224708test/current] [/tmp/bookie7316645069506224708test/current]
+2022-02-08 23:09:15,729 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:15,730 ERROR Journal - Problems reading from /tmp/bookie7316645069506224708test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:15,730 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:15,731 INFO  EntryLogger - Created new entry log file /tmp/bookie7316645069506224708test/current/0.log for logId 0.
+2022-02-08 23:09:15,732 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:15,732 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:15,733 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:15,733 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:15,733 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:15,740 INFO  BookKeeperTestClient - Wait for 127.0.1.1:40607 to become writable
+2022-02-08 23:09:15,741 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:15,741 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@50e488d9.
+2022-02-08 23:09:15,753 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,753 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,753 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:15,787 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:15,788 INFO  Journal - Starting journal on /tmp/bookie7316645069506224708test/current
+2022-02-08 23:09:15,789 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:15,789 INFO  JournalChannel - Opening journal /tmp/bookie7316645069506224708test/current/17edb623e0e.txn
+2022-02-08 23:09:15,838 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:15,839 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:40607
+2022-02-08 23:09:15,839 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:40607' has been created.
+2022-02-08 23:09:15,840 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:15,843 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@5a87173b
+2022-02-08 23:09:15,844 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:15,844 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:15,845 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56488, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:15,845 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56488
+2022-02-08 23:09:15,845 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56488
+2022-02-08 23:09:15,858 INFO  ZooKeeperServer - Established session 0x10001a111e80003 with negotiated timeout 10000 for client /127.0.0.1:56488
+2022-02-08 23:09:15,859 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80003, negotiated timeout = 10000
+2022-02-08 23:09:15,859 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:15,861 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:15,865 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie3694313324168532110test/current] [/tmp/bookie3694313324168532110test/current]
+2022-02-08 23:09:15,896 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:15,897 ERROR Journal - Problems reading from /tmp/bookie3694313324168532110test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:15,897 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:15,898 INFO  EntryLogger - Created new entry log file /tmp/bookie3694313324168532110test/current/0.log for logId 0.
+2022-02-08 23:09:15,898 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:15,899 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:15,899 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:15,899 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:15,899 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:15,912 INFO  BookKeeperTestClient - Wait for 127.0.1.1:35151 to become writable
+2022-02-08 23:09:15,913 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:15,913 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@cfe47f6d.
+2022-02-08 23:09:15,931 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:15,931 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:15,931 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:15,954 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:15,955 INFO  Journal - Starting journal on /tmp/bookie3694313324168532110test/current
+2022-02-08 23:09:15,956 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:15,956 INFO  JournalChannel - Opening journal /tmp/bookie3694313324168532110test/current/17edb623eb5.txn
+2022-02-08 23:09:16,049 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:16,049 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:35151
+2022-02-08 23:09:16,049 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:35151' has been created.
+2022-02-08 23:09:16,050 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:16,053 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@3fcd8612
+2022-02-08 23:09:16,054 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:16,054 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:16,055 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56490, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:16,056 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56490
+2022-02-08 23:09:16,056 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56490
+2022-02-08 23:09:16,080 INFO  ZooKeeperServer - Established session 0x10001a111e80004 with negotiated timeout 10000 for client /127.0.0.1:56490
+2022-02-08 23:09:16,081 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80004, negotiated timeout = 10000
+2022-02-08 23:09:16,081 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:16,082 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:16,086 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie1010120336946791309test/current] [/tmp/bookie1010120336946791309test/current]
+2022-02-08 23:09:16,119 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:16,119 ERROR Journal - Problems reading from /tmp/bookie1010120336946791309test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:16,120 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:16,121 INFO  EntryLogger - Created new entry log file /tmp/bookie1010120336946791309test/current/0.log for logId 0.
+2022-02-08 23:09:16,121 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:16,121 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:16,122 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:16,122 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:16,122 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:16,128 INFO  BookKeeperTestClient - Wait for 127.0.1.1:33017 to become writable
+2022-02-08 23:09:16,129 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:16,129 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@c68b45bc.
+2022-02-08 23:09:16,199 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:16,201 INFO  Journal - Starting journal on /tmp/bookie1010120336946791309test/current
+2022-02-08 23:09:16,201 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:16,201 INFO  JournalChannel - Opening journal /tmp/bookie1010120336946791309test/current/17edb623faa.txn
+2022-02-08 23:09:16,260 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:16,260 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:33017
+2022-02-08 23:09:16,260 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:33017' has been created.
+2022-02-08 23:09:16,262 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:16,265 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@5f3578f6
+2022-02-08 23:09:16,265 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:16,266 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:16,267 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56492
+2022-02-08 23:09:16,267 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56492, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:16,267 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56492
+2022-02-08 23:09:16,280 INFO  ZooKeeperServer - Established session 0x10001a111e80005 with negotiated timeout 10000 for client /127.0.0.1:56492
+2022-02-08 23:09:16,280 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80005, negotiated timeout = 10000
+2022-02-08 23:09:16,280 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:16,281 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:16,284 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie5184224046441843584test/current] [/tmp/bookie5184224046441843584test/current]
+2022-02-08 23:09:16,315 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:16,316 ERROR Journal - Problems reading from /tmp/bookie5184224046441843584test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:16,316 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:16,317 INFO  EntryLogger - Created new entry log file /tmp/bookie5184224046441843584test/current/0.log for logId 0.
+2022-02-08 23:09:16,317 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:16,317 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:16,318 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:16,318 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:16,318 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:16,325 INFO  BookKeeperTestClient - Wait for 127.0.1.1:33407 to become writable
+2022-02-08 23:09:16,326 INFO  Bookie - Finished replaying journal in 1 ms.
+2022-02-08 23:09:16,326 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@136e8454.
+2022-02-08 23:09:16,378 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:16,379 INFO  Journal - Starting journal on /tmp/bookie5184224046441843584test/current
+2022-02-08 23:09:16,379 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:16,379 INFO  JournalChannel - Opening journal /tmp/bookie5184224046441843584test/current/17edb62405c.txn
+2022-02-08 23:09:16,437 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:16,437 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:33407
+2022-02-08 23:09:16,437 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:33407' has been created.
+2022-02-08 23:09:16,438 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:16,443 INFO  ZooKeeper - Initiating client connection, connectString=localhost:46781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@69fd8d3c
+2022-02-08 23:09:16,443 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:16,444 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:46781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:16,444 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:56494
+2022-02-08 23:09:16,444 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:56494, server: localhost/127.0.0.1:46781
+2022-02-08 23:09:16,445 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:56494
+2022-02-08 23:09:16,468 INFO  ZooKeeperServer - Established session 0x10001a111e80006 with negotiated timeout 10000 for client /127.0.0.1:56494
+2022-02-08 23:09:16,469 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:46781, sessionid = 0x10001a111e80006, negotiated timeout = 10000
+2022-02-08 23:09:16,469 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:16,471 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:16,475 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie7689292898315245473test/current] [/tmp/bookie7689292898315245473test/current]
+2022-02-08 23:09:16,506 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:16,507 ERROR Journal - Problems reading from /tmp/bookie7689292898315245473test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:16,507 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:16,508 INFO  EntryLogger - Created new entry log file /tmp/bookie7689292898315245473test/current/0.log for logId 0.
+2022-02-08 23:09:16,509 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:16,509 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:16,509 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:16,510 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:16,510 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:16,517 INFO  BookKeeperTestClient - Wait for 127.0.1.1:44041 to become writable
+2022-02-08 23:09:16,518 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:16,518 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@76660674.
+2022-02-08 23:09:16,556 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:16,557 INFO  Journal - Starting journal on /tmp/bookie7689292898315245473test/current
+2022-02-08 23:09:16,558 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:16,558 INFO  JournalChannel - Opening journal /tmp/bookie7689292898315245473test/current/17edb62410f.txn
+2022-02-08 23:09:16,626 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:16,626 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:44041
+2022-02-08 23:09:16,627 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:44041' has been created.
+2022-02-08 23:09:16,627 INFO  BookKeeperClusterTestCase - Setup testcase ledgerReadEntriesTest[1] in 1134 ms.
+2022-02-08 23:09:16,668 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0xa87629be, L:/127.0.0.1:37950 - R:127.0.1.1/127.0.1.1:35151]
+2022-02-08 23:09:16,668 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:35151
+2022-02-08 23:09:16,669 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:16,669 INFO  PerChannelBookieClient - connection [id: 0xa87629be, L:/127.0.0.1:37950 - R:127.0.1.1/127.0.1.1:35151] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:16,675 INFO  BookieRequestHandler - Channel connected  [id: 0xc35f2d45, L:/127.0.1.1:35151 - R:/127.0.0.1:37950]
+2022-02-08 23:09:16,675 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0xc0145968, L:/127.0.0.1:55010 - R:127.0.1.1/127.0.1.1:33407]
+2022-02-08 23:09:16,676 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:33407
+2022-02-08 23:09:16,677 INFO  PerChannelBookieClient - connection [id: 0xc0145968, L:/127.0.0.1:55010 - R:127.0.1.1/127.0.1.1:33407] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:16,678 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:16,679 INFO  BookieRequestHandler - Channel connected  [id: 0xddb85327, L:/127.0.1.1:33407 - R:/127.0.0.1:55010]
+2022-02-08 23:09:16,887 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x8806da21, L:/127.0.0.1:41524 - R:127.0.1.1/127.0.1.1:33017]
+2022-02-08 23:09:16,887 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:33017
+2022-02-08 23:09:16,888 INFO  PerChannelBookieClient - connection [id: 0x8806da21, L:/127.0.0.1:41524 - R:127.0.1.1/127.0.1.1:33017] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:16,889 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:16,889 INFO  BookieRequestHandler - Channel connected  [id: 0xb9e0f1bc, L:/127.0.1.1:33017 - R:/127.0.0.1:41524]
+2022-02-08 23:09:17,256 INFO  BookKeeperClusterTestCase - TearDown
+2022-02-08 23:09:17,256 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:33017
+2022-02-08 23:09:17,257 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:35151
+2022-02-08 23:09:17,257 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x8806da21, L:/127.0.0.1:41524 ! R:127.0.1.1/127.0.1.1:33017]
+2022-02-08 23:09:17,257 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:33407
+2022-02-08 23:09:17,257 INFO  BookieRequestHandler - Channels disconnected: [id: 0xb9e0f1bc, L:/127.0.1.1:33017 ! R:/127.0.0.1:41524]
+2022-02-08 23:09:17,258 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0xa87629be, L:/127.0.0.1:37950 ! R:127.0.1.1/127.0.1.1:35151]
+2022-02-08 23:09:17,258 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0xc0145968, L:/127.0.0.1:55010 ! R:127.0.1.1/127.0.1.1:33407]
+2022-02-08 23:09:17,258 INFO  BookieRequestHandler - Channels disconnected: [id: 0xc35f2d45, L:/127.0.1.1:35151 ! R:/127.0.0.1:37950]
+2022-02-08 23:09:17,259 INFO  BookieRequestHandler - Channels disconnected: [id: 0xddb85327, L:/127.0.1.1:33407 ! R:/127.0.0.1:55010]
+2022-02-08 23:09:18,410 INFO  SessionTrackerImpl - SessionTrackerImpl exited loop!
+2022-02-08 23:09:19,218 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80001
+2022-02-08 23:09:19,231 INFO  ZooKeeper - Session: 0x10001a111e80001 closed
+2022-02-08 23:09:19,231 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80001
+2022-02-08 23:09:19,231 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:19,231 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:19,231 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80001]
+2022-02-08 23:09:19,231 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56484 which had sessionid 0x10001a111e80001
+2022-02-08 23:09:19,234 INFO  Bookie - Shutting down Bookie-40607 with exitCode 0
+2022-02-08 23:09:19,234 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:19,234 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:19,234 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@4ca60690.
+2022-02-08 23:09:19,278 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:19,278 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:19,279 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:19,279 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:19,279 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:19,279 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:19,280 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:19,280 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:19,280 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:19,280 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:19,280 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:19,334 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:19,334 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:19,334 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:19,334 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:19,334 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:19,335 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80002
+2022-02-08 23:09:19,353 INFO  ZooKeeper - Session: 0x10001a111e80002 closed
+2022-02-08 23:09:19,353 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80002]
+2022-02-08 23:09:19,353 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56486 which had sessionid 0x10001a111e80002
+2022-02-08 23:09:19,354 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80002
+2022-02-08 23:09:19,355 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:19,355 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:19,357 INFO  Bookie - Shutting down Bookie-35151 with exitCode 0
+2022-02-08 23:09:19,357 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:19,357 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:19,478 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@d3cf0c30.
+2022-02-08 23:09:19,534 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:19,534 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:19,535 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:19,535 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:19,535 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:19,535 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:19,535 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:19,535 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:19,535 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:19,536 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:19,536 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:19,536 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:19,542 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:19,542 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:19,543 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:19,543 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:19,543 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80003
+2022-02-08 23:09:19,563 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80003]
+2022-02-08 23:09:19,564 INFO  ZooKeeper - Session: 0x10001a111e80003 closed
+2022-02-08 23:09:19,564 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56488 which had sessionid 0x10001a111e80003
+2022-02-08 23:09:19,564 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:19,564 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:19,564 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80003
+2022-02-08 23:09:19,566 INFO  Bookie - Shutting down Bookie-33017 with exitCode 0
+2022-02-08 23:09:19,567 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:19,567 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:19,723 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@ca88b8f0.
+2022-02-08 23:09:19,779 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:19,779 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:19,780 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:19,780 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:19,780 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:19,780 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:19,781 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:19,781 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:19,781 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:19,781 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:19,781 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:19,781 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:19,788 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:19,788 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:19,788 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:19,788 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:19,789 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80004
+2022-02-08 23:09:19,808 INFO  ZooKeeper - Session: 0x10001a111e80004 closed
+2022-02-08 23:09:19,808 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80004]
+2022-02-08 23:09:19,808 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:19,808 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:19,809 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56490 which had sessionid 0x10001a111e80004
+2022-02-08 23:09:19,808 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80004
+2022-02-08 23:09:19,815 INFO  Bookie - Shutting down Bookie-33407 with exitCode 0
+2022-02-08 23:09:19,815 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:19,815 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:19,838 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:19,838 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:19,838 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:19,946 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@f69f350.
+2022-02-08 23:09:19,991 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:19,991 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:19,991 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:19,992 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:19,992 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:19,992 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:19,992 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:19,992 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:19,992 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:19,992 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:19,992 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:19,992 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:19,997 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:19,997 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:19,997 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:19,997 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:19,997 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80005
+2022-02-08 23:09:20,019 INFO  ZooKeeper - Session: 0x10001a111e80005 closed
+2022-02-08 23:09:20,019 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80005
+2022-02-08 23:09:20,019 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80005]
+2022-02-08 23:09:20,019 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56492 which had sessionid 0x10001a111e80005
+2022-02-08 23:09:20,019 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:20,019 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:20,022 INFO  Bookie - Shutting down Bookie-44041 with exitCode 0
+2022-02-08 23:09:20,022 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:20,022 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:20,022 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@72588d10.
+2022-02-08 23:09:20,042 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:20,042 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:20,042 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:20,070 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:20,071 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:20,071 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:20,071 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:20,071 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:20,075 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:20,075 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:20,076 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:20,076 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:20,076 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:20,076 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:20,125 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:20,125 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:20,125 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:20,125 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:20,125 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:20,126 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80006
+2022-02-08 23:09:20,141 INFO  ZooKeeper - Session: 0x10001a111e80006 closed
+2022-02-08 23:09:20,141 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80006]
+2022-02-08 23:09:20,141 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80006
+2022-02-08 23:09:20,141 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56494 which had sessionid 0x10001a111e80006
+2022-02-08 23:09:20,142 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a111e80000
+2022-02-08 23:09:20,151 INFO  ZooKeeper - Session: 0x10001a111e80000 closed
+2022-02-08 23:09:20,151 INFO  ClientCnxn - EventThread shut down for session: 0x10001a111e80000
+2022-02-08 23:09:20,151 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=Connections,name2=127.0.0.1,name3=0x10001a111e80000]
+2022-02-08 23:09:20,152 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:56482 which had sessionid 0x10001a111e80000
+2022-02-08 23:09:20,152 INFO  NIOServerCnxnFactory - ConnnectionExpirerThread interrupted
+2022-02-08 23:09:20,156 INFO  NIOServerCnxnFactory - selector thread exitted run method
+2022-02-08 23:09:20,157 INFO  NIOServerCnxnFactory - accept thread exitted run method
+2022-02-08 23:09:20,157 INFO  ZooKeeperServer - shutting down
+2022-02-08 23:09:20,157 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:20,157 INFO  SessionTrackerImpl - Shutting down
+2022-02-08 23:09:20,157 INFO  PrepRequestProcessor - Shutting down
+2022-02-08 23:09:20,157 INFO  SyncRequestProcessor - Shutting down
+2022-02-08 23:09:20,157 INFO  PrepRequestProcessor - PrepRequestProcessor exited loop!
+2022-02-08 23:09:20,157 INFO  SyncRequestProcessor - SyncRequestProcessor exited!
+2022-02-08 23:09:20,157 INFO  FinalRequestProcessor - shutdown of request processor complete
+2022-02-08 23:09:20,162 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781,name1=InMemoryDataTree]
+2022-02-08 23:09:20,162 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port46781]
+2022-02-08 23:09:20,163 INFO  FourLetterWordMain - connecting to localhost 46781
+2022-02-08 23:09:20,177 INFO  BookKeeperClusterTestCase - Tearing down test ledgerReadEntriesTest[1] in 2920 ms.
+2022-02-08 23:09:20,178 INFO  BookKeeperClusterTestCase - Setting up test class org.apache.bookkeeper.client.LedgerHandleReadEntriesTest
+2022-02-08 23:09:20,179 INFO  ZooKeeperServer - minSessionTimeout set to 6000
+2022-02-08 23:09:20,179 INFO  ZooKeeperServer - maxSessionTimeout set to 60000
+2022-02-08 23:09:20,179 INFO  ZooKeeperServer - Created server with tickTime 3000 minSessionTimeout 6000 maxSessionTimeout 60000 datadir /tmp/zookeeper7889302941426240077test/version-2 snapdir /tmp/zookeeper7889302941426240077test/version-2
+2022-02-08 23:09:20,185 INFO  NIOServerCnxnFactory - Configuring NIO connection handler with 10s sessionless connection timeout, 1 selector thread(s), 8 worker threads, and 64 kB direct buffers.
+2022-02-08 23:09:20,185 INFO  NIOServerCnxnFactory - binding to port /127.0.0.1:0
+2022-02-08 23:09:20,191 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7889302941426240077test/version-2/snapshot.0
+2022-02-08 23:09:20,191 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7889302941426240077test/version-2/snapshot.0
+2022-02-08 23:09:20,193 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:20,194 INFO  FourLetterWordMain - connecting to localhost 33327
+2022-02-08 23:09:20,194 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48862
+2022-02-08 23:09:20,196 INFO  NIOServerCnxn - Processing stat command from /127.0.0.1:48862
+2022-02-08 23:09:20,196 INFO  AbstractFourLetterCommand - Stat command output
+2022-02-08 23:09:20,196 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48862 (no session established for client)
+2022-02-08 23:09:20,197 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@44a53dd3
+2022-02-08 23:09:20,197 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:20,198 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:20,198 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48864
+2022-02-08 23:09:20,198 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48864, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:20,207 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48864
+2022-02-08 23:09:20,211 INFO  FileTxnLog - Creating new log file: log.1
+2022-02-08 23:09:20,259 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:20,259 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:20,260 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:20,270 INFO  ZooKeeperServer - Established session 0x10001a124370000 with negotiated timeout 10000 for client /127.0.0.1:48864
+2022-02-08 23:09:20,271 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370000, negotiated timeout = 10000
+2022-02-08 23:09:20,272 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:20,310 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@117b2bb8
+2022-02-08 23:09:20,310 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:20,315 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:20,316 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48866
+2022-02-08 23:09:20,316 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48866, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:20,317 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48866
+2022-02-08 23:09:20,331 INFO  ZooKeeperServer - Established session 0x10001a124370001 with negotiated timeout 10000 for client /127.0.0.1:48866
+2022-02-08 23:09:20,331 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370001, negotiated timeout = 10000
+2022-02-08 23:09:20,332 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:20,349 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:20,349 INFO  RackawareEnsemblePlacementPolicyImpl - Initialize rackaware ensemble placement policy @ <Bookie:127.0.1.1:0> @ /default-rack : org.apache.bookkeeper.net.ScriptBasedMapping.
+2022-02-08 23:09:20,349 INFO  RackawareEnsemblePlacementPolicyImpl - Not weighted
+2022-02-08 23:09:20,349 INFO  BookKeeper - Weighted ledger placement is not enabled
+2022-02-08 23:09:20,436 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:20,436 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:20,436 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:20,626 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:20,626 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:20,626 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:20,760 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:20,764 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@3b150a6a
+2022-02-08 23:09:20,764 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:20,765 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:20,765 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48868, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:20,765 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48868
+2022-02-08 23:09:20,766 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48868
+2022-02-08 23:09:20,786 INFO  ZooKeeperServer - Established session 0x10001a124370002 with negotiated timeout 10000 for client /127.0.0.1:48868
+2022-02-08 23:09:20,786 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370002, negotiated timeout = 10000
+2022-02-08 23:09:20,787 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:20,789 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:20,793 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie5301909402285615857test/current] [/tmp/bookie5301909402285615857test/current]
+2022-02-08 23:09:20,844 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:20,845 ERROR Journal - Problems reading from /tmp/bookie5301909402285615857test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:20,845 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:20,846 INFO  EntryLogger - Created new entry log file /tmp/bookie5301909402285615857test/current/0.log for logId 0.
+2022-02-08 23:09:20,847 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:20,847 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:20,847 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:20,848 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:20,848 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:20,860 INFO  BookKeeperTestClient - Wait for 127.0.1.1:43867 to become writable
+2022-02-08 23:09:20,860 INFO  Bookie - Finished replaying journal in 1 ms.
+2022-02-08 23:09:20,861 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@89f8e653.
+2022-02-08 23:09:20,903 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:20,905 INFO  Journal - Starting journal on /tmp/bookie5301909402285615857test/current
+2022-02-08 23:09:20,905 INFO  JournalChannel - Opening journal /tmp/bookie5301909402285615857test/current/17edb62520a.txn
+2022-02-08 23:09:20,907 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:20,973 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:20,973 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:43867
+2022-02-08 23:09:20,973 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:43867' has been created.
+2022-02-08 23:09:20,974 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:20,979 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@74b10077
+2022-02-08 23:09:20,980 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:20,980 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:20,981 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48870
+2022-02-08 23:09:20,981 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48870, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:20,982 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48870
+2022-02-08 23:09:20,996 INFO  ZooKeeperServer - Established session 0x10001a124370003 with negotiated timeout 10000 for client /127.0.0.1:48870
+2022-02-08 23:09:20,997 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370003, negotiated timeout = 10000
+2022-02-08 23:09:20,997 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:20,998 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:21,002 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie3086007656034188006test/current] [/tmp/bookie3086007656034188006test/current]
+2022-02-08 23:09:21,033 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:21,034 ERROR Journal - Problems reading from /tmp/bookie3086007656034188006test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:21,034 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:21,035 INFO  EntryLogger - Created new entry log file /tmp/bookie3086007656034188006test/current/0.log for logId 0.
+2022-02-08 23:09:21,036 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:21,036 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:21,036 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:21,037 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:21,037 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:21,046 INFO  BookKeeperTestClient - Wait for 127.0.1.1:34345 to become writable
+2022-02-08 23:09:21,047 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:21,047 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@4d785d3f.
+2022-02-08 23:09:21,082 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:21,083 INFO  Journal - Starting journal on /tmp/bookie3086007656034188006test/current
+2022-02-08 23:09:21,083 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:21,083 INFO  JournalChannel - Opening journal /tmp/bookie3086007656034188006test/current/17edb6252bc.txn
+2022-02-08 23:09:21,154 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:21,154 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:34345
+2022-02-08 23:09:21,155 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:34345' has been created.
+2022-02-08 23:09:21,156 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:21,159 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@5ed27d90
+2022-02-08 23:09:21,160 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:21,161 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:21,161 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48872, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:21,162 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48872
+2022-02-08 23:09:21,162 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48872
+2022-02-08 23:09:21,174 INFO  ZooKeeperServer - Established session 0x10001a124370004 with negotiated timeout 10000 for client /127.0.0.1:48872
+2022-02-08 23:09:21,174 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370004, negotiated timeout = 10000
+2022-02-08 23:09:21,174 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:21,176 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:21,180 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie2124272891268226887test/current] [/tmp/bookie2124272891268226887test/current]
+2022-02-08 23:09:21,216 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:21,217 ERROR Journal - Problems reading from /tmp/bookie2124272891268226887test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:21,217 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:21,218 INFO  EntryLogger - Created new entry log file /tmp/bookie2124272891268226887test/current/0.log for logId 0.
+2022-02-08 23:09:21,218 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:21,219 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:21,219 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:21,219 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:21,219 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:21,227 INFO  BookKeeperTestClient - Wait for 127.0.1.1:39735 to become writable
+2022-02-08 23:09:21,228 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:21,228 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@4d9047ae.
+2022-02-08 23:09:21,271 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:21,272 INFO  Journal - Starting journal on /tmp/bookie2124272891268226887test/current
+2022-02-08 23:09:21,273 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:21,273 INFO  JournalChannel - Opening journal /tmp/bookie2124272891268226887test/current/17edb62537a.txn
+2022-02-08 23:09:21,340 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:21,340 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:39735
+2022-02-08 23:09:21,340 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:39735' has been created.
+2022-02-08 23:09:21,341 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:21,345 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@4fe807aa
+2022-02-08 23:09:21,345 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:21,346 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:21,347 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48874, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:21,347 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48874
+2022-02-08 23:09:21,347 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48874
+2022-02-08 23:09:21,362 INFO  ZooKeeperServer - Established session 0x10001a124370005 with negotiated timeout 10000 for client /127.0.0.1:48874
+2022-02-08 23:09:21,363 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370005, negotiated timeout = 10000
+2022-02-08 23:09:21,363 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:21,365 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:21,369 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie4960267542782269583test/current] [/tmp/bookie4960267542782269583test/current]
+2022-02-08 23:09:21,404 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:21,404 ERROR Journal - Problems reading from /tmp/bookie4960267542782269583test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:21,405 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:21,406 INFO  EntryLogger - Created new entry log file /tmp/bookie4960267542782269583test/current/0.log for logId 0.
+2022-02-08 23:09:21,406 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:21,406 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:21,407 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:21,407 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:21,407 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:21,410 INFO  SessionTrackerImpl - SessionTrackerImpl exited loop!
+2022-02-08 23:09:21,417 INFO  BookKeeperTestClient - Wait for 127.0.1.1:34699 to become writable
+2022-02-08 23:09:21,417 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:21,418 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@91fc6605.
+2022-02-08 23:09:21,461 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:21,462 INFO  Journal - Starting journal on /tmp/bookie4960267542782269583test/current
+2022-02-08 23:09:21,462 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:21,462 INFO  JournalChannel - Opening journal /tmp/bookie4960267542782269583test/current/17edb625437.txn
+2022-02-08 23:09:21,541 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:21,541 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:34699
+2022-02-08 23:09:21,541 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:34699' has been created.
+2022-02-08 23:09:21,542 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:21,546 INFO  ZooKeeper - Initiating client connection, connectString=localhost:33327 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@6e8a5f59
+2022-02-08 23:09:21,546 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:21,547 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:33327. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:21,548 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:48876, server: localhost/127.0.0.1:33327
+2022-02-08 23:09:21,548 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:48876
+2022-02-08 23:09:21,549 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:48876
+2022-02-08 23:09:21,562 INFO  ZooKeeperServer - Established session 0x10001a124370006 with negotiated timeout 10000 for client /127.0.0.1:48876
+2022-02-08 23:09:21,563 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:33327, sessionid = 0x10001a124370006, negotiated timeout = 10000
+2022-02-08 23:09:21,563 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:21,565 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:21,569 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie1570208939058516005test/current] [/tmp/bookie1570208939058516005test/current]
+2022-02-08 23:09:21,606 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:21,607 ERROR Journal - Problems reading from /tmp/bookie1570208939058516005test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:21,607 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:21,608 INFO  EntryLogger - Created new entry log file /tmp/bookie1570208939058516005test/current/0.log for logId 0.
+2022-02-08 23:09:21,608 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:21,609 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:21,609 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:21,609 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:21,609 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:21,618 INFO  BookKeeperTestClient - Wait for 127.0.1.1:33295 to become writable
+2022-02-08 23:09:21,619 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:21,623 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@848a7397.
+2022-02-08 23:09:21,661 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:21,662 INFO  Journal - Starting journal on /tmp/bookie1570208939058516005test/current
+2022-02-08 23:09:21,663 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:21,663 INFO  JournalChannel - Opening journal /tmp/bookie1570208939058516005test/current/17edb625500.txn
+2022-02-08 23:09:21,731 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:21,732 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:33295
+2022-02-08 23:09:21,732 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:33295' has been created.
+2022-02-08 23:09:21,732 INFO  BookKeeperClusterTestCase - Setup testcase ledgerReadEntriesTest[2] in 1553 ms.
+2022-02-08 23:09:21,773 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x36d25325, L:/127.0.0.1:57770 - R:127.0.1.1/127.0.1.1:34345]
+2022-02-08 23:09:21,774 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:34345
+2022-02-08 23:09:21,775 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:21,775 INFO  BookieRequestHandler - Channel connected  [id: 0x53a18fe4, L:/127.0.1.1:34345 - R:/127.0.0.1:57770]
+2022-02-08 23:09:21,781 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0xc7165b37, L:/127.0.0.1:38384 - R:127.0.1.1/127.0.1.1:43867]
+2022-02-08 23:09:21,781 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:43867
+2022-02-08 23:09:21,781 INFO  PerChannelBookieClient - connection [id: 0x36d25325, L:/127.0.0.1:57770 - R:127.0.1.1/127.0.1.1:34345] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:21,781 INFO  PerChannelBookieClient - connection [id: 0xc7165b37, L:/127.0.0.1:38384 - R:127.0.1.1/127.0.1.1:43867] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:21,781 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:21,782 INFO  BookieRequestHandler - Channel connected  [id: 0x8548bdbf, L:/127.0.1.1:43867 - R:/127.0.0.1:38384]
+2022-02-08 23:09:21,902 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x98f01e80, L:/127.0.0.1:38166 - R:127.0.1.1/127.0.1.1:33295]
+2022-02-08 23:09:21,903 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:33295
+2022-02-08 23:09:21,903 INFO  PerChannelBookieClient - connection [id: 0x98f01e80, L:/127.0.0.1:38166 - R:127.0.1.1/127.0.1.1:33295] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:21,904 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:21,904 INFO  BookieRequestHandler - Channel connected  [id: 0x0fd025e3, L:/127.0.1.1:33295 - R:/127.0.0.1:38166]
+2022-02-08 23:09:22,745 ERROR LedgerHandle - IncorrectParameterException on ledgerId:3 firstEntry:0 lastEntry:-1
+2022-02-08 23:09:22,838 INFO  BookKeeperClusterTestCase - TearDown
+2022-02-08 23:09:22,838 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:43867
+2022-02-08 23:09:22,839 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:34345
+2022-02-08 23:09:22,839 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0xc7165b37, L:/127.0.0.1:38384 ! R:127.0.1.1/127.0.1.1:43867]
+2022-02-08 23:09:22,839 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x36d25325, L:/127.0.0.1:57770 ! R:127.0.1.1/127.0.1.1:34345]
+2022-02-08 23:09:22,839 INFO  BookieRequestHandler - Channels disconnected: [id: 0x8548bdbf, L:/127.0.1.1:43867 ! R:/127.0.0.1:38384]
+2022-02-08 23:09:22,840 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:33295
+2022-02-08 23:09:22,840 INFO  BookieRequestHandler - Channels disconnected: [id: 0x53a18fe4, L:/127.0.1.1:34345 ! R:/127.0.0.1:57770]
+2022-02-08 23:09:22,840 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x98f01e80, L:/127.0.0.1:38166 ! R:127.0.1.1/127.0.1.1:33295]
+2022-02-08 23:09:22,841 INFO  BookieRequestHandler - Channels disconnected: [id: 0x0fd025e3, L:/127.0.1.1:33295 ! R:/127.0.0.1:38166]
+2022-02-08 23:09:22,847 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370001
+2022-02-08 23:09:22,860 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370001]
+2022-02-08 23:09:22,860 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370001
+2022-02-08 23:09:22,860 INFO  ZooKeeper - Session: 0x10001a124370001 closed
+2022-02-08 23:09:22,861 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48866 which had sessionid 0x10001a124370001
+2022-02-08 23:09:22,861 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:22,861 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:22,863 INFO  Bookie - Shutting down Bookie-43867 with exitCode 0
+2022-02-08 23:09:22,863 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:22,863 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:22,997 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@8dfc54d0.
+2022-02-08 23:09:23,053 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:23,054 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:23,054 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:23,055 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:23,055 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:23,055 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:23,055 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:23,055 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:23,055 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:23,055 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:23,055 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:23,055 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:23,063 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:23,063 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:23,063 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:23,063 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:23,063 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370002
+2022-02-08 23:09:23,082 INFO  ZooKeeper - Session: 0x10001a124370002 closed
+2022-02-08 23:09:23,082 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370002]
+2022-02-08 23:09:23,083 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,083 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,083 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48868 which had sessionid 0x10001a124370002
+2022-02-08 23:09:23,083 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370002
+2022-02-08 23:09:23,086 INFO  Bookie - Shutting down Bookie-34345 with exitCode 0
+2022-02-08 23:09:23,086 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:23,086 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:23,198 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@4983e510.
+2022-02-08 23:09:23,243 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:23,243 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:23,244 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:23,244 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:23,244 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:23,244 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:23,244 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:23,244 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:23,244 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:23,245 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:23,245 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:23,245 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:23,252 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:23,252 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:23,252 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:23,252 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:23,253 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370003
+2022-02-08 23:09:23,271 INFO  ZooKeeper - Session: 0x10001a124370003 closed
+2022-02-08 23:09:23,271 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370003
+2022-02-08 23:09:23,271 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370003]
+2022-02-08 23:09:23,272 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48870 which had sessionid 0x10001a124370003
+2022-02-08 23:09:23,272 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,272 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,275 INFO  Bookie - Shutting down Bookie-39735 with exitCode 0
+2022-02-08 23:09:23,275 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:23,275 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:23,275 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@49adb4f0.
+2022-02-08 23:09:23,312 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,312 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,312 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:23,343 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:23,343 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:23,343 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:23,344 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:23,344 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:23,344 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:23,344 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:23,344 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:23,344 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:23,344 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:23,344 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:23,409 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:23,410 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:23,410 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:23,410 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:23,410 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:23,411 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370004
+2022-02-08 23:09:23,426 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370004]
+2022-02-08 23:09:23,426 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370004
+2022-02-08 23:09:23,426 INFO  ZooKeeper - Session: 0x10001a124370004 closed
+2022-02-08 23:09:23,427 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48872 which had sessionid 0x10001a124370004
+2022-02-08 23:09:23,427 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,427 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,431 INFO  Bookie - Shutting down Bookie-34699 with exitCode 0
+2022-02-08 23:09:23,431 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:23,431 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:23,431 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@9608f290.
+2022-02-08 23:09:23,488 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:23,488 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:23,488 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:23,489 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:23,489 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:23,489 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:23,489 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:23,489 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:23,489 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:23,489 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:23,489 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:23,543 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:23,543 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:23,543 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:23,543 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:23,544 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:23,544 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370005
+2022-02-08 23:09:23,559 INFO  ZooKeeper - Session: 0x10001a124370005 closed
+2022-02-08 23:09:23,559 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370005]
+2022-02-08 23:09:23,560 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48874 which had sessionid 0x10001a124370005
+2022-02-08 23:09:23,559 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370005
+2022-02-08 23:09:23,560 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,560 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,563 INFO  Bookie - Shutting down Bookie-33295 with exitCode 0
+2022-02-08 23:09:23,563 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:23,563 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:23,688 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@808f0670.
+2022-02-08 23:09:23,744 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:23,744 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:23,745 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:23,745 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:23,746 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:23,746 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:23,746 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:23,746 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:23,746 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:23,746 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:23,747 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:23,747 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:23,754 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:23,754 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:23,754 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:23,754 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:23,755 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370006
+2022-02-08 23:09:23,770 INFO  ZooKeeper - Session: 0x10001a124370006 closed
+2022-02-08 23:09:23,770 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370006
+2022-02-08 23:09:23,770 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370006]
+2022-02-08 23:09:23,771 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48876 which had sessionid 0x10001a124370006
+2022-02-08 23:09:23,772 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a124370000
+2022-02-08 23:09:23,781 INFO  ZooKeeper - Session: 0x10001a124370000 closed
+2022-02-08 23:09:23,781 INFO  ClientCnxn - EventThread shut down for session: 0x10001a124370000
+2022-02-08 23:09:23,781 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=Connections,name2=127.0.0.1,name3=0x10001a124370000]
+2022-02-08 23:09:23,781 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:48864 which had sessionid 0x10001a124370000
+2022-02-08 23:09:23,782 INFO  NIOServerCnxnFactory - ConnnectionExpirerThread interrupted
+2022-02-08 23:09:23,782 INFO  NIOServerCnxnFactory - accept thread exitted run method
+2022-02-08 23:09:23,788 INFO  NIOServerCnxnFactory - selector thread exitted run method
+2022-02-08 23:09:23,789 INFO  ZooKeeperServer - shutting down
+2022-02-08 23:09:23,789 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:23,789 INFO  SessionTrackerImpl - Shutting down
+2022-02-08 23:09:23,789 INFO  PrepRequestProcessor - Shutting down
+2022-02-08 23:09:23,789 INFO  SyncRequestProcessor - Shutting down
+2022-02-08 23:09:23,789 INFO  PrepRequestProcessor - PrepRequestProcessor exited loop!
+2022-02-08 23:09:23,790 INFO  SyncRequestProcessor - SyncRequestProcessor exited!
+2022-02-08 23:09:23,795 INFO  FinalRequestProcessor - shutdown of request processor complete
+2022-02-08 23:09:23,795 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327,name1=InMemoryDataTree]
+2022-02-08 23:09:23,795 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port33327]
+2022-02-08 23:09:23,795 INFO  FourLetterWordMain - connecting to localhost 33327
+2022-02-08 23:09:23,811 INFO  BookKeeperClusterTestCase - Tearing down test ledgerReadEntriesTest[2] in 972 ms.
+2022-02-08 23:09:23,813 INFO  BookKeeperClusterTestCase - Setting up test class org.apache.bookkeeper.client.LedgerHandleReadEntriesTest
+2022-02-08 23:09:23,813 INFO  ZooKeeperServer - minSessionTimeout set to 6000
+2022-02-08 23:09:23,814 INFO  ZooKeeperServer - maxSessionTimeout set to 60000
+2022-02-08 23:09:23,814 INFO  ZooKeeperServer - Created server with tickTime 3000 minSessionTimeout 6000 maxSessionTimeout 60000 datadir /tmp/zookeeper7198506617798751583test/version-2 snapdir /tmp/zookeeper7198506617798751583test/version-2
+2022-02-08 23:09:23,821 INFO  NIOServerCnxnFactory - Configuring NIO connection handler with 10s sessionless connection timeout, 1 selector thread(s), 8 worker threads, and 64 kB direct buffers.
+2022-02-08 23:09:23,821 INFO  NIOServerCnxnFactory - binding to port /127.0.0.1:0
+2022-02-08 23:09:23,833 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7198506617798751583test/version-2/snapshot.0
+2022-02-08 23:09:23,833 INFO  FileTxnSnapLog - Snapshotting: 0x0 to /tmp/zookeeper7198506617798751583test/version-2/snapshot.0
+2022-02-08 23:09:23,835 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:23,836 INFO  FourLetterWordMain - connecting to localhost 36781
+2022-02-08 23:09:23,836 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49744
+2022-02-08 23:09:23,837 INFO  NIOServerCnxn - Processing stat command from /127.0.0.1:49744
+2022-02-08 23:09:23,837 INFO  AbstractFourLetterCommand - Stat command output
+2022-02-08 23:09:23,838 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49744 (no session established for client)
+2022-02-08 23:09:23,838 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@7eecb3e9
+2022-02-08 23:09:23,838 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:23,847 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:23,848 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49746
+2022-02-08 23:09:23,848 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49746, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:23,853 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49746
+2022-02-08 23:09:23,858 INFO  FileTxnLog - Creating new log file: log.1
+2022-02-08 23:09:23,912 INFO  ZooKeeperServer - Established session 0x10001a132710000 with negotiated timeout 10000 for client /127.0.0.1:49746
+2022-02-08 23:09:23,913 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710000, negotiated timeout = 10000
+2022-02-08 23:09:23,913 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:23,963 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@2b08de4a
+2022-02-08 23:09:23,964 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:23,964 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:23,965 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49748, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:23,965 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49748
+2022-02-08 23:09:23,966 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49748
+2022-02-08 23:09:23,971 INFO  ZooKeeperServer - Established session 0x10001a132710001 with negotiated timeout 10000 for client /127.0.0.1:49748
+2022-02-08 23:09:23,972 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710001, negotiated timeout = 10000
+2022-02-08 23:09:23,972 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:23,973 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:23,973 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:23,973 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:23,983 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:23,983 INFO  RackawareEnsemblePlacementPolicyImpl - Initialize rackaware ensemble placement policy @ <Bookie:127.0.1.1:0> @ /default-rack : org.apache.bookkeeper.net.ScriptBasedMapping.
+2022-02-08 23:09:23,983 INFO  RackawareEnsemblePlacementPolicyImpl - Not weighted
+2022-02-08 23:09:23,984 INFO  BookKeeper - Weighted ledger placement is not enabled
+2022-02-08 23:09:24,016 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:24,021 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@4cc59360
+2022-02-08 23:09:24,021 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:24,022 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:24,023 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49750
+2022-02-08 23:09:24,023 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49750, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:24,024 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49750
+2022-02-08 23:09:24,037 INFO  ZooKeeperServer - Established session 0x10001a132710002 with negotiated timeout 10000 for client /127.0.0.1:49750
+2022-02-08 23:09:24,038 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710002, negotiated timeout = 10000
+2022-02-08 23:09:24,038 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:24,040 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:24,044 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie1093804962031635531test/current] [/tmp/bookie1093804962031635531test/current]
+2022-02-08 23:09:24,097 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:24,098 ERROR Journal - Problems reading from /tmp/bookie1093804962031635531test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:24,098 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:24,099 INFO  EntryLogger - Created new entry log file /tmp/bookie1093804962031635531test/current/0.log for logId 0.
+2022-02-08 23:09:24,100 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:24,100 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:24,100 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:24,100 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:24,101 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:24,109 INFO  BookKeeperTestClient - Wait for 127.0.1.1:34437 to become writable
+2022-02-08 23:09:24,109 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:24,110 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@53575767.
+2022-02-08 23:09:24,156 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:24,157 INFO  Journal - Starting journal on /tmp/bookie1093804962031635531test/current
+2022-02-08 23:09:24,158 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:24,158 INFO  JournalChannel - Opening journal /tmp/bookie1093804962031635531test/current/17edb625ebf.txn
+2022-02-08 23:09:24,229 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:24,229 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:34437
+2022-02-08 23:09:24,229 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:34437' has been created.
+2022-02-08 23:09:24,230 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:24,234 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@524630c7
+2022-02-08 23:09:24,235 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:24,236 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:24,237 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49752
+2022-02-08 23:09:24,237 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49752, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:24,238 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49752
+2022-02-08 23:09:24,248 INFO  ZooKeeperServer - Established session 0x10001a132710003 with negotiated timeout 10000 for client /127.0.0.1:49752
+2022-02-08 23:09:24,248 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710003, negotiated timeout = 10000
+2022-02-08 23:09:24,249 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:24,250 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:24,253 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie1277929110516505694test/current] [/tmp/bookie1277929110516505694test/current]
+2022-02-08 23:09:24,279 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:24,280 ERROR Journal - Problems reading from /tmp/bookie1277929110516505694test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:24,280 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:24,281 INFO  EntryLogger - Created new entry log file /tmp/bookie1277929110516505694test/current/0.log for logId 0.
+2022-02-08 23:09:24,281 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:24,282 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:24,282 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:24,283 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:24,283 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:24,289 INFO  BookKeeperTestClient - Wait for 127.0.1.1:40493 to become writable
+2022-02-08 23:09:24,290 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:24,290 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@bd8dbc63.
+2022-02-08 23:09:24,334 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:24,341 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:24,341 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:24,341 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:24,348 INFO  Journal - Starting journal on /tmp/bookie1277929110516505694test/current
+2022-02-08 23:09:24,348 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:24,348 INFO  JournalChannel - Opening journal /tmp/bookie1277929110516505694test/current/17edb625f7d.txn
+2022-02-08 23:09:24,406 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:24,407 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:40493
+2022-02-08 23:09:24,407 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:40493' has been created.
+2022-02-08 23:09:24,408 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:24,410 INFO  SessionTrackerImpl - SessionTrackerImpl exited loop!
+2022-02-08 23:09:24,412 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@8635984
+2022-02-08 23:09:24,413 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:24,413 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:24,414 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49754, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:24,414 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49754
+2022-02-08 23:09:24,414 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49754
+2022-02-08 23:09:24,426 INFO  ZooKeeperServer - Established session 0x10001a132710004 with negotiated timeout 10000 for client /127.0.0.1:49754
+2022-02-08 23:09:24,426 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710004, negotiated timeout = 10000
+2022-02-08 23:09:24,426 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:24,428 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:24,432 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie9187743453494761068test/current] [/tmp/bookie9187743453494761068test/current]
+2022-02-08 23:09:24,467 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:24,469 ERROR Journal - Problems reading from /tmp/bookie9187743453494761068test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:24,469 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:24,470 INFO  EntryLogger - Created new entry log file /tmp/bookie9187743453494761068test/current/0.log for logId 0.
+2022-02-08 23:09:24,470 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:24,471 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:24,471 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:24,472 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:24,472 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:24,479 INFO  BookKeeperTestClient - Wait for 127.0.1.1:36247 to become writable
+2022-02-08 23:09:24,479 INFO  Bookie - Finished replaying journal in 1 ms.
+2022-02-08 23:09:24,479 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@38b0329b.
+2022-02-08 23:09:24,513 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:24,514 INFO  Journal - Starting journal on /tmp/bookie9187743453494761068test/current
+2022-02-08 23:09:24,514 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:24,515 INFO  JournalChannel - Opening journal /tmp/bookie9187743453494761068test/current/17edb626024.txn
+2022-02-08 23:09:24,541 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:24,541 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:24,541 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:24,583 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:24,584 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:36247
+2022-02-08 23:09:24,584 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:36247' has been created.
+2022-02-08 23:09:24,585 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:24,589 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@65cf5ab2
+2022-02-08 23:09:24,590 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:24,591 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:24,592 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49756, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:24,592 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49756
+2022-02-08 23:09:24,592 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49756
+2022-02-08 23:09:24,603 INFO  ZooKeeperServer - Established session 0x10001a132710005 with negotiated timeout 10000 for client /127.0.0.1:49756
+2022-02-08 23:09:24,604 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710005, negotiated timeout = 10000
+2022-02-08 23:09:24,604 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:24,605 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:24,609 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie2714384496861965059test/current] [/tmp/bookie2714384496861965059test/current]
+2022-02-08 23:09:24,634 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:24,635 ERROR Journal - Problems reading from /tmp/bookie2714384496861965059test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:24,635 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:24,636 INFO  EntryLogger - Created new entry log file /tmp/bookie2714384496861965059test/current/0.log for logId 0.
+2022-02-08 23:09:24,636 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:24,637 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:24,637 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:24,637 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:24,637 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:24,645 INFO  BookKeeperTestClient - Wait for 127.0.1.1:42151 to become writable
+2022-02-08 23:09:24,646 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:24,646 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@360d0c58.
+2022-02-08 23:09:24,680 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:24,681 INFO  Journal - Starting journal on /tmp/bookie2714384496861965059test/current
+2022-02-08 23:09:24,682 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:24,682 INFO  JournalChannel - Opening journal /tmp/bookie2714384496861965059test/current/17edb6260cb.txn
+2022-02-08 23:09:24,731 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:24,731 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:24,731 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:24,738 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:24,739 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:42151
+2022-02-08 23:09:24,739 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:42151' has been created.
+2022-02-08 23:09:24,740 INFO  BookKeeperClusterTestCase - Starting new bookie on port: 0
+2022-02-08 23:09:24,743 INFO  ZooKeeper - Initiating client connection, connectString=localhost:36781 sessionTimeout=10000 watcher=org.apache.bookkeeper.zookeeper.ZooKeeperWatcherBase@73cdfd20
+2022-02-08 23:09:24,744 INFO  ClientCnxnSocket - jute.maxbuffer value is 4194304 Bytes
+2022-02-08 23:09:24,744 INFO  ClientCnxn - Opening socket connection to server localhost/127.0.0.1:36781. Will not attempt to authenticate using SASL (unknown error)
+2022-02-08 23:09:24,745 INFO  ClientCnxn - Socket connection established, initiating session, client: /127.0.0.1:49758, server: localhost/127.0.0.1:36781
+2022-02-08 23:09:24,745 INFO  NIOServerCnxnFactory - Accepted socket connection from /127.0.0.1:49758
+2022-02-08 23:09:24,746 INFO  ZooKeeperServer - Client attempting to establish new session at /127.0.0.1:49758
+2022-02-08 23:09:24,770 INFO  ZooKeeperServer - Established session 0x10001a132710006 with negotiated timeout 10000 for client /127.0.0.1:49758
+2022-02-08 23:09:24,770 INFO  ClientCnxn - Session establishment complete on server localhost/127.0.0.1:36781, sessionid = 0x10001a132710006, negotiated timeout = 10000
+2022-02-08 23:09:24,770 INFO  ZooKeeperWatcherBase - ZooKeeper client is connected now.
+2022-02-08 23:09:24,772 INFO  ZKRegistrationManager - INSTANCEID not exists in zookeeper. Not considering it for data verification
+2022-02-08 23:09:24,776 INFO  Bookie - Stamping new cookies on all dirs [/tmp/bookie5081466779655129358test/current] [/tmp/bookie5081466779655129358test/current]
+2022-02-08 23:09:24,810 INFO  Bookie - instantiate ledger manager org.apache.bookkeeper.meta.FlatLedgerManagerFactory
+2022-02-08 23:09:24,811 ERROR Journal - Problems reading from /tmp/bookie5081466779655129358test/current/lastMark (this is okay if it is the first time starting this bookie
+2022-02-08 23:09:24,811 INFO  Bookie - Using ledger storage: org.apache.bookkeeper.bookie.SortedLedgerStorage
+2022-02-08 23:09:24,812 INFO  EntryLogger - Created new entry log file /tmp/bookie5081466779655129358test/current/0.log for logId 0.
+2022-02-08 23:09:24,813 INFO  IndexPersistenceMgr - openFileLimit = 20000
+2022-02-08 23:09:24,813 INFO  IndexInMemPageMgr - maxDirectMemory = 1610612736, pageSize = 8192, pageLimit = 65536
+2022-02-08 23:09:24,813 INFO  ScanAndCompareGarbageCollector - Over Replicated Ledger Deletion : enabled=true, interval=86400000
+2022-02-08 23:09:24,813 INFO  GarbageCollectorThread - Minor Compaction : enabled=true, threshold=0.20000000298023224, interval=3600000
+2022-02-08 23:09:24,814 INFO  GarbageCollectorThread - Major Compaction : enabled=true, threshold=0.800000011920929, interval=86400000
+2022-02-08 23:09:24,826 INFO  BookKeeperTestClient - Wait for 127.0.1.1:38709 to become writable
+2022-02-08 23:09:24,827 INFO  Bookie - Finished replaying journal in 0 ms.
+2022-02-08 23:09:24,828 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@9f2231a8.
+2022-02-08 23:09:24,870 INFO  Bookie - Finished reading journal, starting bookie
+2022-02-08 23:09:24,871 INFO  Journal - Starting journal on /tmp/bookie5081466779655129358test/current
+2022-02-08 23:09:24,871 INFO  Journal - ForceWrite Thread started
+2022-02-08 23:09:24,872 INFO  JournalChannel - Opening journal /tmp/bookie5081466779655129358test/current/17edb626189.txn
+2022-02-08 23:09:24,929 WARN  RackawareEnsemblePlacementPolicyImpl - Failed to resolve network location for [127.0.1.1], using default rack for them : /default-rack.
+2022-02-08 23:09:24,929 INFO  NetworkTopologyImpl - Adding a new node: /default-rack/127.0.1.1:38709
+2022-02-08 23:09:24,929 INFO  BookKeeperClusterTestCase - New bookie '127.0.1.1:38709' has been created.
+2022-02-08 23:09:24,929 INFO  BookKeeperClusterTestCase - Setup testcase ledgerReadEntriesTest[3] in 1116 ms.
+2022-02-08 23:09:24,970 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x83de0dcf, L:/127.0.0.1:45682 - R:127.0.1.1/127.0.1.1:34437]
+2022-02-08 23:09:24,971 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:34437
+2022-02-08 23:09:24,979 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0xd411920b, L:/127.0.0.1:47668 - R:127.0.1.1/127.0.1.1:42151]
+2022-02-08 23:09:24,979 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:42151
+2022-02-08 23:09:24,980 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:24,981 INFO  BookieRequestHandler - Channel connected  [id: 0xce2099a2, L:/127.0.1.1:42151 - R:/127.0.0.1:47668]
+2022-02-08 23:09:24,981 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:24,981 INFO  PerChannelBookieClient - connection [id: 0x83de0dcf, L:/127.0.0.1:45682 - R:127.0.1.1/127.0.1.1:34437] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:24,982 INFO  BookieRequestHandler - Channel connected  [id: 0x98bb5484, L:/127.0.1.1:34437 - R:/127.0.0.1:45682]
+2022-02-08 23:09:24,982 INFO  PerChannelBookieClient - connection [id: 0xd411920b, L:/127.0.0.1:47668 - R:127.0.1.1/127.0.1.1:42151] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:25,168 INFO  PerChannelBookieClient - Successfully connected to bookie: [id: 0x747943d3, L:/127.0.0.1:55716 - R:127.0.1.1/127.0.1.1:36247]
+2022-02-08 23:09:25,168 INFO  PerChannelBookieClient - Successfully connected to bookie: 127.0.1.1:36247
+2022-02-08 23:09:25,169 INFO  PerChannelBookieClient - connection [id: 0x747943d3, L:/127.0.0.1:55716 - R:127.0.1.1/127.0.1.1:36247] authenticated as BookKeeperPrincipal{ANONYMOUS}
+2022-02-08 23:09:25,169 INFO  AuthHandler - Authentication success on server side
+2022-02-08 23:09:25,169 INFO  BookieRequestHandler - Channel connected  [id: 0x1ab070d2, L:/127.0.1.1:36247 - R:/127.0.0.1:55716]
+2022-02-08 23:09:25,861 ERROR LedgerHandle - IncorrectParameterException on ledgerId:3 firstEntry:-1 lastEntry:0
+2022-02-08 23:09:25,890 INFO  BookKeeperClusterTestCase - TearDown
+2022-02-08 23:09:25,890 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:36247
+2022-02-08 23:09:25,891 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:34437
+2022-02-08 23:09:25,891 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x747943d3, L:/127.0.0.1:55716 ! R:127.0.1.1/127.0.1.1:36247]
+2022-02-08 23:09:25,892 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0x83de0dcf, L:/127.0.0.1:45682 ! R:127.0.1.1/127.0.1.1:34437]
+2022-02-08 23:09:25,892 INFO  BookieRequestHandler - Channels disconnected: [id: 0x1ab070d2, L:/127.0.1.1:36247 ! R:/127.0.0.1:55716]
+2022-02-08 23:09:25,893 INFO  BookieRequestHandler - Channels disconnected: [id: 0x98bb5484, L:/127.0.1.1:34437 ! R:/127.0.0.1:45682]
+2022-02-08 23:09:25,893 INFO  PerChannelBookieClient - Closing the per channel bookie client for 127.0.1.1:42151
+2022-02-08 23:09:25,893 INFO  PerChannelBookieClient - Disconnected from bookie channel [id: 0xd411920b, L:/127.0.0.1:47668 ! R:127.0.1.1/127.0.1.1:42151]
+2022-02-08 23:09:25,895 INFO  BookieRequestHandler - Channels disconnected: [id: 0xce2099a2, L:/127.0.1.1:42151 ! R:/127.0.0.1:47668]
+2022-02-08 23:09:25,903 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710001
+2022-02-08 23:09:25,912 INFO  ZooKeeper - Session: 0x10001a132710001 closed
+2022-02-08 23:09:25,912 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710001]
+2022-02-08 23:09:25,912 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49748 which had sessionid 0x10001a132710001
+2022-02-08 23:09:25,912 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710001
+2022-02-08 23:09:25,912 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:25,913 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:25,914 INFO  Bookie - Shutting down Bookie-34437 with exitCode 0
+2022-02-08 23:09:25,915 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:25,915 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:26,027 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@4f78dab0.
+2022-02-08 23:09:26,072 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:26,073 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:26,073 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:26,073 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:26,073 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:26,074 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:26,074 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:26,074 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:26,074 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:26,074 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:26,074 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:26,074 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:26,082 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:26,082 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:26,082 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:26,082 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:26,083 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710002
+2022-02-08 23:09:26,101 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710002]
+2022-02-08 23:09:26,101 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710002
+2022-02-08 23:09:26,101 INFO  ZooKeeper - Session: 0x10001a132710002 closed
+2022-02-08 23:09:26,102 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49750 which had sessionid 0x10001a132710002
+2022-02-08 23:09:26,103 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,103 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,110 INFO  Bookie - Shutting down Bookie-40493 with exitCode 0
+2022-02-08 23:09:26,110 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:26,110 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:26,110 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@c15b52f0.
+2022-02-08 23:09:26,172 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:26,173 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:26,173 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:26,173 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:26,174 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:26,174 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:26,174 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:26,174 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:26,174 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:26,174 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:26,174 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:26,228 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:26,228 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,228 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,228 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:26,228 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:26,228 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:26,229 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:26,229 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:26,230 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710003
+2022-02-08 23:09:26,245 INFO  ZooKeeper - Session: 0x10001a132710003 closed
+2022-02-08 23:09:26,245 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710003]
+2022-02-08 23:09:26,246 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49752 which had sessionid 0x10001a132710003
+2022-02-08 23:09:26,246 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,245 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710003
+2022-02-08 23:09:26,246 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,249 INFO  Bookie - Shutting down Bookie-36247 with exitCode 0
+2022-02-08 23:09:26,249 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:26,249 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:26,395 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@34b6b2b0.
+2022-02-08 23:09:26,405 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,405 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,405 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:26,451 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:26,452 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:26,452 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:26,452 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:26,453 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:26,453 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:26,453 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:26,453 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:26,453 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:26,453 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:26,453 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:26,453 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:26,460 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:26,460 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:26,460 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:26,460 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:26,461 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710004
+2022-02-08 23:09:26,478 INFO  ZooKeeper - Session: 0x10001a132710004 closed
+2022-02-08 23:09:26,478 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710004]
+2022-02-08 23:09:26,478 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710004
+2022-02-08 23:09:26,479 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49754 which had sessionid 0x10001a132710004
+2022-02-08 23:09:26,479 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,479 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,482 INFO  Bookie - Shutting down Bookie-42151 with exitCode 0
+2022-02-08 23:09:26,482 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:26,482 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:26,583 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,583 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,583 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:26,607 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@324a8e30.
+2022-02-08 23:09:26,663 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:26,663 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:26,664 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:26,664 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:26,664 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:26,664 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:26,665 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:26,665 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:26,665 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:26,665 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:26,665 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:26,665 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:26,672 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:26,672 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:26,673 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:26,673 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:26,673 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710005
+2022-02-08 23:09:26,689 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710005]
+2022-02-08 23:09:26,689 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710005
+2022-02-08 23:09:26,689 INFO  ZooKeeper - Session: 0x10001a132710005 closed
+2022-02-08 23:09:26,689 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49756 which had sessionid 0x10001a132710005
+2022-02-08 23:09:26,690 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,690 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,692 INFO  Bookie - Shutting down Bookie-38709 with exitCode 0
+2022-02-08 23:09:26,692 INFO  Bookie - Turning bookie to read only during shut down
+2022-02-08 23:09:26,692 INFO  SyncThread - Shutting down SyncThread
+2022-02-08 23:09:26,693 INFO  SyncThread - Flush ledger storage at checkpoint org.apache.bookkeeper.bookie.CheckpointSourceList$CheckpointList@a360a650.
+2022-02-08 23:09:26,738 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,738 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,738 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:26,752 INFO  Journal - Shutting down Journal
+2022-02-08 23:09:26,753 ERROR Journal - ForceWrite thread interrupted
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal$ForceWriteThread.run(Journal.java:389)
+2022-02-08 23:09:26,753 WARN  Journal - Journal exits when shutting down
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.reportInterruptAfterWait(AbstractQueuedSynchronizer.java:2014)
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2048)
+	at java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+	at org.apache.bookkeeper.bookie.Journal.run(Journal.java:849)
+2022-02-08 23:09:26,753 INFO  Journal - Journal exited loop!
+2022-02-08 23:09:26,753 INFO  Journal - Finished Shutting down Journal thread
+2022-02-08 23:09:26,754 INFO  Bookie - Journal thread(s) quit.
+2022-02-08 23:09:26,754 INFO  InterleavedLedgerStorage - Shutting down InterleavedLedgerStorage
+2022-02-08 23:09:26,754 INFO  InterleavedLedgerStorage - Shutting down GC thread
+2022-02-08 23:09:26,754 INFO  GarbageCollectorThread - Shutting down GarbageCollectorThread
+2022-02-08 23:09:26,754 INFO  InterleavedLedgerStorage - Shutting down entry logger
+2022-02-08 23:09:26,754 INFO  EntryLogger - Stopping EntryLogger
+2022-02-08 23:09:26,830 INFO  EntryLogger - Stopped entry logger preallocator.
+2022-02-08 23:09:26,830 INFO  InterleavedLedgerStorage - Complete shutting down Ledger Storage
+2022-02-08 23:09:26,830 INFO  LedgerDirsMonitor - Shutting down LedgerDirsMonitor
+2022-02-08 23:09:26,831 INFO  LedgerDirsMonitor - LedgerDirsMonitor thread is interrupted
+2022-02-08 23:09:26,831 INFO  LedgerDirsMonitor - LedgerDirsMonitorThread exited!
+2022-02-08 23:09:26,831 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710006
+2022-02-08 23:09:26,855 INFO  ZooKeeper - Session: 0x10001a132710006 closed
+2022-02-08 23:09:26,855 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710006]
+2022-02-08 23:09:26,856 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49758 which had sessionid 0x10001a132710006
+2022-02-08 23:09:26,856 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710006
+2022-02-08 23:09:26,856 INFO  PrepRequestProcessor - Processed session termination for sessionid: 0x10001a132710000
+2022-02-08 23:09:26,866 INFO  ZooKeeper - Session: 0x10001a132710000 closed
+2022-02-08 23:09:26,866 INFO  ClientCnxn - EventThread shut down for session: 0x10001a132710000
+2022-02-08 23:09:26,867 INFO  NIOServerCnxnFactory - ConnnectionExpirerThread interrupted
+2022-02-08 23:09:26,866 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=Connections,name2=127.0.0.1,name3=0x10001a132710000]
+2022-02-08 23:09:26,873 INFO  NIOServerCnxnFactory - selector thread exitted run method
+2022-02-08 23:09:26,873 INFO  NIOServerCnxnFactory - accept thread exitted run method
+2022-02-08 23:09:26,873 INFO  NIOServerCnxn - Closed socket connection for client /127.0.0.1:49746 which had sessionid 0x10001a132710000
+2022-02-08 23:09:26,874 INFO  ZooKeeperServer - shutting down
+2022-02-08 23:09:26,874 ERROR ZooKeeperServer - ZKShutdownHandler is not registered, so ZooKeeper server won't take any action on ERROR or SHUTDOWN server state changes
+2022-02-08 23:09:26,874 INFO  SessionTrackerImpl - Shutting down
+2022-02-08 23:09:26,874 INFO  PrepRequestProcessor - Shutting down
+2022-02-08 23:09:26,874 INFO  SyncRequestProcessor - Shutting down
+2022-02-08 23:09:26,874 INFO  PrepRequestProcessor - PrepRequestProcessor exited loop!
+2022-02-08 23:09:26,874 INFO  SyncRequestProcessor - SyncRequestProcessor exited!
+2022-02-08 23:09:26,878 INFO  FinalRequestProcessor - shutdown of request processor complete
+2022-02-08 23:09:26,878 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781,name1=InMemoryDataTree]
+2022-02-08 23:09:26,878 INFO  MBeanRegistry - Unregister MBean [org.apache.ZooKeeperService:name0=StandaloneServer_port36781]
+2022-02-08 23:09:26,878 INFO  FourLetterWordMain - connecting to localhost 36781
+2022-02-08 23:09:26,894 INFO  BookKeeperClusterTestCase - Tearing down test ledgerReadEntriesTest[3] in 1003 ms.
+2022-02-08 23:09:26,928 INFO  BookieServer - Shutting down BookieServer
+2022-02-08 23:09:26,928 INFO  BookieNettyServer - Shutting down BookieNettyServer
+2022-02-08 23:09:26,928 INFO  BookieServer - BookieDeathWatcher exited loop!
+2022-02-08 23:09:27,410 INFO  SessionTrackerImpl - SessionTrackerImpl exited loop!

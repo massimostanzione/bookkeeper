@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LedgerEntryPage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.bookie</a> &gt; <span class="el_source">LedgerEntryPage.java</span></div><h1>LedgerEntryPage.java</h1><pre class="source lang-java linenums">/*
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+
+package org.apache.bookkeeper.bookie;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.bookkeeper.proto.BookieProtocol;
+import org.apache.bookkeeper.util.ZeroBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This is a page in the LedgerCache. It holds the locations
+ * (entrylogfile, offset) for entry ids.
+ */
+public class LedgerEntryPage {
+
+<span class="fc" id="L38">    private static final Logger LOG = LoggerFactory.getLogger(LedgerEntryPage.class);</span>
+
+    private static final int indexEntrySize = 8;
+    private final int pageSize;
+    private final int entriesPerPage;
+<span class="fc" id="L43">    private volatile EntryKey entryKey = new EntryKey(-1, BookieProtocol.INVALID_ENTRY_ID);</span>
+    private final ByteBuffer page;
+<span class="fc" id="L45">    private volatile boolean clean = true;</span>
+<span class="fc" id="L46">    private final AtomicInteger useCount = new AtomicInteger(0);</span>
+<span class="fc" id="L47">    private final AtomicInteger version = new AtomicInteger(0);</span>
+<span class="fc" id="L48">    private volatile int last = -1; // Last update position</span>
+    private final LEPStateChangeCallback callback;
+
+    public static int getIndexEntrySize() {
+<span class="fc" id="L52">        return indexEntrySize;</span>
+    }
+
+    public LedgerEntryPage(int pageSize, int entriesPerPage) {
+<span class="nc" id="L56">        this(pageSize, entriesPerPage, null);</span>
+<span class="nc" id="L57">    }</span>
+
+<span class="fc" id="L59">    public LedgerEntryPage(int pageSize, int entriesPerPage, LEPStateChangeCallback callback) {</span>
+<span class="fc" id="L60">        this.pageSize = pageSize;</span>
+<span class="fc" id="L61">        this.entriesPerPage = entriesPerPage;</span>
+<span class="fc" id="L62">        page = ByteBuffer.allocateDirect(pageSize);</span>
+<span class="fc" id="L63">        this.callback = callback;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (null != this.callback) {</span>
+<span class="fc" id="L65">            callback.onResetInUse(this);</span>
+        }
+<span class="fc" id="L67">    }</span>
+
+    // Except for not allocating a new direct byte buffer; this should do everything that
+    // the constructor does
+    public void resetPage() {
+<span class="nc" id="L72">        page.clear();</span>
+<span class="nc" id="L73">        ZeroBuffer.put(page);</span>
+<span class="nc" id="L74">        last = -1;</span>
+<span class="nc" id="L75">        entryKey = new EntryKey(-1, BookieProtocol.INVALID_ENTRY_ID);</span>
+<span class="nc" id="L76">        clean = true;</span>
+<span class="nc" id="L77">        useCount.set(0);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (null != this.callback) {</span>
+<span class="nc" id="L79">            callback.onResetInUse(this);</span>
+        }
+<span class="nc" id="L81">    }</span>
+
+
+    @Override
+    public String toString() {
+<span class="nc" id="L86">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L87">        sb.append(getLedger());</span>
+<span class="nc" id="L88">        sb.append('@');</span>
+<span class="nc" id="L89">        sb.append(getFirstEntry());</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        sb.append(clean ? &quot; clean &quot; : &quot; dirty &quot;);</span>
+<span class="nc" id="L91">        sb.append(useCount.get());</span>
+<span class="nc" id="L92">        return sb.toString();</span>
+    }
+
+    public void usePage() {
+<span class="fc" id="L96">        int oldVal = useCount.getAndIncrement();</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if ((0 == oldVal) &amp;&amp; (null != callback)) {</span>
+<span class="fc" id="L98">            callback.onSetInUse(this);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    public void releasePageNoCallback() {
+<span class="nc" id="L103">        releasePageInternal(false);</span>
+<span class="nc" id="L104">    }</span>
+
+    public void releasePage() {
+<span class="fc" id="L107">        releasePageInternal(true);</span>
+<span class="fc" id="L108">    }</span>
+
+    private void releasePageInternal(boolean shouldCallback) {
+<span class="fc" id="L111">        int newUseCount = useCount.decrementAndGet();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (newUseCount &lt; 0) {</span>
+<span class="nc" id="L113">            throw new IllegalStateException(&quot;Use count has gone below 0&quot;);</span>
+        }
+<span class="pc bpc" id="L115" title="3 of 6 branches missed.">        if (shouldCallback &amp;&amp; (null != callback) &amp;&amp; (newUseCount == 0)) {</span>
+<span class="fc" id="L116">            callback.onResetInUse(this);</span>
+        }
+<span class="fc" id="L118">    }</span>
+
+    private void checkPage() {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (useCount.get() &lt;= 0) {</span>
+<span class="nc" id="L122">            throw new IllegalStateException(&quot;Page not marked in use&quot;);</span>
+        }
+<span class="fc" id="L124">    }</span>
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (other instanceof LedgerEntryPage) {</span>
+<span class="nc" id="L129">            LedgerEntryPage otherLEP = (LedgerEntryPage) other;</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">            return otherLEP.getLedger() == getLedger() &amp;&amp; otherLEP.getFirstEntry() == getFirstEntry();</span>
+        } else {
+<span class="nc" id="L132">            return false;</span>
+        }
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L138">        return (int) getLedger() ^ (int) (getFirstEntry());</span>
+    }
+
+    void setClean(int versionOfCleaning) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        this.clean = (versionOfCleaning == version.get());</span>
+
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if ((null != callback) &amp;&amp; clean) {</span>
+<span class="fc" id="L145">            callback.onSetClean(this);</span>
+        }
+<span class="fc" id="L147">    }</span>
+
+    boolean isClean() {
+<span class="fc" id="L150">        return clean;</span>
+    }
+
+    public void setOffset(long offset, int position) {
+<span class="fc" id="L154">        checkPage();</span>
+<span class="fc" id="L155">        page.putLong(position, offset);</span>
+<span class="fc" id="L156">        version.incrementAndGet();</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (last &lt; position / getIndexEntrySize()) {</span>
+<span class="fc" id="L158">            last = position / getIndexEntrySize();</span>
+        }
+<span class="fc" id="L160">        this.clean = false;</span>
+
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (null != callback) {</span>
+<span class="fc" id="L163">            callback.onSetDirty(this);</span>
+        }
+<span class="fc" id="L165">    }</span>
+
+    public long getOffset(int position) {
+<span class="fc" id="L168">        checkPage();</span>
+<span class="fc" id="L169">        return page.getLong(position);</span>
+    }
+
+    public void zeroPage() {
+<span class="fc" id="L173">        checkPage();</span>
+<span class="fc" id="L174">        page.clear();</span>
+<span class="fc" id="L175">        ZeroBuffer.put(page);</span>
+<span class="fc" id="L176">        last = -1;</span>
+<span class="fc" id="L177">        clean = true;</span>
+<span class="fc" id="L178">    }</span>
+
+    public void readPage(FileInfo fi) throws IOException {
+<span class="nc" id="L181">        checkPage();</span>
+<span class="nc" id="L182">        page.clear();</span>
+        try {
+<span class="nc" id="L184">            fi.read(page, getFirstEntryPosition(), true);</span>
+<span class="nc" id="L185">        } catch (ShortReadException sre) {</span>
+<span class="nc" id="L186">            throw new ShortReadException(&quot;Short page read of ledger &quot; + getLedger()</span>
+<span class="nc" id="L187">                    + &quot; tried to get &quot; + page.capacity() + &quot; from position &quot;</span>
+<span class="nc" id="L188">                    + getFirstEntryPosition() + &quot; still need &quot; + page.remaining(), sre);</span>
+<span class="nc" id="L189">        } catch (IllegalArgumentException iae) {</span>
+<span class="nc" id="L190">            LOG.error(&quot;IllegalArgumentException when trying to read ledger {} from position {}&quot;</span>
+<span class="nc" id="L191">                , new Object[]{getLedger(), getFirstEntryPosition(), iae});</span>
+<span class="nc" id="L192">            throw iae;</span>
+<span class="nc" id="L193">        }</span>
+        // make sure we don't include partial index entry
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (page.remaining() != 0) {</span>
+<span class="nc" id="L196">            LOG.info(&quot;Short page read of ledger {} : tried to read {} bytes from position {}, but only {} bytes read.&quot;,</span>
+<span class="nc" id="L197">                     new Object[] { getLedger(), page.capacity(), getFirstEntryPosition(), page.position() });</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (page.position() % indexEntrySize != 0) {</span>
+<span class="nc" id="L199">                int partialIndexEntryStart = page.position() - page.position() % indexEntrySize;</span>
+<span class="nc" id="L200">                page.putLong(partialIndexEntryStart, 0L);</span>
+            }
+        }
+<span class="nc" id="L203">        last = getLastEntryIndex();</span>
+<span class="nc" id="L204">        clean = true;</span>
+<span class="nc" id="L205">    }</span>
+
+    public ByteBuffer getPageToWrite() {
+<span class="fc" id="L208">        checkPage();</span>
+<span class="fc" id="L209">        page.clear();</span>
+<span class="fc" id="L210">        return page;</span>
+    }
+
+    long getLedger() {
+<span class="fc" id="L214">        return entryKey.getLedgerId();</span>
+    }
+
+    int getVersion() {
+<span class="fc" id="L218">        return version.get();</span>
+    }
+
+    public EntryKey getEntryKey() {
+<span class="fc" id="L222">        return entryKey;</span>
+    }
+
+    void setLedgerAndFirstEntry(long ledgerId, long firstEntry) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (firstEntry % entriesPerPage != 0) {</span>
+<span class="nc" id="L227">            throw new IllegalArgumentException(firstEntry + &quot; is not a multiple of &quot; + entriesPerPage);</span>
+        }
+<span class="fc" id="L229">        this.entryKey = new EntryKey(ledgerId, firstEntry);</span>
+<span class="fc" id="L230">    }</span>
+    long getFirstEntry() {
+<span class="fc" id="L232">        return entryKey.getEntryId();</span>
+    }
+
+    long getMaxPossibleEntry() {
+<span class="nc" id="L236">        return entryKey.getEntryId() + entriesPerPage;</span>
+    }
+
+    long getFirstEntryPosition() {
+<span class="fc" id="L240">        return entryKey.getEntryId() * indexEntrySize;</span>
+    }
+
+    public boolean inUse() {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        return useCount.get() &gt; 0;</span>
+    }
+
+    private int getLastEntryIndex() {
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        for (int i = entriesPerPage - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            if (getOffset(i * getIndexEntrySize()) &gt; 0) {</span>
+<span class="nc" id="L250">                return i;</span>
+            }
+        }
+<span class="nc" id="L253">        return -1;</span>
+    }
+
+    public long getLastEntry() {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (last &gt;= 0) {</span>
+<span class="nc" id="L258">            return last + entryKey.getEntryId();</span>
+        } else {
+<span class="nc" id="L260">            int index = getLastEntryIndex();</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            return index &gt;= 0 ? (index + entryKey.getEntryId()) : 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

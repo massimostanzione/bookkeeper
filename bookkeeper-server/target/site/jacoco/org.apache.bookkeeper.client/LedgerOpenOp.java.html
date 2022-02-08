@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LedgerOpenOp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.client</a> &gt; <span class="el_source">LedgerOpenOp.java</span></div><h1>LedgerOpenOp.java</h1><pre class="source lang-java linenums">/*
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+
+package org.apache.bookkeeper.client;
+
+import static org.apache.bookkeeper.client.BookKeeper.DigestType.fromApiDigestType;
+
+import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.security.GeneralSecurityException;
+import org.apache.bookkeeper.client.AsyncCallback.OpenCallback;
+import org.apache.bookkeeper.client.AsyncCallback.ReadLastConfirmedCallback;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.client.SyncCallbackUtils.SyncOpenCallback;
+import org.apache.bookkeeper.client.api.OpenBuilder;
+import org.apache.bookkeeper.client.api.ReadHandle;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.util.MathUtils;
+import org.apache.bookkeeper.util.OrderedSafeExecutor.OrderedSafeGenericCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Encapsulates the ledger open operation
+ *
+ */
+class LedgerOpenOp implements GenericCallback&lt;LedgerMetadata&gt; {
+<span class="nc" id="L49">    static final Logger LOG = LoggerFactory.getLogger(LedgerOpenOp.class);</span>
+
+    final BookKeeper bk;
+    final long ledgerId;
+    final OpenCallback cb;
+    final Object ctx;
+    LedgerHandle lh;
+    final byte[] passwd;
+<span class="nc" id="L57">    boolean doRecovery = true;</span>
+<span class="nc" id="L58">    boolean administrativeOpen = false;</span>
+    long startTime;
+    final OpStatsLogger openOpLogger;
+    
+    final DigestType suggestedDigestType;
+    final boolean enableDigestAutodetection;
+
+    /**
+     * Constructor.
+     *
+     * @param bk
+     * @param ledgerId
+     * @param digestType. Ignored if conf.getEnableDigestTypeAutodetection() is true
+     * @param passwd
+     * @param cb
+     * @param ctx
+     */
+    public LedgerOpenOp(BookKeeper bk, long ledgerId, DigestType digestType, byte[] passwd,
+<span class="nc" id="L76">                        OpenCallback cb, Object ctx) {</span>
+<span class="nc" id="L77">        this.bk = bk;</span>
+<span class="nc" id="L78">        this.ledgerId = ledgerId;</span>
+<span class="nc" id="L79">        this.passwd = passwd;</span>
+<span class="nc" id="L80">        this.cb = cb;</span>
+<span class="nc" id="L81">        this.ctx = ctx;</span>
+<span class="nc" id="L82">        this.enableDigestAutodetection = bk.getConf().getEnableDigestTypeAutodetection();</span>
+<span class="nc" id="L83">        this.suggestedDigestType = digestType;</span>
+<span class="nc" id="L84">        this.openOpLogger = bk.getOpenOpLogger();</span>
+<span class="nc" id="L85">    }</span>
+
+<span class="nc" id="L87">    public LedgerOpenOp(BookKeeper bk, long ledgerId, OpenCallback cb, Object ctx) {</span>
+<span class="nc" id="L88">        this.bk = bk;</span>
+<span class="nc" id="L89">        this.ledgerId = ledgerId;</span>
+<span class="nc" id="L90">        this.cb = cb;</span>
+<span class="nc" id="L91">        this.ctx = ctx;</span>
+
+<span class="nc" id="L93">        this.passwd = bk.getConf().getBookieRecoveryPasswd();</span>
+<span class="nc" id="L94">        this.administrativeOpen = true;</span>
+<span class="nc" id="L95">        this.enableDigestAutodetection = false;</span>
+<span class="nc" id="L96">        this.suggestedDigestType = bk.conf.getBookieRecoveryDigestType();</span>
+<span class="nc" id="L97">        this.openOpLogger = bk.getOpenOpLogger();</span>
+<span class="nc" id="L98">    }</span>
+
+    /**
+     * Inititates the ledger open operation
+     */
+    public void initiate() {
+<span class="nc" id="L104">        startTime = MathUtils.nowInNano();</span>
+
+        /**
+         * Asynchronously read the ledger metadata node.
+         */
+<span class="nc" id="L109">        bk.getLedgerManager().readLedgerMetadata(ledgerId, this);</span>
+<span class="nc" id="L110">    }</span>
+
+    /**
+     * Inititates the ledger open operation without recovery
+     */
+    public void initiateWithoutRecovery() {
+<span class="nc" id="L116">        this.doRecovery = false;</span>
+<span class="nc" id="L117">        initiate();</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Implements Open Ledger Callback.
+     */
+    @Override
+    public void operationComplete(int rc, LedgerMetadata metadata) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (BKException.Code.OK != rc) {</span>
+            // open ledger failed.
+<span class="nc" id="L127">            openComplete(rc, null);</span>
+<span class="nc" id="L128">            return;</span>
+        }
+
+        final byte[] passwd;
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        DigestType digestType = enableDigestAutodetection </span>
+<span class="nc" id="L133">                                    ? fromApiDigestType(metadata.getDigestType())</span>
+                                    : suggestedDigestType;
+										
+        /* For an administrative open, the default passwords
+         * are read from the configuration, but if the metadata
+         * already contains passwords, use these instead. */
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        if (administrativeOpen &amp;&amp; metadata.hasPassword()) {</span>
+<span class="nc" id="L140">            passwd = metadata.getPassword();</span>
+<span class="nc" id="L141">            digestType = fromApiDigestType(metadata.getDigestType());</span>
+        } else {
+<span class="nc" id="L143">            passwd = this.passwd;</span>
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (metadata.hasPassword()) {</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (!Arrays.equals(passwd, metadata.getPassword())) {</span>
+<span class="nc" id="L147">                    LOG.error(&quot;Provided passwd does not match that in metadata&quot;);</span>
+<span class="nc" id="L148">                    openComplete(BKException.Code.UnauthorizedAccessException, null);</span>
+<span class="nc" id="L149">                    return;</span>
+                }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (digestType != fromApiDigestType(metadata.getDigestType())) {</span>
+<span class="nc" id="L152">                    LOG.error(&quot;Provided digest does not match that in metadata&quot;);</span>
+<span class="nc" id="L153">                    openComplete(BKException.Code.DigestMatchException, null);</span>
+<span class="nc" id="L154">                    return;</span>
+                }
+            }
+        }
+
+        // get the ledger metadata back
+        try {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            lh = new ReadOnlyLedgerHandle(bk, ledgerId, metadata, digestType, passwd, !doRecovery);</span>
+<span class="nc" id="L162">        } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L163">            LOG.error(&quot;Security exception while opening ledger: &quot; + ledgerId, e);</span>
+<span class="nc" id="L164">            openComplete(BKException.Code.DigestNotInitializedException, null);</span>
+<span class="nc" id="L165">            return;</span>
+<span class="nc" id="L166">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L167">            LOG.error(&quot;Incorrectly entered parameter throttle: &quot; + bk.getConf().getThrottleValue(), e);</span>
+<span class="nc" id="L168">            openComplete(BKException.Code.IncorrectParameterException, null);</span>
+<span class="nc" id="L169">            return;</span>
+<span class="nc" id="L170">        }</span>
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (metadata.isClosed()) {</span>
+            // Ledger was closed properly
+<span class="nc" id="L174">            openComplete(BKException.Code.OK, lh);</span>
+<span class="nc" id="L175">            return;</span>
+        }
+
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (doRecovery) {</span>
+<span class="nc" id="L179">            lh.recover(new OrderedSafeGenericCallback&lt;Void&gt;(bk.getMainWorkerPool(), ledgerId) {</span>
+                @Override
+                public void safeOperationComplete(int rc, Void result) {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                    if (rc == BKException.Code.OK) {</span>
+<span class="nc" id="L183">                        openComplete(BKException.Code.OK, lh);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                    } else if (rc == BKException.Code.UnauthorizedAccessException) {</span>
+<span class="nc" id="L185">                        openComplete(BKException.Code.UnauthorizedAccessException, null);</span>
+                    } else {
+<span class="nc" id="L187">                        openComplete(bk.getReturnRc(BKException.Code.LedgerRecoveryException), null);</span>
+                    }
+<span class="nc" id="L189">                }</span>
+                @Override
+                public String toString() {
+<span class="nc" id="L192">                    return String.format(&quot;Recover(%d)&quot;, ledgerId);</span>
+                }
+            });
+        } else {
+<span class="nc" id="L196">            lh.asyncReadLastConfirmed(new ReadLastConfirmedCallback() {</span>
+                @Override
+                public void readLastConfirmedComplete(int rc,
+                        long lastConfirmed, Object ctx) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                    if (rc != BKException.Code.OK) {</span>
+<span class="nc" id="L201">                        openComplete(bk.getReturnRc(BKException.Code.ReadException), null);</span>
+                    } else {
+<span class="nc" id="L203">                        lh.lastAddConfirmed = lh.lastAddPushed = lastConfirmed;</span>
+<span class="nc" id="L204">                        openComplete(BKException.Code.OK, lh);</span>
+                    }
+<span class="nc" id="L206">                }</span>
+            }, null);
+
+        }
+<span class="nc" id="L210">    }</span>
+
+    void openComplete(int rc, LedgerHandle lh) {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (BKException.Code.OK != rc) {</span>
+<span class="nc" id="L214">            openOpLogger.registerFailedEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);</span>
+        } else {
+<span class="nc" id="L216">            openOpLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(startTime), TimeUnit.NANOSECONDS);</span>
+        }
+<span class="nc" id="L218">        cb.openComplete(rc, lh, ctx);</span>
+<span class="nc" id="L219">    }</span>
+
+    static final class OpenBuilderImpl implements OpenBuilder {
+
+<span class="nc" id="L223">        private boolean builderRecovery = false;</span>
+        private Long builderLedgerId;
+        private byte[] builderPassword;
+<span class="nc" id="L226">        private org.apache.bookkeeper.client.api.DigestType builderDigestType</span>
+                = org.apache.bookkeeper.client.api.DigestType.CRC32;
+        private final BookKeeper bk;
+
+<span class="nc" id="L230">        OpenBuilderImpl(BookKeeper bookkeeper) {</span>
+<span class="nc" id="L231">            this.bk = bookkeeper;</span>
+<span class="nc" id="L232">        }</span>
+
+        @Override
+        public OpenBuilder withLedgerId(long ledgerId) {
+<span class="nc" id="L236">            this.builderLedgerId = ledgerId;</span>
+<span class="nc" id="L237">            return this;</span>
+        }
+
+        @Override
+        public OpenBuilder withRecovery(boolean recovery) {
+<span class="nc" id="L242">            this.builderRecovery = recovery;</span>
+<span class="nc" id="L243">            return this;</span>
+        }
+
+        @Override
+        public OpenBuilder withPassword(byte[] password) {
+<span class="nc" id="L248">            this.builderPassword = password;</span>
+<span class="nc" id="L249">            return this;</span>
+        }
+
+        @Override
+        public OpenBuilder withDigestType(org.apache.bookkeeper.client.api.DigestType digestType) {
+<span class="nc" id="L254">            this.builderDigestType = digestType;</span>
+<span class="nc" id="L255">            return this;</span>
+        }
+
+        @Override
+        public CompletableFuture&lt;ReadHandle&gt; execute() {
+<span class="nc" id="L260">            CompletableFuture&lt;ReadHandle&gt; future = new CompletableFuture&lt;&gt;();</span>
+<span class="nc" id="L261">            SyncOpenCallback callback = new SyncOpenCallback(future);</span>
+<span class="nc" id="L262">            open(callback);</span>
+<span class="nc" id="L263">            return future;</span>
+        }
+
+        private boolean validate() {
+<span class="nc bnc" id="L267" title="All 4 branches missed.">            if (builderLedgerId == null || builderLedgerId &lt; 0) {</span>
+<span class="nc" id="L268">                LOG.error(&quot;invalid ledgerId {} &lt; 0&quot;, builderLedgerId);</span>
+<span class="nc" id="L269">                return false;</span>
+            }
+<span class="nc" id="L271">            return true;</span>
+        }
+
+        private void open(OpenCallback cb) {
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            if (!validate()) {</span>
+<span class="nc" id="L277">                cb.openComplete(BKException.Code.NoSuchLedgerExistsException, null, null);</span>
+<span class="nc" id="L278">                return;</span>
+            }
+
+<span class="nc" id="L281">            LedgerOpenOp op = new LedgerOpenOp(bk, builderLedgerId, fromApiDigestType(builderDigestType),</span>
+                builderPassword, cb, null);
+<span class="nc" id="L283">            ReentrantReadWriteLock closeLock = bk.getCloseLock();</span>
+<span class="nc" id="L284">            closeLock.readLock().lock();</span>
+            try {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                if (bk.isClosed()) {</span>
+<span class="nc" id="L287">                    cb.openComplete(BKException.Code.ClientClosedException, null, null);</span>
+<span class="nc" id="L288">                    return;</span>
+                }
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                if (builderRecovery) {</span>
+<span class="nc" id="L291">                    op.initiate();</span>
+                } else {
+<span class="nc" id="L293">                    op.initiateWithoutRecovery();</span>
+                }
+            } finally {
+<span class="nc" id="L296">                closeLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L298">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

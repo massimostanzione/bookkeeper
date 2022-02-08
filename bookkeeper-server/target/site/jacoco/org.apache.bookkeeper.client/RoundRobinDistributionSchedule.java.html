@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RoundRobinDistributionSchedule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.client</a> &gt; <span class="el_source">RoundRobinDistributionSchedule.java</span></div><h1>RoundRobinDistributionSchedule.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.bookkeeper.client;
+
+import com.google.common.collect.ImmutableMap;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.util.BitSet;
+import java.util.Map;
+import java.util.Arrays;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
+
+import io.netty.util.Recycler;
+import io.netty.util.Recycler.Handle;
+
+
+/**
+ * A specific {@link DistributionSchedule} that places entries in round-robin
+ * fashion. For ensemble size 3, and quorum size 2, Entry 0 goes to bookie 0 and
+ * 1, entry 1 goes to bookie 1 and 2, and entry 2 goes to bookie 2 and 0, and so
+ * on.
+ *
+ */
+class RoundRobinDistributionSchedule implements DistributionSchedule {
+    private final int writeQuorumSize;
+    private final int ackQuorumSize;
+    private final int ensembleSize;
+
+<span class="fc" id="L47">    public RoundRobinDistributionSchedule(int writeQuorumSize, int ackQuorumSize, int ensembleSize) {</span>
+<span class="fc" id="L48">        this.writeQuorumSize = writeQuorumSize;</span>
+<span class="fc" id="L49">        this.ackQuorumSize = ackQuorumSize;</span>
+<span class="fc" id="L50">        this.ensembleSize = ensembleSize;</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    public WriteSet getWriteSet(long entryId) {
+<span class="fc" id="L55">        return WriteSetImpl.create(ensembleSize, writeQuorumSize, entryId);</span>
+    }
+
+    @VisibleForTesting
+    static WriteSet writeSetFromValues(Integer... values) {
+<span class="nc" id="L60">        WriteSetImpl writeSet = WriteSetImpl.create(0, 0, 0);</span>
+<span class="nc" id="L61">        writeSet.setSize(values.length);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        for (int i = 0; i &lt; values.length; i++) {</span>
+<span class="nc" id="L63">            writeSet.set(i, values[i]);</span>
+        }
+<span class="nc" id="L65">        return writeSet;</span>
+    }
+
+    private static class WriteSetImpl implements WriteSet {
+<span class="fc" id="L69">        int[] array = null;</span>
+        int size;
+
+        private final Handle&lt;WriteSetImpl&gt; recyclerHandle;
+<span class="fc" id="L73">        private static final Recycler&lt;WriteSetImpl&gt; RECYCLER</span>
+<span class="fc" id="L74">            = new Recycler&lt;WriteSetImpl&gt;() {</span>
+                    protected WriteSetImpl newObject(
+                            Recycler.Handle&lt;WriteSetImpl&gt; handle) {
+<span class="fc" id="L77">                        return new WriteSetImpl(handle);</span>
+                    }
+                };
+
+<span class="fc" id="L81">        private WriteSetImpl(Handle&lt;WriteSetImpl&gt; recyclerHandle) {</span>
+<span class="fc" id="L82">            this.recyclerHandle = recyclerHandle;</span>
+<span class="fc" id="L83">        }</span>
+
+        static WriteSetImpl create(int ensembleSize,
+                                   int writeQuorumSize,
+                                   long entryId) {
+<span class="fc" id="L88">            WriteSetImpl writeSet = RECYCLER.get();</span>
+<span class="fc" id="L89">            writeSet.reset(ensembleSize, writeQuorumSize, entryId);</span>
+<span class="fc" id="L90">            return writeSet;</span>
+        }
+
+        private void reset(int ensembleSize, int writeQuorumSize,
+                           long entryId) {
+<span class="fc" id="L95">            setSize(writeQuorumSize);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (int w = 0; w &lt; writeQuorumSize; w++) {</span>
+<span class="fc" id="L97">                set(w, (int)((entryId + w) % ensembleSize));</span>
+            }
+<span class="fc" id="L99">        }</span>
+
+        private void setSize(int newSize) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (array == null) {</span>
+<span class="fc" id="L103">                array = new int[newSize];</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            } else if (newSize &gt; array.length) {</span>
+<span class="nc" id="L105">                int[] newArray = new int[newSize];</span>
+<span class="nc" id="L106">                System.arraycopy(array, 0,</span>
+                                 newArray, 0, array.length);
+<span class="nc" id="L108">                array = newArray;</span>
+            }
+<span class="fc" id="L110">            size = newSize;</span>
+<span class="fc" id="L111">        }</span>
+
+        @Override
+<span class="fc" id="L114">        public int size() { return size; }</span>
+
+        @Override
+        public boolean contains(int i) {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            return indexOf(i) != -1;</span>
+        }
+
+        @Override
+        public int get(int i) {
+<span class="fc" id="L123">            checkBounds(i);</span>
+<span class="fc" id="L124">            return array[i];</span>
+        }
+
+        @Override
+        public int set(int i, int index) {
+<span class="fc" id="L129">            checkBounds(i);</span>
+<span class="fc" id="L130">            int oldVal = array[i];</span>
+<span class="fc" id="L131">            array[i] = index;</span>
+<span class="fc" id="L132">            return oldVal;</span>
+        }
+
+        @Override
+        public void sort() {
+<span class="nc" id="L137">            Arrays.sort(array, 0, size);</span>
+<span class="nc" id="L138">        }</span>
+
+        @Override
+        public int indexOf(int index) {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            for (int j = 0; j &lt; size; j++) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (array[j] == index) {</span>
+<span class="nc" id="L144">                    return j;</span>
+                }
+            }
+<span class="nc" id="L147">            return -1;</span>
+        }
+
+        @Override
+        public void addMissingIndices(int maxIndex) {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (size &lt; maxIndex) {</span>
+<span class="nc" id="L153">                int oldSize = size;</span>
+<span class="nc" id="L154">                setSize(maxIndex);</span>
+<span class="nc" id="L155">                for (int i = 0, j = oldSize;</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                     i &lt; maxIndex &amp;&amp; j &lt; maxIndex; i++) {</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                    if (!contains(i)) {</span>
+<span class="nc" id="L158">                        set(j, i);</span>
+<span class="nc" id="L159">                        j++;</span>
+                    }
+                }
+            }
+<span class="nc" id="L163">        }</span>
+
+        @Override
+        public void moveAndShift(int from, int to) {
+<span class="nc" id="L167">            checkBounds(from);</span>
+<span class="nc" id="L168">            checkBounds(to);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (from &gt; to) {</span>
+<span class="nc" id="L170">                int tmp = array[from];</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                for (int i = from; i &gt; to; i--) {</span>
+<span class="nc" id="L172">                    array[i] = array[i-1];</span>
+                }
+<span class="nc" id="L174">                array[to] = tmp;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            } else if (from &lt; to) {</span>
+<span class="nc" id="L176">                int tmp = array[from];</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                for (int i = from; i &lt; to; i++) {</span>
+<span class="nc" id="L178">                    array[i] = array[i+1];</span>
+                }
+<span class="nc" id="L180">                array[to] = tmp;</span>
+            }
+<span class="nc" id="L182">        }</span>
+
+        @Override
+        public void recycle() {
+<span class="fc" id="L186">            recyclerHandle.recycle(this);</span>
+<span class="fc" id="L187">        }</span>
+
+        @Override
+        public WriteSet copy() {
+<span class="nc" id="L191">            WriteSetImpl copy = RECYCLER.get();</span>
+<span class="nc" id="L192">            copy.setSize(size);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L194">                copy.set(i, array[i]);</span>
+            }
+<span class="nc" id="L196">            return copy;</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L201">            int sum = 0;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L203">                sum += sum * 31 + i;</span>
+            }
+<span class="nc" id="L205">            return sum;</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (other instanceof WriteSetImpl) {</span>
+<span class="nc" id="L211">                WriteSetImpl o = (WriteSetImpl)other;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if (o.size() != size()) {</span>
+<span class="nc" id="L213">                    return false;</span>
+                }
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                for (int i = 0; i &lt; size(); i++) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                    if (o.get(i) != get(i)) {</span>
+<span class="nc" id="L217">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L220">                return true;</span>
+            }
+<span class="nc" id="L222">            return false;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L227">            StringBuilder b = new StringBuilder(&quot;WriteSet[&quot;);</span>
+<span class="nc" id="L228">            int i = 0;</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            for (; i &lt; size() - 1; i++) {</span>
+<span class="nc" id="L230">                b.append(get(i)).append(&quot;,&quot;);</span>
+            }
+<span class="nc" id="L232">            b.append(get(i)).append(&quot;]&quot;);</span>
+<span class="nc" id="L233">            return b.toString();</span>
+        }
+
+        private void checkBounds(int i) {
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">            if (i &lt; 0 || i &gt; size) {</span>
+<span class="nc" id="L238">                throw new IndexOutOfBoundsException(</span>
+                        &quot;Index &quot; + i + &quot; out of bounds, array size = &quot; + size);
+            }
+<span class="fc" id="L241">        }</span>
+    }
+
+    @Override
+    public AckSet getAckSet() {
+<span class="fc" id="L246">        return AckSetImpl.create(ensembleSize, writeQuorumSize, ackQuorumSize);</span>
+    }
+
+    private static class AckSetImpl implements AckSet {
+        private int writeQuorumSize;
+        private int ackQuorumSize;
+<span class="fc" id="L252">        private final BitSet ackSet = new BitSet();</span>
+        // grows on reset()
+<span class="fc" id="L254">        private BookieSocketAddress[] failureMap = new BookieSocketAddress[0];</span>
+
+        private final Handle&lt;AckSetImpl&gt; recyclerHandle;
+<span class="fc" id="L257">        private static final Recycler&lt;AckSetImpl&gt; RECYCLER = new Recycler&lt;AckSetImpl&gt;() {</span>
+            protected AckSetImpl newObject(Recycler.Handle&lt;AckSetImpl&gt; handle) {
+<span class="fc" id="L259">                return new AckSetImpl(handle);</span>
+            }
+        };
+
+<span class="fc" id="L263">        private AckSetImpl(Handle&lt;AckSetImpl&gt; recyclerHandle) {</span>
+<span class="fc" id="L264">            this.recyclerHandle = recyclerHandle;</span>
+<span class="fc" id="L265">        }</span>
+
+        static AckSetImpl create(int ensembleSize,
+                                 int writeQuorumSize,
+                                 int ackQuorumSize) {
+<span class="fc" id="L270">            AckSetImpl ackSet = RECYCLER.get();</span>
+<span class="fc" id="L271">            ackSet.reset(ensembleSize, writeQuorumSize, ackQuorumSize);</span>
+<span class="fc" id="L272">            return ackSet;</span>
+        }
+
+        private void reset(int ensembleSize,
+                           int writeQuorumSize,
+                           int ackQuorumSize) {
+<span class="fc" id="L278">            this.ackQuorumSize = ackQuorumSize;</span>
+<span class="fc" id="L279">            this.writeQuorumSize = writeQuorumSize;</span>
+<span class="fc" id="L280">            ackSet.clear();</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (failureMap.length &lt; ensembleSize) {</span>
+<span class="fc" id="L282">                failureMap = new BookieSocketAddress[ensembleSize];</span>
+            }
+<span class="fc" id="L284">            Arrays.fill(failureMap, null);</span>
+<span class="fc" id="L285">        }</span>
+
+        @Override
+        public boolean completeBookieAndCheck(int bookieIndexHeardFrom) {
+<span class="fc" id="L289">            failureMap[bookieIndexHeardFrom] = null;</span>
+<span class="fc" id="L290">            ackSet.set(bookieIndexHeardFrom);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            return ackSet.cardinality() &gt;= ackQuorumSize;</span>
+        }
+
+        @Override
+        public boolean failBookieAndCheck(int bookieIndexHeardFrom,
+                                          BookieSocketAddress address) {
+<span class="nc" id="L297">            ackSet.clear(bookieIndexHeardFrom);</span>
+<span class="nc" id="L298">            failureMap[bookieIndexHeardFrom] = address;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            return failed() &gt; (writeQuorumSize - ackQuorumSize);</span>
+        }
+
+        @Override
+        public Map&lt;Integer, BookieSocketAddress&gt; getFailedBookies() {
+<span class="nc" id="L304">            ImmutableMap.Builder&lt;Integer, BookieSocketAddress&gt; builder</span>
+                = new ImmutableMap.Builder&lt;&gt;();
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            for (int i = 0; i &lt; failureMap.length; i++) {</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                if (failureMap[i] != null) {</span>
+<span class="nc" id="L308">                    builder.put(i, failureMap[i]);</span>
+                }
+            }
+<span class="nc" id="L311">            return builder.build();</span>
+        }
+
+        @Override
+        public boolean removeBookieAndCheck(int bookie) {
+<span class="nc" id="L316">            ackSet.clear(bookie);</span>
+<span class="nc" id="L317">            failureMap[bookie] = null;</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">            return ackSet.cardinality() &gt;= ackQuorumSize;</span>
+        }
+
+        @Override
+        public void recycle() {
+<span class="fc" id="L323">            recyclerHandle.recycle(this);</span>
+<span class="fc" id="L324">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L328">            return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L329">                .add(&quot;ackQuorumSize&quot;, ackQuorumSize)</span>
+<span class="nc" id="L330">                .add(&quot;ackSet&quot;, ackSet)</span>
+<span class="nc" id="L331">                .add(&quot;failureMap&quot;, failureMap).toString();</span>
+        }
+
+        private int failed() {
+<span class="nc" id="L335">            int count = 0;</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">            for (int i = 0; i &lt; failureMap.length; i++) {</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                if (failureMap[i] != null) {</span>
+<span class="nc" id="L338">                    count++;</span>
+                }
+            }
+<span class="nc" id="L341">            return count;</span>
+        }
+    }
+
+    private class RRQuorumCoverageSet implements QuorumCoverageSet {
+<span class="nc" id="L346">        private final int[] covered = new int[ensembleSize];</span>
+
+<span class="nc" id="L348">        private RRQuorumCoverageSet() {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            for (int i = 0; i &lt; covered.length; i++) {</span>
+<span class="nc" id="L350">                covered[i] = BKException.Code.UNINITIALIZED;</span>
+            }
+<span class="nc" id="L352">        }</span>
+
+        @Override
+        public synchronized void addBookie(int bookieIndexHeardFrom, int rc) {
+<span class="nc" id="L356">            covered[bookieIndexHeardFrom] = rc;</span>
+<span class="nc" id="L357">        }</span>
+
+        @Override
+        public synchronized boolean checkCovered() {
+            // now check if there are any write quorums, with |ackQuorum| nodes available
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            for (int i = 0; i &lt; ensembleSize; i++) {</span>
+<span class="nc" id="L363">                int nodesNotCovered = 0;</span>
+<span class="nc" id="L364">                int nodesOkay = 0;</span>
+<span class="nc" id="L365">                int nodesUninitialized = 0;</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">                for (int j = 0; j &lt; writeQuorumSize; j++) {</span>
+<span class="nc" id="L367">                    int nodeIndex = (i + j) % ensembleSize;</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                    if (covered[nodeIndex] == BKException.Code.OK) {</span>
+<span class="nc" id="L369">                        nodesOkay++;</span>
+<span class="nc bnc" id="L370" title="All 4 branches missed.">                    } else if (covered[nodeIndex] != BKException.Code.NoSuchEntryException &amp;&amp;</span>
+                            covered[nodeIndex] != BKException.Code.NoSuchLedgerExistsException) {
+<span class="nc" id="L372">                        nodesNotCovered++;</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                    } else if (covered[nodeIndex] == BKException.Code.UNINITIALIZED) {</span>
+<span class="nc" id="L374">                        nodesUninitialized++;</span>
+                    }
+                }
+                // if we haven't seen any OK responses and there are still nodes not heard from,
+                // let's wait until
+<span class="nc bnc" id="L379" title="All 6 branches missed.">                if (nodesNotCovered &gt;= ackQuorumSize ||</span>
+                        (nodesOkay == 0 &amp;&amp; nodesUninitialized &gt; 0)) {
+<span class="nc" id="L381">                    return false;</span>
+                }
+            }
+<span class="nc" id="L384">            return true;</span>
+        }
+    }
+
+    @Override
+    public QuorumCoverageSet getCoverageSet() {
+<span class="nc" id="L390">        return new RRQuorumCoverageSet();</span>
+    }
+
+    @Override
+    public boolean hasEntry(long entryId, int bookieIndex) {
+<span class="nc" id="L395">        WriteSet w = getWriteSet(entryId);</span>
+        try {
+<span class="nc" id="L397">            return w.contains(bookieIndex);</span>
+        } finally {
+<span class="nc" id="L399">            w.recycle();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

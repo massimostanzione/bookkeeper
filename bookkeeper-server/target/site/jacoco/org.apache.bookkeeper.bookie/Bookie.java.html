@@ -1,0 +1,1584 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Bookie.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.bookie</a> &gt; <span class="el_source">Bookie.java</span></div><h1>Bookie.java</h1><pre class="source lang-java linenums">/**
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+
+package org.apache.bookkeeper.bookie;
+
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_ADD_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_ADD_ENTRY_BYTES;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_READ_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_READ_ENTRY_BYTES;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_RECOVERY_ADD_ENTRY;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.JOURNAL_SCOPE;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.LD_INDEX_SCOPE;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.LD_LEDGER_SCOPE;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.READ_BYTES;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.SERVER_STATUS;
+import static org.apache.bookkeeper.bookie.BookKeeperServerStats.WRITE_BYTES;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import org.apache.bookkeeper.bookie.BookieException.BookieIllegalOpException;
+import org.apache.bookkeeper.bookie.BookieException.CookieNotFoundException;
+import org.apache.bookkeeper.bookie.BookieException.DiskPartitionDuplicationException;
+import org.apache.bookkeeper.bookie.BookieException.InvalidCookieException;
+import org.apache.bookkeeper.bookie.BookieException.MetadataStoreException;
+import org.apache.bookkeeper.bookie.BookieException.UnknownBookieIdException;
+import org.apache.bookkeeper.bookie.Journal.JournalScanner;
+import org.apache.bookkeeper.bookie.LedgerDirsManager.LedgerDirsListener;
+import org.apache.bookkeeper.bookie.LedgerDirsManager.NoWritableLedgerDirException;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.discover.RegistrationManager;
+import org.apache.bookkeeper.discover.ZKRegistrationManager;
+import org.apache.bookkeeper.meta.LedgerManager;
+import org.apache.bookkeeper.meta.LedgerManagerFactory;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.net.DNS;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
+import org.apache.bookkeeper.stats.Counter;
+import org.apache.bookkeeper.stats.Gauge;
+import org.apache.bookkeeper.stats.NullStatsLogger;
+import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.util.BookKeeperConstants;
+import org.apache.bookkeeper.util.DiskChecker;
+import org.apache.bookkeeper.util.IOUtils;
+import org.apache.bookkeeper.util.MathUtils;
+import org.apache.bookkeeper.util.ReflectionUtils;
+import org.apache.bookkeeper.util.collections.ConcurrentLongHashMap;
+import org.apache.bookkeeper.versioning.Version;
+import org.apache.bookkeeper.versioning.Versioned;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Implements a bookie.
+ */
+public class Bookie extends BookieCriticalThread {
+
+<span class="fc" id="L111">    private static final Logger LOG = LoggerFactory.getLogger(Bookie.class);</span>
+
+    final List&lt;File&gt; journalDirectories;
+    final ServerConfiguration conf;
+
+    final SyncThread syncThread;
+    final LedgerManagerFactory ledgerManagerFactory;
+    final LedgerManager ledgerManager;
+    final LedgerStorage ledgerStorage;
+    final List&lt;Journal&gt; journals;
+
+    final HandleFactory handles;
+
+    static final long METAENTRY_ID_LEDGER_KEY = -0x1000;
+    static final long METAENTRY_ID_FENCE_KEY  = -0x2000;
+
+    private final LedgerDirsManager ledgerDirsManager;
+    private LedgerDirsManager indexDirsManager;
+
+    LedgerDirsMonitor ledgerMonitor;
+    LedgerDirsMonitor idxMonitor;
+
+    // Registration Manager for managing registration
+    RegistrationManager registrationManager;
+
+    // Running flag
+<span class="fc" id="L137">    private volatile boolean running = false;</span>
+    // Flag identify whether it is in shutting down progress
+<span class="fc" id="L139">    private volatile boolean shuttingdown = false;</span>
+    // Bookie status
+<span class="fc" id="L141">    private final BookieStatus bookieStatus = new BookieStatus();</span>
+
+<span class="fc" id="L143">    private int exitCode = ExitCode.OK;</span>
+
+<span class="fc" id="L145">    private final ConcurrentLongHashMap&lt;byte[]&gt; masterKeyCache = new ConcurrentLongHashMap&lt;&gt;();</span>
+
+    protected final String bookieId;
+
+<span class="fc" id="L149">    private final AtomicBoolean rmRegistered = new AtomicBoolean(false);</span>
+<span class="fc" id="L150">    protected final AtomicBoolean forceReadOnly = new AtomicBoolean(false);</span>
+    // executor to manage the state changes for a bookie.
+<span class="fc" id="L152">    final ExecutorService stateService = Executors.newSingleThreadExecutor(</span>
+<span class="fc" id="L153">            new ThreadFactoryBuilder().setNameFormat(&quot;BookieStateService-%d&quot;).build());</span>
+
+    // Expose Stats
+    private final StatsLogger statsLogger;
+    private final Counter writeBytes;
+    private final Counter readBytes;
+    // Bookie Operation Latency Stats
+    private final OpStatsLogger addEntryStats;
+    private final OpStatsLogger recoveryAddEntryStats;
+    private final OpStatsLogger readEntryStats;
+    // Bookie Operation Bytes Stats
+    private final OpStatsLogger addBytesStats;
+    private final OpStatsLogger readBytesStats;
+
+    /**
+     * Exception is thrown when no such a ledger is found in this bookie.
+     */
+    public static class NoLedgerException extends IOException {
+        private static final long serialVersionUID = 1L;
+        private final long ledgerId;
+        public NoLedgerException(long ledgerId) {
+<span class="nc" id="L174">            super(&quot;Ledger &quot; + ledgerId + &quot; not found&quot;);</span>
+<span class="nc" id="L175">            this.ledgerId = ledgerId;</span>
+<span class="nc" id="L176">        }</span>
+        public long getLedgerId() {
+<span class="nc" id="L178">            return ledgerId;</span>
+        }
+    }
+
+    /**
+     * Exception is thrown when no such an entry is found in this bookie.
+     */
+    public static class NoEntryException extends IOException {
+        private static final long serialVersionUID = 1L;
+        private final long ledgerId;
+        private final long entryId;
+        public NoEntryException(long ledgerId, long entryId) {
+<span class="fc" id="L190">            this(&quot;Entry &quot; + entryId + &quot; not found in &quot; + ledgerId, ledgerId, entryId);</span>
+<span class="fc" id="L191">        }</span>
+
+        public NoEntryException(String msg, long ledgerId, long entryId) {
+<span class="fc" id="L194">            super(msg);</span>
+<span class="fc" id="L195">            this.ledgerId = ledgerId;</span>
+<span class="fc" id="L196">            this.entryId = entryId;</span>
+<span class="fc" id="L197">        }</span>
+
+        public long getLedger() {
+<span class="nc" id="L200">            return ledgerId;</span>
+        }
+        public long getEntry() {
+<span class="nc" id="L203">            return entryId;</span>
+        }
+    }
+
+    // Write Callback do nothing
+<span class="fc" id="L208">    static class NopWriteCallback implements WriteCallback {</span>
+        @Override
+        public void writeComplete(int rc, long ledgerId, long entryId,
+                                  BookieSocketAddress addr, Object ctx) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L213">                LOG.debug(&quot;Finished writing entry {} @ ledger {} for {} : {}&quot;,</span>
+<span class="nc" id="L214">                          new Object[] { entryId, ledgerId, addr, rc });</span>
+            }
+<span class="fc" id="L216">        }</span>
+    }
+
+    public static void checkDirectoryStructure(File dir) throws IOException {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (!dir.exists()) {</span>
+<span class="fc" id="L221">            File parent = dir.getParentFile();</span>
+<span class="fc" id="L222">            File preV3versionFile = new File(dir.getParent(),</span>
+                    BookKeeperConstants.VERSION_FILENAME);
+
+<span class="fc" id="L225">            final AtomicBoolean oldDataExists = new AtomicBoolean(false);</span>
+<span class="fc" id="L226">            parent.list(new FilenameFilter() {</span>
+                    @Override
+                    public boolean accept(File dir, String name) {
+<span class="nc bnc" id="L229" title="All 6 branches missed.">                        if (name.endsWith(&quot;.txn&quot;) || name.endsWith(&quot;.idx&quot;) || name.endsWith(&quot;.log&quot;)) {</span>
+<span class="nc" id="L230">                            oldDataExists.set(true);</span>
+                        }
+<span class="nc" id="L232">                        return true;</span>
+                    }
+                });
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">            if (preV3versionFile.exists() || oldDataExists.get()) {</span>
+<span class="nc" id="L236">                String err = &quot;Directory layout version is less than 3, upgrade needed&quot;;</span>
+<span class="nc" id="L237">                LOG.error(err);</span>
+<span class="nc" id="L238">                throw new IOException(err);</span>
+            }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (!dir.mkdirs()) {</span>
+<span class="nc" id="L241">                String err = &quot;Unable to create directory &quot; + dir;</span>
+<span class="nc" id="L242">                LOG.error(err);</span>
+<span class="nc" id="L243">                throw new IOException(err);</span>
+            }
+        }
+<span class="fc" id="L246">    }</span>
+
+    @VisibleForTesting
+    public void setRegistrationManager(RegistrationManager rm) {
+<span class="nc" id="L250">        this.registrationManager = rm;</span>
+<span class="nc" id="L251">    }</span>
+
+    @VisibleForTesting
+    public RegistrationManager getRegistrationManager() {
+<span class="nc" id="L255">        return this.registrationManager;</span>
+    }
+
+    /**
+     * Check that the environment for the bookie is correct.
+     * This means that the configuration has stayed the same as the
+     * first run and the filesystem structure is up to date.
+     */
+    private void checkEnvironment(RegistrationManager rm) throws BookieException, IOException {
+<span class="fc" id="L264">        List&lt;File&gt; allLedgerDirs = new ArrayList&lt;File&gt;(ledgerDirsManager.getAllLedgerDirs().size()</span>
+<span class="fc" id="L265">                                                     + indexDirsManager.getAllLedgerDirs().size());</span>
+<span class="fc" id="L266">        allLedgerDirs.addAll(ledgerDirsManager.getAllLedgerDirs());</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (indexDirsManager != ledgerDirsManager) {</span>
+<span class="nc" id="L268">            allLedgerDirs.addAll(indexDirsManager.getAllLedgerDirs());</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (rm == null) { // exists only for testing, just make sure directories are correct</span>
+
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            for (File journalDirectory : journalDirectories) {</span>
+<span class="nc" id="L273">                checkDirectoryStructure(journalDirectory);</span>
+<span class="nc" id="L274">            }</span>
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            for (File dir : allLedgerDirs) {</span>
+<span class="nc" id="L277">                checkDirectoryStructure(dir);</span>
+<span class="nc" id="L278">            }</span>
+<span class="nc" id="L279">            return;</span>
+        }
+
+<span class="fc" id="L282">        checkEnvironmentWithStorageExpansion(conf, rm, journalDirectories, allLedgerDirs);</span>
+
+<span class="fc" id="L284">        checkIfDirsOnSameDiskPartition(allLedgerDirs);</span>
+<span class="fc" id="L285">        checkIfDirsOnSameDiskPartition(journalDirectories);</span>
+<span class="fc" id="L286">    }</span>
+
+    /**
+     * Checks if multiple directories are in same diskpartition/filesystem/device.
+     * If ALLOW_MULTIPLEDIRS_UNDER_SAME_DISKPARTITION config parameter is not enabled, and
+     * if it is found that there are multiple directories in the same DiskPartition then
+     * it will throw DiskPartitionDuplicationException.
+     *
+     * @param dirs dirs to validate
+     *
+     * @throws IOException
+     */
+    private void checkIfDirsOnSameDiskPartition(List&lt;File&gt; dirs) throws DiskPartitionDuplicationException {
+<span class="fc" id="L299">        boolean allowDiskPartitionDuplication = conf.isAllowMultipleDirsUnderSameDiskPartition();</span>
+<span class="fc" id="L300">        final MutableBoolean isDuplicationFoundAndNotAllowed = new MutableBoolean(false);</span>
+<span class="fc" id="L301">        Map&lt;FileStore, List&lt;File&gt;&gt; fileStoreDirsMap = new HashMap&lt;FileStore, List&lt;File&gt;&gt;();</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (File dir : dirs) {</span>
+            FileStore fileStore;
+            try {
+<span class="fc" id="L305">                fileStore = Files.getFileStore(dir.toPath());</span>
+<span class="nc" id="L306">            } catch (IOException e) {</span>
+<span class="nc" id="L307">                LOG.error(&quot;Got IOException while trying to FileStore of {}&quot;, dir);</span>
+<span class="nc" id="L308">                throw new BookieException.DiskPartitionDuplicationException(e);</span>
+<span class="fc" id="L309">            }</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">            if (fileStoreDirsMap.containsKey(fileStore)) {</span>
+<span class="nc" id="L311">                fileStoreDirsMap.get(fileStore).add(dir);</span>
+            } else {
+<span class="fc" id="L313">                List&lt;File&gt; dirsList = new ArrayList&lt;File&gt;();</span>
+<span class="fc" id="L314">                dirsList.add(dir);</span>
+<span class="fc" id="L315">                fileStoreDirsMap.put(fileStore, dirsList);</span>
+            }
+<span class="fc" id="L317">        }</span>
+
+<span class="fc" id="L319">        fileStoreDirsMap.forEach((fileStore, dirsList) -&gt; {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (dirsList.size() &gt; 1) {</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (allowDiskPartitionDuplication) {</span>
+<span class="nc" id="L322">                    LOG.warn(&quot;Dirs: {} are in same DiskPartition/FileSystem: {}&quot;, dirsList, fileStore);</span>
+                } else {
+<span class="nc" id="L324">                    LOG.error(&quot;Dirs: {} are in same DiskPartition/FileSystem: {}&quot;, dirsList, fileStore);</span>
+<span class="nc" id="L325">                    isDuplicationFoundAndNotAllowed.setValue(true);</span>
+                }
+            }
+<span class="fc" id="L328">        });</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (isDuplicationFoundAndNotAllowed.getValue()) {</span>
+<span class="nc" id="L330">            throw new BookieException.DiskPartitionDuplicationException();</span>
+        }
+<span class="fc" id="L332">    }</span>
+
+    static List&lt;BookieSocketAddress&gt; possibleBookieIds(ServerConfiguration conf)
+            throws BookieException {
+        // we need to loop through all possible bookie identifiers to ensure it is treated as a new environment
+        // just because of bad configuration
+<span class="fc" id="L338">        List&lt;BookieSocketAddress&gt; addresses = Lists.newArrayListWithExpectedSize(3);</span>
+        try {
+            // ip address
+<span class="fc" id="L341">            addresses.add(getBookieAddress(</span>
+<span class="fc" id="L342">                new ServerConfiguration(conf).setUseHostNameAsBookieID(false).setAdvertisedAddress(null)));</span>
+            // host name
+<span class="fc" id="L344">            addresses.add(getBookieAddress(</span>
+<span class="fc" id="L345">                new ServerConfiguration(conf).setUseHostNameAsBookieID(true).setAdvertisedAddress(null)));</span>
+            // advertised address
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (null != conf.getAdvertisedAddress()) {</span>
+<span class="nc" id="L348">                addresses.add(getBookieAddress(conf));</span>
+            }
+<span class="nc" id="L350">        } catch (UnknownHostException e) {</span>
+<span class="nc" id="L351">            throw new UnknownBookieIdException(e);</span>
+<span class="fc" id="L352">        }</span>
+<span class="fc" id="L353">        return addresses;</span>
+    }
+
+    static Versioned&lt;Cookie&gt; readAndVerifyCookieFromRegistrationManager(
+            Cookie masterCookie, RegistrationManager rm,
+            List&lt;BookieSocketAddress&gt; addresses, boolean allowExpansion)
+            throws BookieException {
+<span class="fc" id="L360">        Versioned&lt;Cookie&gt; rmCookie = null;</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        for (BookieSocketAddress address : addresses) {</span>
+            try {
+<span class="nc" id="L363">                rmCookie = Cookie.readFromRegistrationManager(rm, address);</span>
+                // If allowStorageExpansion option is set, we should
+                // make sure that the new set of ledger/index dirs
+                // is a super set of the old; else, we fail the cookie check
+<span class="nc bnc" id="L367" title="All 2 branches missed.">                if (allowExpansion) {</span>
+<span class="nc" id="L368">                    masterCookie.verifyIsSuperSet(rmCookie.getValue());</span>
+                } else {
+<span class="nc" id="L370">                    masterCookie.verify(rmCookie.getValue());</span>
+                }
+<span class="fc" id="L372">            } catch (CookieNotFoundException e) {</span>
+<span class="fc" id="L373">                continue;</span>
+<span class="nc" id="L374">            }</span>
+<span class="nc" id="L375">        }</span>
+<span class="fc" id="L376">        return rmCookie;</span>
+    }
+
+    private static Pair&lt;List&lt;File&gt;, List&lt;Cookie&gt;&gt; verifyAndGetMissingDirs(
+            Cookie masterCookie, boolean allowExpansion, List&lt;File&gt; dirs)
+            throws InvalidCookieException, IOException {
+<span class="fc" id="L382">        List&lt;File&gt; missingDirs = Lists.newArrayList();</span>
+<span class="fc" id="L383">        List&lt;Cookie&gt; existedCookies = Lists.newArrayList();</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (File dir : dirs) {</span>
+<span class="fc" id="L385">            checkDirectoryStructure(dir);</span>
+            try {
+<span class="nc" id="L387">                Cookie c = Cookie.readFromDirectory(dir);</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">                if (allowExpansion) {</span>
+<span class="nc" id="L389">                    masterCookie.verifyIsSuperSet(c);</span>
+                } else {
+<span class="nc" id="L391">                    masterCookie.verify(c);</span>
+                }
+<span class="nc" id="L393">                existedCookies.add(c);</span>
+<span class="fc" id="L394">            } catch (FileNotFoundException fnf) {</span>
+<span class="fc" id="L395">                missingDirs.add(dir);</span>
+<span class="nc" id="L396">            }</span>
+<span class="fc" id="L397">        }</span>
+<span class="fc" id="L398">        return Pair.of(missingDirs, existedCookies);</span>
+    }
+
+    private static void stampNewCookie(ServerConfiguration conf,
+                                       Cookie masterCookie,
+                                       RegistrationManager rm,
+                                       Version version,
+                                       List&lt;File&gt; journalDirectories,
+                                       List&lt;File&gt; allLedgerDirs)
+            throws BookieException, IOException {
+        // backfill all the directories that miss cookies (for storage expansion)
+<span class="fc" id="L409">        LOG.info(&quot;Stamping new cookies on all dirs {} {}&quot;,</span>
+                 journalDirectories, allLedgerDirs);
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (File journalDirectory : journalDirectories) {</span>
+<span class="fc" id="L412">            masterCookie.writeToDirectory(journalDirectory);</span>
+<span class="fc" id="L413">        }</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        for (File dir : allLedgerDirs) {</span>
+<span class="fc" id="L415">            masterCookie.writeToDirectory(dir);</span>
+<span class="fc" id="L416">        }</span>
+<span class="fc" id="L417">        masterCookie.writeToRegistrationManager(rm, conf, version);</span>
+<span class="fc" id="L418">    }</span>
+
+    public static void checkEnvironmentWithStorageExpansion(
+            ServerConfiguration conf,
+            RegistrationManager rm,
+            List&lt;File&gt; journalDirectories,
+            List&lt;File&gt; allLedgerDirs) throws BookieException {
+        try {
+            // 1. retrieve the instance id
+<span class="fc" id="L427">            String instanceId = rm.getClusterInstanceId();</span>
+
+            // 2. build the master cookie from the configuration
+<span class="fc" id="L430">            Cookie.Builder builder = Cookie.generateCookie(conf);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            if (null != instanceId) {</span>
+<span class="nc" id="L432">                builder.setInstanceId(instanceId);</span>
+            }
+<span class="fc" id="L434">            Cookie masterCookie = builder.build();</span>
+<span class="fc" id="L435">            boolean allowExpansion = conf.getAllowStorageExpansion();</span>
+
+            // 3. read the cookie from registration manager. it is the `source-of-truth` of a given bookie.
+            //    if it doesn't exist in registration manager, this bookie is a new bookie, otherwise it is
+            //    an old bookie.
+<span class="fc" id="L440">            List&lt;BookieSocketAddress&gt; possibleBookieIds = possibleBookieIds(conf);</span>
+<span class="fc" id="L441">            final Versioned&lt;Cookie&gt; rmCookie</span>
+<span class="fc" id="L442">                = readAndVerifyCookieFromRegistrationManager(</span>
+                        masterCookie, rm, possibleBookieIds, allowExpansion);
+
+            // 4. check if the cookie appear in all the directories.
+<span class="fc" id="L446">            List&lt;File&gt; missedCookieDirs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L447">            List&lt;Cookie&gt; existingCookies = Lists.newArrayList();</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (null != rmCookie) {</span>
+<span class="nc" id="L449">                existingCookies.add(rmCookie.getValue());</span>
+            }
+
+            // 4.1 verify the cookies in journal directories
+<span class="fc" id="L453">            Pair&lt;List&lt;File&gt;, List&lt;Cookie&gt;&gt; journalResult =</span>
+<span class="fc" id="L454">                verifyAndGetMissingDirs(masterCookie,</span>
+                                        allowExpansion, journalDirectories);
+<span class="fc" id="L456">            missedCookieDirs.addAll(journalResult.getLeft());</span>
+<span class="fc" id="L457">            existingCookies.addAll(journalResult.getRight());</span>
+            // 4.2. verify the cookies in ledger directories
+<span class="fc" id="L459">            Pair&lt;List&lt;File&gt;, List&lt;Cookie&gt;&gt; ledgerResult =</span>
+<span class="fc" id="L460">                verifyAndGetMissingDirs(masterCookie,</span>
+                                        allowExpansion, allLedgerDirs);
+<span class="fc" id="L462">            missedCookieDirs.addAll(ledgerResult.getLeft());</span>
+<span class="fc" id="L463">            existingCookies.addAll(ledgerResult.getRight());</span>
+
+            // 5. if there are directories missing cookies,
+            //    this is either a:
+            //    - new environment
+            //    - a directory is being added
+            //    - a directory has been corrupted/wiped, which is an error
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (!missedCookieDirs.isEmpty()) {</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">                if (rmCookie == null) {</span>
+                    // 5.1 new environment: all directories should be empty
+<span class="fc" id="L473">                    verifyDirsForNewEnvironment(missedCookieDirs);</span>
+<span class="fc" id="L474">                    stampNewCookie(conf, masterCookie, rm, Version.NEW,</span>
+                                   journalDirectories, allLedgerDirs);
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                } else if (allowExpansion) {</span>
+                    // 5.2 storage is expanding
+<span class="nc" id="L478">                    Set&lt;File&gt; knownDirs = getKnownDirs(existingCookies);</span>
+<span class="nc" id="L479">                    verifyDirsForStorageExpansion(missedCookieDirs, knownDirs);</span>
+<span class="nc" id="L480">                    stampNewCookie(conf, masterCookie,</span>
+<span class="nc" id="L481">                                   rm, rmCookie.getVersion(),</span>
+                                   journalDirectories, allLedgerDirs);
+<span class="nc" id="L483">                } else {</span>
+                    // 5.3 Cookie-less directories and
+                    //     we can't do anything with them
+<span class="nc" id="L486">                    LOG.error(&quot;There are directories without a cookie,&quot;</span>
+                              + &quot; and this is neither a new environment,&quot;
+                              + &quot; nor is storage expansion enabled. &quot;
+                              + &quot;Empty directories are {}&quot;, missedCookieDirs);
+<span class="nc" id="L490">                    throw new InvalidCookieException();</span>
+                }
+            }
+<span class="nc" id="L493">        } catch (IOException ioe) {</span>
+<span class="nc" id="L494">            LOG.error(&quot;Error accessing cookie on disks&quot;, ioe);</span>
+<span class="nc" id="L495">            throw new BookieException.InvalidCookieException(ioe);</span>
+<span class="fc" id="L496">        }</span>
+<span class="fc" id="L497">    }</span>
+
+    private static void verifyDirsForNewEnvironment(List&lt;File&gt; missedCookieDirs)
+            throws InvalidCookieException {
+<span class="fc" id="L501">        List&lt;File&gt; nonEmptyDirs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        for (File dir : missedCookieDirs) {</span>
+<span class="fc" id="L503">            String[] content = dir.list();</span>
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">            if (content != null &amp;&amp; content.length != 0) {</span>
+<span class="nc" id="L505">                nonEmptyDirs.add(dir);</span>
+            }
+<span class="fc" id="L507">        }</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        if (!nonEmptyDirs.isEmpty()) {</span>
+<span class="nc" id="L509">            LOG.error(&quot;Not all the new directories are empty. New directories that are not empty are: &quot; + nonEmptyDirs);</span>
+<span class="nc" id="L510">            throw new InvalidCookieException();</span>
+        }
+<span class="fc" id="L512">    }</span>
+
+    private static Set&lt;File&gt; getKnownDirs(List&lt;Cookie&gt; cookies) {
+<span class="nc" id="L515">        return cookies.stream()</span>
+<span class="nc" id="L516">            .flatMap((c) -&gt; Arrays.stream(c.getLedgerDirPathsFromCookie()))</span>
+<span class="nc" id="L517">            .map((s) -&gt; new File(s))</span>
+<span class="nc" id="L518">            .collect(Collectors.toSet());</span>
+    }
+
+    private static void verifyDirsForStorageExpansion(
+            List&lt;File&gt; missedCookieDirs,
+            Set&lt;File&gt; existingLedgerDirs) throws InvalidCookieException {
+
+<span class="nc" id="L525">        List&lt;File&gt; dirsMissingData = new ArrayList&lt;File&gt;();</span>
+<span class="nc" id="L526">        List&lt;File&gt; nonEmptyDirs = new ArrayList&lt;File&gt;();</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        for (File dir : missedCookieDirs) {</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">            if (existingLedgerDirs.contains(dir.getParentFile())) {</span>
+                // if one of the existing ledger dirs doesn't have cookie,
+                // let us not proceed further
+<span class="nc" id="L531">                dirsMissingData.add(dir);</span>
+<span class="nc" id="L532">                continue;</span>
+            }
+<span class="nc" id="L534">            String[] content = dir.list();</span>
+<span class="nc bnc" id="L535" title="All 4 branches missed.">            if (content != null &amp;&amp; content.length != 0) {</span>
+<span class="nc" id="L536">                nonEmptyDirs.add(dir);</span>
+            }
+<span class="nc" id="L538">        }</span>
+<span class="nc bnc" id="L539" title="All 4 branches missed.">        if (dirsMissingData.size() &gt; 0 || nonEmptyDirs.size() &gt; 0) {</span>
+<span class="nc" id="L540">            LOG.error(&quot;Either not all local directories have cookies or directories being added &quot;</span>
+                    + &quot; newly are not empty. &quot;
+                    + &quot;Directories missing cookie file are: &quot; + dirsMissingData
+                    + &quot; New directories that are not empty are: &quot; + nonEmptyDirs);
+<span class="nc" id="L544">            throw new InvalidCookieException();</span>
+        }
+<span class="nc" id="L546">    }</span>
+
+    /**
+     * Return the configured address of the bookie.
+     */
+    public static BookieSocketAddress getBookieAddress(ServerConfiguration conf)
+            throws UnknownHostException {
+        // Advertised address takes precedence over the listening interface and the
+        // useHostNameAsBookieID settings
+<span class="pc bpc" id="L555" title="3 of 4 branches missed.">        if (conf.getAdvertisedAddress() != null &amp;&amp; conf.getAdvertisedAddress().trim().length() &gt; 0) {</span>
+<span class="nc" id="L556">            String hostAddress = conf.getAdvertisedAddress().trim();</span>
+<span class="nc" id="L557">            return new BookieSocketAddress(hostAddress, conf.getBookiePort());</span>
+        }
+
+<span class="fc" id="L560">        String iface = conf.getListeningInterface();</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (iface == null) {</span>
+<span class="fc" id="L562">            iface = &quot;default&quot;;</span>
+        }
+<span class="fc" id="L564">        String hostName = DNS.getDefaultHost(iface);</span>
+<span class="fc" id="L565">        InetSocketAddress inetAddr = new InetSocketAddress(hostName, conf.getBookiePort());</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">        if (inetAddr.isUnresolved()) {</span>
+<span class="nc" id="L567">            throw new UnknownHostException(&quot;Unable to resolve default hostname: &quot;</span>
+                    + hostName + &quot; for interface: &quot; + iface);
+        }
+<span class="fc" id="L570">        String hostAddress = inetAddr.getAddress().getHostAddress();</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        if (conf.getUseHostNameAsBookieID()) {</span>
+<span class="fc" id="L572">            hostAddress = inetAddr.getAddress().getCanonicalHostName();</span>
+        }
+
+<span class="fc" id="L575">        BookieSocketAddress addr =</span>
+<span class="fc" id="L576">                new BookieSocketAddress(hostAddress, conf.getBookiePort());</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        if (addr.getSocketAddress().getAddress().isLoopbackAddress()</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">            &amp;&amp; !conf.getAllowLoopback()) {</span>
+<span class="nc" id="L579">            throw new UnknownHostException(&quot;Trying to listen on loopback address, &quot;</span>
+                    + addr + &quot; but this is forbidden by default &quot;
+                    + &quot;(see ServerConfiguration#getAllowLoopback())&quot;);
+        }
+<span class="fc" id="L583">        return addr;</span>
+    }
+
+    public LedgerDirsManager getLedgerDirsManager() {
+<span class="nc" id="L587">        return ledgerDirsManager;</span>
+    }
+
+    LedgerDirsManager getIndexDirsManager() {
+<span class="nc" id="L591">        return indexDirsManager;</span>
+    }
+
+    public long getTotalDiskSpace() throws IOException {
+<span class="nc" id="L595">        return getLedgerDirsManager().getTotalDiskSpace(ledgerDirsManager.getAllLedgerDirs());</span>
+    }
+
+    public long getTotalFreeSpace() throws IOException {
+<span class="nc" id="L599">        return getLedgerDirsManager().getTotalFreeSpace(ledgerDirsManager.getAllLedgerDirs());</span>
+    }
+
+    public static File getCurrentDirectory(File dir) {
+<span class="fc" id="L603">        return new File(dir, BookKeeperConstants.CURRENT_DIR);</span>
+    }
+
+    public static File[] getCurrentDirectories(File[] dirs) {
+<span class="fc" id="L607">        File[] currentDirs = new File[dirs.length];</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">        for (int i = 0; i &lt; dirs.length; i++) {</span>
+<span class="fc" id="L609">            currentDirs[i] = getCurrentDirectory(dirs[i]);</span>
+        }
+<span class="fc" id="L611">        return currentDirs;</span>
+    }
+
+    public Bookie(ServerConfiguration conf)
+            throws IOException, InterruptedException, BookieException {
+<span class="nc" id="L616">        this(conf, NullStatsLogger.INSTANCE);</span>
+<span class="nc" id="L617">    }</span>
+
+    public Bookie(ServerConfiguration conf, StatsLogger statsLogger)
+            throws IOException, InterruptedException, BookieException {
+<span class="fc" id="L621">        super(&quot;Bookie-&quot; + conf.getBookiePort());</span>
+<span class="fc" id="L622">        this.statsLogger = statsLogger;</span>
+<span class="fc" id="L623">        this.conf = conf;</span>
+<span class="fc" id="L624">        this.journalDirectories = Lists.newArrayList();</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        for (File journalDirectory : conf.getJournalDirs()) {</span>
+<span class="fc" id="L626">            this.journalDirectories.add(getCurrentDirectory(journalDirectory));</span>
+        }
+<span class="fc" id="L628">        DiskChecker diskChecker = new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold());</span>
+<span class="fc" id="L629">        this.ledgerDirsManager = new LedgerDirsManager(conf, conf.getLedgerDirs(), diskChecker,</span>
+<span class="fc" id="L630">                statsLogger.scope(LD_LEDGER_SCOPE));</span>
+
+<span class="fc" id="L632">        File[] idxDirs = conf.getIndexDirs();</span>
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        if (null == idxDirs) {</span>
+<span class="fc" id="L634">            this.indexDirsManager = this.ledgerDirsManager;</span>
+        } else {
+<span class="nc" id="L636">            this.indexDirsManager = new LedgerDirsManager(conf, idxDirs, diskChecker,</span>
+<span class="nc" id="L637">                    statsLogger.scope(LD_INDEX_SCOPE));</span>
+        }
+
+        // instantiate zookeeper client to initialize ledger manager
+<span class="fc" id="L641">        this.registrationManager = instantiateRegistrationManager(conf);</span>
+<span class="fc" id="L642">        checkEnvironment(this.registrationManager);</span>
+        try {
+<span class="fc" id="L644">            ZooKeeper zooKeeper = null;  // ZooKeeper is null existing only for testing</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">            if (registrationManager != null) {</span>
+<span class="fc" id="L646">                zooKeeper = ((ZKRegistrationManager) this.registrationManager).getZk();</span>
+                // current the registration manager is zookeeper only
+<span class="fc" id="L648">                ledgerManagerFactory = LedgerManagerFactory.newLedgerManagerFactory(</span>
+                    conf,
+                    zooKeeper);
+<span class="fc" id="L651">                LOG.info(&quot;instantiate ledger manager {}&quot;, ledgerManagerFactory.getClass().getName());</span>
+<span class="fc" id="L652">                ledgerManager = ledgerManagerFactory.newLedgerManager();</span>
+            } else {
+<span class="nc" id="L654">                ledgerManagerFactory = null;</span>
+<span class="nc" id="L655">                ledgerManager = null;</span>
+            }
+<span class="nc" id="L657">        } catch (KeeperException e) {</span>
+<span class="nc" id="L658">            throw new MetadataStoreException(&quot;Failed to initialize ledger manager&quot;, e);</span>
+<span class="fc" id="L659">        }</span>
+
+        // Initialise ledgerDirMonitor. This would look through all the
+        // configured directories. When disk errors or all the ledger
+        // directories are full, would throws exception and fail bookie startup.
+<span class="fc" id="L664">        this.ledgerMonitor = new LedgerDirsMonitor(conf, diskChecker, ledgerDirsManager);</span>
+        try {
+<span class="fc" id="L666">            this.ledgerMonitor.init();</span>
+<span class="nc" id="L667">        } catch (NoWritableLedgerDirException nle) {</span>
+            // start in read-only mode if no writable dirs and read-only allowed
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            if (!conf.isReadOnlyModeEnabled()) {</span>
+<span class="nc" id="L670">                throw nle;</span>
+            } else {
+<span class="nc" id="L672">                this.transitionToReadOnlyMode();</span>
+            }
+<span class="fc" id="L674">        }</span>
+
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">        if (null == idxDirs) {</span>
+<span class="fc" id="L677">            this.idxMonitor = this.ledgerMonitor;</span>
+        } else {
+<span class="nc" id="L679">            this.idxMonitor = new LedgerDirsMonitor(conf, diskChecker, indexDirsManager);</span>
+            try {
+<span class="nc" id="L681">                this.idxMonitor.init();</span>
+<span class="nc" id="L682">            } catch (NoWritableLedgerDirException nle) {</span>
+                // start in read-only mode if no writable dirs and read-only allowed
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                if (!conf.isReadOnlyModeEnabled()) {</span>
+<span class="nc" id="L685">                    throw nle;</span>
+                } else {
+<span class="nc" id="L687">                    this.transitionToReadOnlyMode();</span>
+                }
+<span class="nc" id="L689">            }</span>
+        }
+
+        // ZK ephemeral node for this Bookie.
+<span class="fc" id="L693">        this.bookieId = getMyId();</span>
+
+        // instantiate the journals
+<span class="fc" id="L696">        journals = Lists.newArrayList();</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">        for (int i = 0; i &lt; journalDirectories.size(); i++) {</span>
+<span class="fc" id="L698">            journals.add(new Journal(journalDirectories.get(i),</span>
+<span class="fc" id="L699">                         conf, ledgerDirsManager, statsLogger.scope(JOURNAL_SCOPE + &quot;_&quot; + i)));</span>
+        }
+
+<span class="fc" id="L702">        CheckpointSource checkpointSource = new CheckpointSourceList(journals);</span>
+
+        // Instantiate the ledger storage implementation
+<span class="fc" id="L705">        String ledgerStorageClass = conf.getLedgerStorageClass();</span>
+<span class="fc" id="L706">        LOG.info(&quot;Using ledger storage: {}&quot;, ledgerStorageClass);</span>
+<span class="fc" id="L707">        ledgerStorage = LedgerStorageFactory.createLedgerStorage(ledgerStorageClass);</span>
+<span class="fc" id="L708">        syncThread = new SyncThread(conf, getLedgerDirsListener(), ledgerStorage, checkpointSource);</span>
+
+<span class="fc" id="L710">        ledgerStorage.initialize(</span>
+            conf,
+            ledgerManager,
+            ledgerDirsManager,
+            indexDirsManager,
+            checkpointSource,
+            syncThread,
+            statsLogger);
+
+
+<span class="fc" id="L720">        handles = new HandleFactoryImpl(ledgerStorage);</span>
+
+        // Expose Stats
+<span class="fc" id="L723">        writeBytes = statsLogger.getCounter(WRITE_BYTES);</span>
+<span class="fc" id="L724">        readBytes = statsLogger.getCounter(READ_BYTES);</span>
+<span class="fc" id="L725">        addEntryStats = statsLogger.getOpStatsLogger(BOOKIE_ADD_ENTRY);</span>
+<span class="fc" id="L726">        recoveryAddEntryStats = statsLogger.getOpStatsLogger(BOOKIE_RECOVERY_ADD_ENTRY);</span>
+<span class="fc" id="L727">        readEntryStats = statsLogger.getOpStatsLogger(BOOKIE_READ_ENTRY);</span>
+<span class="fc" id="L728">        addBytesStats = statsLogger.getOpStatsLogger(BOOKIE_ADD_ENTRY_BYTES);</span>
+<span class="fc" id="L729">        readBytesStats = statsLogger.getOpStatsLogger(BOOKIE_READ_ENTRY_BYTES);</span>
+        // 1 : up, 0 : readonly, -1 : unregistered
+<span class="fc" id="L731">        statsLogger.registerGauge(SERVER_STATUS, new Gauge&lt;Number&gt;() {</span>
+            @Override
+            public Number getDefaultValue() {
+<span class="nc" id="L734">                return 0;</span>
+            }
+
+            @Override
+            public Number getSample() {
+<span class="nc bnc" id="L739" title="All 2 branches missed.">                if (!rmRegistered.get()){</span>
+<span class="nc" id="L740">                    return -1;</span>
+<span class="nc bnc" id="L741" title="All 4 branches missed.">                } else if (forceReadOnly.get() || bookieStatus.isInReadOnlyMode()) {</span>
+<span class="nc" id="L742">                    return 0;</span>
+                } else {
+<span class="nc" id="L744">                    return 1;</span>
+                }
+            }
+        });
+<span class="fc" id="L748">    }</span>
+
+    private String getMyId() throws UnknownHostException {
+<span class="fc" id="L751">        return Bookie.getBookieAddress(conf).toString();</span>
+    }
+
+    void readJournal() throws IOException, BookieException {
+<span class="fc" id="L755">        long startTs = MathUtils.now();</span>
+<span class="fc" id="L756">        JournalScanner scanner = new JournalScanner() {</span>
+            @Override
+            public void process(int journalVersion, long offset, ByteBuffer recBuff) throws IOException {
+<span class="nc" id="L759">                long ledgerId = recBuff.getLong();</span>
+<span class="nc" id="L760">                long entryId = recBuff.getLong();</span>
+                try {
+<span class="nc bnc" id="L762" title="All 2 branches missed.">                    if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L763">                        LOG.debug(&quot;Replay journal - ledger id : {}, entry id : {}.&quot;, ledgerId, entryId);</span>
+                    }
+<span class="nc bnc" id="L765" title="All 2 branches missed.">                    if (entryId == METAENTRY_ID_LEDGER_KEY) {</span>
+<span class="nc bnc" id="L766" title="All 2 branches missed.">                        if (journalVersion &gt;= JournalChannel.V3) {</span>
+<span class="nc" id="L767">                            int masterKeyLen = recBuff.getInt();</span>
+<span class="nc" id="L768">                            byte[] masterKey = new byte[masterKeyLen];</span>
+
+<span class="nc" id="L770">                            recBuff.get(masterKey);</span>
+<span class="nc" id="L771">                            masterKeyCache.put(ledgerId, masterKey);</span>
+<span class="nc" id="L772">                        } else {</span>
+<span class="nc" id="L773">                            throw new IOException(&quot;Invalid journal. Contains journalKey &quot;</span>
+                                    + &quot; but layout version (&quot; + journalVersion
+                                    + &quot;) is too old to hold this&quot;);
+                        }
+<span class="nc bnc" id="L777" title="All 2 branches missed.">                    } else if (entryId == METAENTRY_ID_FENCE_KEY) {</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">                        if (journalVersion &gt;= JournalChannel.V4) {</span>
+<span class="nc" id="L779">                            byte[] key = masterKeyCache.get(ledgerId);</span>
+<span class="nc bnc" id="L780" title="All 2 branches missed.">                            if (key == null) {</span>
+<span class="nc" id="L781">                                key = ledgerStorage.readMasterKey(ledgerId);</span>
+                            }
+<span class="nc" id="L783">                            LedgerDescriptor handle = handles.getHandle(ledgerId, key);</span>
+<span class="nc" id="L784">                            handle.setFenced();</span>
+<span class="nc" id="L785">                        } else {</span>
+<span class="nc" id="L786">                            throw new IOException(&quot;Invalid journal. Contains fenceKey &quot;</span>
+                                    + &quot; but layout version (&quot; + journalVersion
+                                    + &quot;) is too old to hold this&quot;);
+                        }
+                    } else {
+<span class="nc" id="L791">                        byte[] key = masterKeyCache.get(ledgerId);</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                        if (key == null) {</span>
+<span class="nc" id="L793">                            key = ledgerStorage.readMasterKey(ledgerId);</span>
+                        }
+<span class="nc" id="L795">                        LedgerDescriptor handle = handles.getHandle(ledgerId, key);</span>
+
+<span class="nc" id="L797">                        recBuff.rewind();</span>
+<span class="nc" id="L798">                        handle.addEntry(Unpooled.wrappedBuffer(recBuff));</span>
+                    }
+<span class="nc" id="L800">                } catch (NoLedgerException nsle) {</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">                    if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L802">                        LOG.debug(&quot;Skip replaying entries of ledger {} since it was deleted.&quot;, ledgerId);</span>
+                    }
+<span class="nc" id="L804">                } catch (BookieException be) {</span>
+<span class="nc" id="L805">                    throw new IOException(be);</span>
+<span class="nc" id="L806">                }</span>
+<span class="nc" id="L807">            }</span>
+        };
+
+<span class="fc bfc" id="L810" title="All 2 branches covered.">        for (Journal journal : journals) {</span>
+<span class="fc" id="L811">            journal.replay(scanner);</span>
+<span class="fc" id="L812">        }</span>
+<span class="fc" id="L813">        long elapsedTs = MathUtils.now() - startTs;</span>
+<span class="fc" id="L814">        LOG.info(&quot;Finished replaying journal in {} ms.&quot;, elapsedTs);</span>
+<span class="fc" id="L815">    }</span>
+
+    @Override
+    public synchronized void start() {
+<span class="fc" id="L819">        setDaemon(true);</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L821">            LOG.debug(&quot;I'm starting a bookie with journal directories {}&quot;,</span>
+<span class="nc" id="L822">                    journalDirectories.stream().map(File::getName).collect(Collectors.joining(&quot;, &quot;)));</span>
+        }
+        //Start DiskChecker thread
+<span class="fc" id="L825">        ledgerMonitor.start();</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">        if (indexDirsManager != ledgerDirsManager) {</span>
+<span class="nc" id="L827">            idxMonitor.start();</span>
+        }
+
+        // replay journals
+        try {
+<span class="fc" id="L832">            readJournal();</span>
+<span class="nc" id="L833">        } catch (IOException ioe) {</span>
+<span class="nc" id="L834">            LOG.error(&quot;Exception while replaying journals, shutting down&quot;, ioe);</span>
+<span class="nc" id="L835">            shutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L836">            return;</span>
+<span class="nc" id="L837">        } catch (BookieException be) {</span>
+<span class="nc" id="L838">            LOG.error(&quot;Exception while replaying journals, shutting down&quot;, be);</span>
+<span class="nc" id="L839">            shutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L840">            return;</span>
+<span class="fc" id="L841">        }</span>
+
+        // Do a fully flush after journal replay
+        try {
+<span class="fc" id="L845">            syncThread.requestFlush().get();</span>
+<span class="nc" id="L846">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L847">            LOG.warn(&quot;Interrupting the fully flush after replaying journals : &quot;, e);</span>
+<span class="nc" id="L848">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L849">        } catch (ExecutionException e) {</span>
+<span class="nc" id="L850">            LOG.error(&quot;Error on executing a fully flush after replaying journals.&quot;);</span>
+<span class="nc" id="L851">            shutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="pc" id="L852">        }</span>
+<span class="fc" id="L853">        LOG.info(&quot;Finished reading journal, starting bookie&quot;);</span>
+
+        // start bookie thread
+<span class="fc" id="L856">        super.start();</span>
+
+        // After successful bookie startup, register listener for disk
+        // error/full notifications.
+<span class="fc" id="L860">        ledgerDirsManager.addLedgerDirsListener(getLedgerDirsListener());</span>
+<span class="pc bpc" id="L861" title="1 of 2 branches missed.">        if (indexDirsManager != ledgerDirsManager) {</span>
+<span class="nc" id="L862">            indexDirsManager.addLedgerDirsListener(getLedgerDirsListener());</span>
+        }
+
+<span class="fc" id="L865">        ledgerStorage.start();</span>
+
+        // check the bookie status to start with
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">        if (forceReadOnly.get()) {</span>
+<span class="nc" id="L869">            this.bookieStatus.setToReadOnlyMode();</span>
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        } else if (conf.isPersistBookieStatusEnabled()) {</span>
+<span class="nc" id="L871">            this.bookieStatus.readFromDirectories(ledgerDirsManager.getAllLedgerDirs());</span>
+        }
+
+        // set running here.
+        // since bookie server use running as a flag to tell bookie server whether it is alive
+        // if setting it in bookie thread, the watcher might run before bookie thread.
+<span class="fc" id="L877">        running = true;</span>
+        try {
+<span class="fc" id="L879">            registerBookie(true).get();</span>
+<span class="nc" id="L880">        } catch (Exception e) {</span>
+<span class="nc" id="L881">            LOG.error(&quot;Couldn't register bookie with zookeeper, shutting down : &quot;, e);</span>
+<span class="nc" id="L882">            shutdown(ExitCode.ZK_REG_FAIL);</span>
+<span class="fc" id="L883">        }</span>
+<span class="fc" id="L884">    }</span>
+
+    /*
+     * Get the DiskFailure listener for the bookie
+     */
+    private LedgerDirsListener getLedgerDirsListener() {
+
+<span class="fc" id="L891">        return new LedgerDirsListener() {</span>
+
+            @Override
+            public void diskFull(File disk) {
+                // Nothing needs to be handled here.
+<span class="nc" id="L896">            }</span>
+
+            @Override
+            public void diskAlmostFull(File disk) {
+                // Nothing needs to be handled here.
+<span class="nc" id="L901">            }</span>
+
+            @Override
+            public void diskFailed(File disk) {
+                // Shutdown the bookie on disk failure.
+<span class="nc" id="L906">                triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L907">            }</span>
+
+            @Override
+            public void allDisksFull() {
+                // Transition to readOnly mode on all disks full
+<span class="nc" id="L912">                transitionToReadOnlyMode();</span>
+<span class="nc" id="L913">            }</span>
+
+            @Override
+            public void fatalError() {
+<span class="nc" id="L917">                LOG.error(&quot;Fatal error reported by ledgerDirsManager&quot;);</span>
+<span class="nc" id="L918">                triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L919">            }</span>
+
+            @Override
+            public void diskWritable(File disk) {
+                // Transition to writable mode when a disk becomes writable again.
+<span class="nc" id="L924">                transitionToWritableMode();</span>
+<span class="nc" id="L925">            }</span>
+
+            @Override
+            public void diskJustWritable(File disk) {
+                // Transition to writable mode when a disk becomes writable again.
+<span class="nc" id="L930">                transitionToWritableMode();</span>
+<span class="nc" id="L931">            }</span>
+        };
+    }
+
+    /**
+     * Instantiate the registration manager for the Bookie.
+     */
+    private RegistrationManager instantiateRegistrationManager(ServerConfiguration conf) throws BookieException {
+        // Create the registration manager instance
+        Class&lt;? extends RegistrationManager&gt; managerCls;
+        try {
+<span class="fc" id="L942">            managerCls = conf.getRegistrationManagerClass();</span>
+<span class="nc" id="L943">        } catch (ConfigurationException e) {</span>
+<span class="nc" id="L944">            throw new BookieIllegalOpException(e);</span>
+<span class="fc" id="L945">        }</span>
+
+<span class="fc" id="L947">        RegistrationManager manager = ReflectionUtils.newInstance(managerCls);</span>
+<span class="fc" id="L948">        return manager.initialize(conf, () -&gt; {</span>
+<span class="nc" id="L949">            rmRegistered.set(false);</span>
+            // schedule a re-register operation
+<span class="nc" id="L951">            registerBookie(false);</span>
+<span class="nc" id="L952">        }, statsLogger);</span>
+    }
+
+    /**
+     * Register as an available bookie.
+     */
+    protected Future&lt;Void&gt; registerBookie(final boolean throwException) {
+<span class="fc" id="L959">        return stateService.submit(new Callable&lt;Void&gt;() {</span>
+            @Override
+            public Void call() throws IOException {
+                try {
+<span class="fc" id="L963">                    doRegisterBookie();</span>
+<span class="nc" id="L964">                } catch (IOException ioe) {</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">                    if (throwException) {</span>
+<span class="nc" id="L966">                        throw ioe;</span>
+                    } else {
+<span class="nc" id="L968">                        LOG.error(&quot;Couldn't register bookie with zookeeper, shutting down : &quot;, ioe);</span>
+<span class="nc" id="L969">                        triggerBookieShutdown(ExitCode.ZK_REG_FAIL);</span>
+                    }
+<span class="fc" id="L971">                }</span>
+<span class="fc" id="L972">                return (Void) null;</span>
+            }
+        });
+    }
+
+    protected void doRegisterBookie() throws IOException {
+<span class="pc bpc" id="L978" title="2 of 4 branches missed.">        doRegisterBookie(forceReadOnly.get() || bookieStatus.isInReadOnlyMode());</span>
+<span class="fc" id="L979">    }</span>
+
+    private void doRegisterBookie(boolean isReadOnly) throws IOException {
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">        if (null == registrationManager ||</span>
+<span class="pc bpc" id="L983" title="1 of 2 branches missed.">            ((ZKRegistrationManager) this.registrationManager).getZk() == null) {</span>
+            // registration manager is null, means not register itself to zk.
+            // ZooKeeper is null existing only for testing.
+<span class="nc" id="L986">            LOG.info(&quot;null zk while do register&quot;);</span>
+<span class="nc" id="L987">            return;</span>
+        }
+
+<span class="fc" id="L990">        rmRegistered.set(false);</span>
+        try {
+<span class="fc" id="L992">            registrationManager.registerBookie(bookieId, isReadOnly);</span>
+<span class="fc" id="L993">            rmRegistered.set(true);</span>
+<span class="nc" id="L994">        } catch (BookieException e) {</span>
+<span class="nc" id="L995">            throw new IOException(e);</span>
+<span class="fc" id="L996">        }</span>
+<span class="fc" id="L997">    }</span>
+
+
+    /**
+     * Transition the bookie from readOnly mode to writable.
+     */
+    private Future&lt;Void&gt; transitionToWritableMode() {
+<span class="nc" id="L1004">        return stateService.submit(new Callable&lt;Void&gt;() {</span>
+            @Override
+            public Void call() throws Exception {
+<span class="nc" id="L1007">                doTransitionToWritableMode();</span>
+<span class="nc" id="L1008">                return null;</span>
+            }
+        });
+    }
+
+    @VisibleForTesting
+    public void doTransitionToWritableMode() {
+<span class="nc bnc" id="L1015" title="All 4 branches missed.">        if (shuttingdown || forceReadOnly.get()) {</span>
+<span class="nc" id="L1016">            return;</span>
+        }
+
+<span class="nc bnc" id="L1019" title="All 2 branches missed.">        if (!bookieStatus.setToWritableMode()) {</span>
+            // do nothing if already in writable mode
+<span class="nc" id="L1021">            return;</span>
+        }
+<span class="nc" id="L1023">        LOG.info(&quot;Transitioning Bookie to Writable mode and will serve read/write requests.&quot;);</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">        if (conf.isPersistBookieStatusEnabled()) {</span>
+<span class="nc" id="L1025">            bookieStatus.writeToDirectories(ledgerDirsManager.getAllLedgerDirs());</span>
+        }
+        // change zookeeper state only when using zookeeper
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        if (null == registrationManager) {</span>
+<span class="nc" id="L1029">            return;</span>
+        }
+        try {
+<span class="nc" id="L1032">            doRegisterBookie(false);</span>
+<span class="nc" id="L1033">        } catch (IOException e) {</span>
+<span class="nc" id="L1034">            LOG.warn(&quot;Error in transitioning back to writable mode : &quot;, e);</span>
+<span class="nc" id="L1035">            transitionToReadOnlyMode();</span>
+<span class="nc" id="L1036">            return;</span>
+<span class="nc" id="L1037">        }</span>
+        // clear the readonly state
+        try {
+<span class="nc" id="L1040">            registrationManager.unregisterBookie(bookieId, true);</span>
+<span class="nc" id="L1041">        } catch (BookieException e) {</span>
+            // if we failed when deleting the readonly flag in zookeeper, it is OK since client would
+            // already see the bookie in writable list. so just log the exception
+<span class="nc" id="L1044">            LOG.warn(&quot;Failed to delete bookie readonly state in zookeeper : &quot;, e);</span>
+<span class="nc" id="L1045">            return;</span>
+<span class="nc" id="L1046">        }</span>
+<span class="nc" id="L1047">    }</span>
+
+    /**
+     * Transition the bookie to readOnly mode.
+     */
+    private Future&lt;Void&gt; transitionToReadOnlyMode() {
+<span class="nc" id="L1053">        return stateService.submit(new Callable&lt;Void&gt;() {</span>
+            @Override
+            public Void call() {
+<span class="nc" id="L1056">                doTransitionToReadOnlyMode();</span>
+<span class="nc" id="L1057">                return (Void) null;</span>
+            }
+        });
+    }
+
+    @VisibleForTesting
+    public void doTransitionToReadOnlyMode() {
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">        if (shuttingdown) {</span>
+<span class="nc" id="L1065">            return;</span>
+        }
+<span class="nc bnc" id="L1067" title="All 2 branches missed.">        if (!bookieStatus.setToReadOnlyMode()) {</span>
+<span class="nc" id="L1068">            return;</span>
+        }
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">        if (!conf.isReadOnlyModeEnabled()) {</span>
+<span class="nc" id="L1071">            LOG.warn(&quot;ReadOnly mode is not enabled. &quot;</span>
+                    + &quot;Can be enabled by configuring &quot;
+                    + &quot;'readOnlyModeEnabled=true' in configuration.&quot;
+                    + &quot;Shutting down bookie&quot;);
+<span class="nc" id="L1075">            triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L1076">            return;</span>
+        }
+<span class="nc" id="L1078">        LOG.info(&quot;Transitioning Bookie to ReadOnly mode,&quot;</span>
+                + &quot; and will serve only read requests from clients!&quot;);
+        // persist the bookie status if we enable this
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">        if (conf.isPersistBookieStatusEnabled()) {</span>
+<span class="nc" id="L1082">            this.bookieStatus.writeToDirectories(ledgerDirsManager.getAllLedgerDirs());</span>
+        }
+        // change zookeeper state only when using zookeeper
+<span class="nc bnc" id="L1085" title="All 2 branches missed.">        if (null == registrationManager) {</span>
+<span class="nc" id="L1086">            return;</span>
+        }
+        try {
+<span class="nc" id="L1089">            registrationManager.registerBookie(bookieId, true);</span>
+<span class="nc" id="L1090">        } catch (BookieException e) {</span>
+<span class="nc" id="L1091">            LOG.error(&quot;Error in transition to ReadOnly Mode.&quot;</span>
+                    + &quot; Shutting down&quot;, e);
+<span class="nc" id="L1093">            triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+<span class="nc" id="L1094">            return;</span>
+<span class="nc" id="L1095">        }</span>
+<span class="nc" id="L1096">    }</span>
+
+    /*
+     * Check whether Bookie is writable
+     */
+    public boolean isReadOnly() {
+<span class="pc bpc" id="L1102" title="2 of 4 branches missed.">        return forceReadOnly.get() || bookieStatus.isInReadOnlyMode();</span>
+    }
+
+    public boolean isRunning() {
+<span class="fc" id="L1106">        return running;</span>
+    }
+
+    @Override
+    public void run() {
+        // bookie thread wait for journal thread
+        try {
+            // start journals
+<span class="fc bfc" id="L1114" title="All 2 branches covered.">            for (Journal journal: journals) {</span>
+<span class="fc" id="L1115">                journal.start();</span>
+<span class="fc" id="L1116">            }</span>
+
+            // wait until journal quits
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">            for (Journal journal: journals) {</span>
+
+<span class="fc" id="L1121">                journal.join();</span>
+<span class="fc" id="L1122">            }</span>
+<span class="fc" id="L1123">            LOG.info(&quot;Journal thread(s) quit.&quot;);</span>
+<span class="nc" id="L1124">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L1125">            LOG.warn(&quot;Interrupted on running journal thread : &quot;, ie);</span>
+<span class="fc" id="L1126">        }</span>
+        // if the journal thread quits due to shutting down, it is ok
+<span class="pc bpc" id="L1128" title="1 of 2 branches missed.">        if (!shuttingdown) {</span>
+            // some error found in journal thread and it quits
+            // following add operations to it would hang unit client timeout
+            // so we should let bookie server exists
+<span class="nc" id="L1132">            LOG.error(&quot;Journal manager quits unexpectedly.&quot;);</span>
+<span class="nc" id="L1133">            triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);</span>
+        }
+<span class="fc" id="L1135">    }</span>
+
+    // Triggering the Bookie shutdown in its own thread,
+    // because shutdown can be called from sync thread which would be
+    // interrupted by shutdown call.
+<span class="fc" id="L1140">    AtomicBoolean shutdownTriggered = new AtomicBoolean(false);</span>
+    void triggerBookieShutdown(final int exitCode) {
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">        if (!shutdownTriggered.compareAndSet(false, true)) {</span>
+<span class="nc" id="L1143">            return;</span>
+        }
+<span class="nc" id="L1145">        LOG.info(&quot;Triggering shutdown of Bookie-{} with exitCode {}&quot;,</span>
+<span class="nc" id="L1146">                 conf.getBookiePort(), exitCode);</span>
+<span class="nc" id="L1147">        BookieThread th = new BookieThread(&quot;BookieShutdownTrigger&quot;) {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L1150">                Bookie.this.shutdown(exitCode);</span>
+<span class="nc" id="L1151">            }</span>
+        };
+<span class="nc" id="L1153">        th.start();</span>
+<span class="nc" id="L1154">    }</span>
+
+    // provided a public shutdown method for other caller
+    // to shut down bookie gracefully
+    public int shutdown() {
+<span class="fc" id="L1159">        return shutdown(ExitCode.OK);</span>
+    }
+
+    // internal shutdown method to let shutdown bookie gracefully
+    // when encountering exception
+    synchronized int shutdown(int exitCode) {
+        try {
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">            if (running) { // avoid shutdown twice</span>
+                // the exitCode only set when first shutdown usually due to exception found
+<span class="fc" id="L1168">                LOG.info(&quot;Shutting down Bookie-{} with exitCode {}&quot;,</span>
+<span class="fc" id="L1169">                         conf.getBookiePort(), exitCode);</span>
+<span class="pc bpc" id="L1170" title="1 of 2 branches missed.">                if (this.exitCode == ExitCode.OK) {</span>
+<span class="fc" id="L1171">                    this.exitCode = exitCode;</span>
+                }
+                // mark bookie as in shutting down progress
+<span class="fc" id="L1174">                shuttingdown = true;</span>
+
+                // turn bookie to read only during shutting down process
+<span class="fc" id="L1177">                LOG.info(&quot;Turning bookie to read only during shut down&quot;);</span>
+<span class="fc" id="L1178">                this.forceReadOnly.set(true);</span>
+
+                // Shutdown Sync thread
+<span class="fc" id="L1181">                syncThread.shutdown();</span>
+
+                // Shutdown journals
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">                for (Journal journal : journals) {</span>
+<span class="fc" id="L1185">                    journal.shutdown();</span>
+<span class="fc" id="L1186">                }</span>
+<span class="fc" id="L1187">                this.join();</span>
+
+                // Shutdown the EntryLogger which has the GarbageCollector Thread running
+<span class="fc" id="L1190">                ledgerStorage.shutdown();</span>
+
+                // close Ledger Manager
+                try {
+<span class="pc bpc" id="L1194" title="1 of 2 branches missed.">                    if (null != ledgerManager) {</span>
+<span class="fc" id="L1195">                        ledgerManager.close();</span>
+                    }
+<span class="pc bpc" id="L1197" title="1 of 2 branches missed.">                    if (null != ledgerManagerFactory) {</span>
+<span class="fc" id="L1198">                        ledgerManagerFactory.uninitialize();</span>
+                    }
+<span class="nc" id="L1200">                } catch (IOException ie) {</span>
+<span class="nc" id="L1201">                    LOG.error(&quot;Failed to close active ledger manager : &quot;, ie);</span>
+<span class="fc" id="L1202">                }</span>
+
+                //Shutdown disk checker
+<span class="fc" id="L1205">                ledgerMonitor.shutdown();</span>
+<span class="pc bpc" id="L1206" title="1 of 2 branches missed.">                if (indexDirsManager != ledgerDirsManager) {</span>
+<span class="nc" id="L1207">                    idxMonitor.shutdown();</span>
+                }
+
+                // Shutdown the state service
+<span class="fc" id="L1211">                stateService.shutdown();</span>
+            }
+            // Shutdown the ZK client
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">            if (registrationManager != null) {</span>
+<span class="fc" id="L1215">                registrationManager.close();</span>
+            }
+<span class="nc" id="L1217">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L1218">            LOG.error(&quot;Interrupted during shutting down bookie : &quot;, ie);</span>
+        } finally {
+            // setting running to false here, so watch thread
+            // in bookie server know it only after bookie shut down
+<span class="fc" id="L1222">            running = false;</span>
+        }
+<span class="fc" id="L1224">        return this.exitCode;</span>
+    }
+
+    /**
+     * Retrieve the ledger descriptor for the ledger which entry should be added to.
+     * The LedgerDescriptor returned from this method should be eventually freed with
+     * #putHandle().
+     *
+     * @throws BookieException if masterKey does not match the master key of the ledger
+     */
+    private LedgerDescriptor getLedgerForEntry(ByteBuf entry, final byte[] masterKey)
+            throws IOException, BookieException {
+<span class="fc" id="L1236">        final long ledgerId = entry.getLong(entry.readerIndex());</span>
+
+<span class="fc" id="L1238">        LedgerDescriptor l = handles.getHandle(ledgerId, masterKey);</span>
+<span class="fc bfc" id="L1239" title="All 2 branches covered.">        if (masterKeyCache.get(ledgerId) == null) {</span>
+            // Force the load into masterKey cache
+<span class="fc" id="L1241">            byte[] oldValue = masterKeyCache.putIfAbsent(ledgerId, masterKey);</span>
+<span class="pc bpc" id="L1242" title="1 of 2 branches missed.">            if (oldValue == null) {</span>
+                // new handle, we should add the key to journal ensure we can rebuild
+<span class="fc" id="L1244">                ByteBuffer bb = ByteBuffer.allocate(8 + 8 + 4 + masterKey.length);</span>
+<span class="fc" id="L1245">                bb.putLong(ledgerId);</span>
+<span class="fc" id="L1246">                bb.putLong(METAENTRY_ID_LEDGER_KEY);</span>
+<span class="fc" id="L1247">                bb.putInt(masterKey.length);</span>
+<span class="fc" id="L1248">                bb.put(masterKey);</span>
+<span class="fc" id="L1249">                bb.flip();</span>
+
+<span class="fc" id="L1251">                getJournal(ledgerId).logAddEntry(bb, new NopWriteCallback(), null);</span>
+            }
+        }
+
+<span class="fc" id="L1255">        return l;</span>
+    }
+
+    private Journal getJournal(long ledgerId) {
+<span class="fc" id="L1259">        return journals.get(MathUtils.signSafeMod(ledgerId, journals.size()));</span>
+    }
+
+    /**
+     * Add an entry to a ledger as specified by handle.
+     */
+    private void addEntryInternal(LedgerDescriptor handle, ByteBuf entry, WriteCallback cb, Object ctx)
+            throws IOException, BookieException {
+<span class="fc" id="L1267">        long ledgerId = handle.getLedgerId();</span>
+<span class="fc" id="L1268">        long entryId = handle.addEntry(entry);</span>
+
+<span class="fc" id="L1270">        writeBytes.add(entry.readableBytes());</span>
+
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">        if (LOG.isTraceEnabled()) {</span>
+<span class="nc" id="L1273">            LOG.trace(&quot;Adding {}@{}&quot;, entryId, ledgerId);</span>
+        }
+<span class="fc" id="L1275">        getJournal(ledgerId).logAddEntry(entry, cb, ctx);</span>
+<span class="fc" id="L1276">    }</span>
+
+    /**
+     * Add entry to a ledger, even if the ledger has previous been fenced. This should only
+     * happen in bookie recovery or ledger recovery cases, where entries are being replicates
+     * so that they exist on a quorum of bookies. The corresponding client side call for this
+     * is not exposed to users.
+     */
+    public void recoveryAddEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey)
+            throws IOException, BookieException {
+<span class="nc" id="L1286">        long requestNanos = MathUtils.nowInNano();</span>
+<span class="nc" id="L1287">        boolean success = false;</span>
+<span class="nc" id="L1288">        int entrySize = 0;</span>
+        try {
+<span class="nc" id="L1290">            LedgerDescriptor handle = getLedgerForEntry(entry, masterKey);</span>
+<span class="nc" id="L1291">            synchronized (handle) {</span>
+<span class="nc" id="L1292">                entrySize = entry.readableBytes();</span>
+<span class="nc" id="L1293">                addEntryInternal(handle, entry, cb, ctx);</span>
+<span class="nc" id="L1294">            }</span>
+<span class="nc" id="L1295">            success = true;</span>
+<span class="nc" id="L1296">        } catch (NoWritableLedgerDirException e) {</span>
+<span class="nc" id="L1297">            transitionToReadOnlyMode();</span>
+<span class="nc" id="L1298">            throw new IOException(e);</span>
+        } finally {
+<span class="nc" id="L1300">            long elapsedNanos = MathUtils.elapsedNanos(requestNanos);</span>
+<span class="nc bnc" id="L1301" title="All 2 branches missed.">            if (success) {</span>
+<span class="nc" id="L1302">                recoveryAddEntryStats.registerSuccessfulEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="nc" id="L1303">                addBytesStats.registerSuccessfulValue(entrySize);</span>
+            } else {
+<span class="nc" id="L1305">                recoveryAddEntryStats.registerFailedEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="nc" id="L1306">                addBytesStats.registerFailedValue(entrySize);</span>
+            }
+
+<span class="nc" id="L1309">            entry.release();</span>
+        }
+<span class="nc" id="L1311">    }</span>
+
+    public void setExplicitLac(ByteBuf entry, Object ctx, byte[] masterKey)
+            throws IOException, BookieException {
+        try {
+<span class="nc" id="L1316">            long ledgerId = entry.getLong(entry.readerIndex());</span>
+<span class="nc" id="L1317">            LedgerDescriptor handle = handles.getHandle(ledgerId, masterKey);</span>
+<span class="nc" id="L1318">            synchronized (handle) {</span>
+<span class="nc" id="L1319">                handle.setExplicitLac(entry);</span>
+<span class="nc" id="L1320">            }</span>
+<span class="nc" id="L1321">        } catch (NoWritableLedgerDirException e) {</span>
+<span class="nc" id="L1322">            transitionToReadOnlyMode();</span>
+<span class="nc" id="L1323">            throw new IOException(e);</span>
+<span class="nc" id="L1324">        }</span>
+<span class="nc" id="L1325">    }</span>
+
+    public ByteBuf getExplicitLac(long ledgerId) throws IOException, Bookie.NoLedgerException {
+        ByteBuf lac;
+<span class="nc" id="L1329">        LedgerDescriptor handle = handles.getReadOnlyHandle(ledgerId);</span>
+<span class="nc" id="L1330">        synchronized (handle) {</span>
+<span class="nc" id="L1331">            lac = handle.getExplicitLac();</span>
+<span class="nc" id="L1332">        }</span>
+<span class="nc" id="L1333">        return lac;</span>
+    }
+
+    /**
+     * Add entry to a ledger.
+     * @throws BookieException.LedgerFencedException if the ledger is fenced
+     */
+    public void addEntry(ByteBuf entry, WriteCallback cb, Object ctx, byte[] masterKey)
+            throws IOException, BookieException.LedgerFencedException, BookieException {
+<span class="fc" id="L1342">        long requestNanos = MathUtils.nowInNano();</span>
+<span class="fc" id="L1343">        boolean success = false;</span>
+<span class="fc" id="L1344">        int entrySize = 0;</span>
+        try {
+<span class="fc" id="L1346">            LedgerDescriptor handle = getLedgerForEntry(entry, masterKey);</span>
+<span class="fc" id="L1347">            synchronized (handle) {</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">                if (handle.isFenced()) {</span>
+<span class="nc" id="L1349">                    throw BookieException</span>
+<span class="nc" id="L1350">                            .create(BookieException.Code.LedgerFencedException);</span>
+                }
+<span class="fc" id="L1352">                entrySize = entry.readableBytes();</span>
+<span class="fc" id="L1353">                addEntryInternal(handle, entry, cb, ctx);</span>
+<span class="fc" id="L1354">            }</span>
+<span class="fc" id="L1355">            success = true;</span>
+<span class="nc" id="L1356">        } catch (NoWritableLedgerDirException e) {</span>
+<span class="nc" id="L1357">            transitionToReadOnlyMode();</span>
+<span class="nc" id="L1358">            throw new IOException(e);</span>
+        } finally {
+<span class="fc" id="L1360">            long elapsedNanos = MathUtils.elapsedNanos(requestNanos);</span>
+<span class="pc bpc" id="L1361" title="1 of 2 branches missed.">            if (success) {</span>
+<span class="fc" id="L1362">                addEntryStats.registerSuccessfulEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="fc" id="L1363">                addBytesStats.registerSuccessfulValue(entrySize);</span>
+            } else {
+<span class="nc" id="L1365">                addEntryStats.registerFailedEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="nc" id="L1366">                addBytesStats.registerFailedValue(entrySize);</span>
+            }
+
+<span class="fc" id="L1369">            entry.release();</span>
+        }
+<span class="fc" id="L1371">    }</span>
+
+<span class="nc" id="L1373">    static class FutureWriteCallback implements WriteCallback {</span>
+
+<span class="nc" id="L1375">        SettableFuture&lt;Boolean&gt; result = SettableFuture.create();</span>
+
+        @Override
+        public void writeComplete(int rc, long ledgerId, long entryId,
+                                  BookieSocketAddress addr, Object ctx) {
+<span class="nc bnc" id="L1380" title="All 2 branches missed.">            if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L1381">                LOG.debug(&quot;Finished writing entry {} @ ledger {} for {} : {}&quot;,</span>
+<span class="nc" id="L1382">                          new Object[] { entryId, ledgerId, addr, rc });</span>
+            }
+
+<span class="nc bnc" id="L1385" title="All 2 branches missed.">            result.set(0 == rc);</span>
+<span class="nc" id="L1386">        }</span>
+
+        public SettableFuture&lt;Boolean&gt; getResult() {
+<span class="nc" id="L1389">            return result;</span>
+        }
+    }
+
+    /**
+     * Fences a ledger. From this point on, clients will be unable to
+     * write to this ledger. Only recoveryAddEntry will be
+     * able to add entries to the ledger.
+     * This method is idempotent. Once a ledger is fenced, it can
+     * never be unfenced. Fencing a fenced ledger has no effect.
+     */
+    public SettableFuture&lt;Boolean&gt; fenceLedger(long ledgerId, byte[] masterKey) throws IOException, BookieException {
+<span class="nc" id="L1401">        LedgerDescriptor handle = handles.getHandle(ledgerId, masterKey);</span>
+<span class="nc" id="L1402">        return handle.fenceAndLogInJournal(getJournal(ledgerId));</span>
+    }
+
+    public ByteBuf readEntry(long ledgerId, long entryId)
+            throws IOException, NoLedgerException {
+<span class="fc" id="L1407">        long requestNanos = MathUtils.nowInNano();</span>
+<span class="fc" id="L1408">        boolean success = false;</span>
+<span class="fc" id="L1409">        int entrySize = 0;</span>
+        try {
+<span class="fc" id="L1411">            LedgerDescriptor handle = handles.getReadOnlyHandle(ledgerId);</span>
+<span class="pc bpc" id="L1412" title="1 of 2 branches missed.">            if (LOG.isTraceEnabled()) {</span>
+<span class="nc" id="L1413">                LOG.trace(&quot;Reading {}@{}&quot;, entryId, ledgerId);</span>
+            }
+<span class="fc" id="L1415">            ByteBuf entry = handle.readEntry(entryId);</span>
+<span class="fc" id="L1416">            readBytes.add(entry.readableBytes());</span>
+<span class="fc" id="L1417">            success = true;</span>
+<span class="fc" id="L1418">            return entry;</span>
+        } finally {
+<span class="fc" id="L1420">            long elapsedNanos = MathUtils.elapsedNanos(requestNanos);</span>
+<span class="pc bpc" id="L1421" title="1 of 2 branches missed.">            if (success) {</span>
+<span class="fc" id="L1422">                readEntryStats.registerSuccessfulEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="fc" id="L1423">                readBytesStats.registerSuccessfulValue(entrySize);</span>
+            } else {
+<span class="nc" id="L1425">                readEntryStats.registerFailedEvent(elapsedNanos, TimeUnit.NANOSECONDS);</span>
+<span class="nc" id="L1426">                readBytesStats.registerFailedValue(entrySize);</span>
+            }
+        }
+    }
+
+    public long readLastAddConfirmed(long ledgerId) throws IOException {
+<span class="fc" id="L1432">        LedgerDescriptor handle = handles.getReadOnlyHandle(ledgerId);</span>
+<span class="fc" id="L1433">        return handle.getLastAddConfirmed();</span>
+    }
+
+    public Observable waitForLastAddConfirmedUpdate(long ledgerId, long previoisLAC, Observer observer)
+            throws IOException {
+<span class="nc" id="L1438">        LedgerDescriptor handle = handles.getReadOnlyHandle(ledgerId);</span>
+<span class="nc" id="L1439">        return handle.waitForLastAddConfirmedUpdate(previoisLAC, observer);</span>
+    }
+
+    // The rest of the code is test stuff
+<span class="nc" id="L1443">    static class CounterCallback implements WriteCallback {</span>
+        int count;
+
+        @Override
+        public synchronized void writeComplete(int rc, long l, long e, BookieSocketAddress addr, Object ctx) {
+<span class="nc" id="L1448">            count--;</span>
+<span class="nc bnc" id="L1449" title="All 2 branches missed.">            if (count == 0) {</span>
+<span class="nc" id="L1450">                notifyAll();</span>
+            }
+<span class="nc" id="L1452">        }</span>
+
+        public synchronized void incCount() {
+<span class="nc" id="L1455">            count++;</span>
+<span class="nc" id="L1456">        }</span>
+
+        public synchronized void waitZero() throws InterruptedException {
+<span class="nc bnc" id="L1459" title="All 2 branches missed.">            while (count &gt; 0) {</span>
+<span class="nc" id="L1460">                wait();</span>
+            }
+<span class="nc" id="L1462">        }</span>
+    }
+
+    /**
+     * Format the bookie server data.
+     *
+     * @param conf ServerConfiguration
+     * @param isInteractive Whether format should ask prompt for confirmation if old data exists or not.
+     * @param force If non interactive and force is true, then old data will be removed without confirm prompt.
+     * @return Returns true if the format is success else returns false
+     */
+    public static boolean format(ServerConfiguration conf,
+            boolean isInteractive, boolean force) {
+<span class="nc bnc" id="L1475" title="All 2 branches missed.">        for (File journalDir : conf.getJournalDirs()) {</span>
+<span class="nc" id="L1476">            String[] journalDirFiles =</span>
+<span class="nc bnc" id="L1477" title="All 4 branches missed.">                    journalDir.exists() &amp;&amp; journalDir.isDirectory() ? journalDir.list() : null;</span>
+<span class="nc bnc" id="L1478" title="All 4 branches missed.">            if (journalDirFiles != null &amp;&amp; journalDirFiles.length != 0) {</span>
+                try {
+<span class="nc" id="L1480">                    boolean confirm = false;</span>
+<span class="nc bnc" id="L1481" title="All 2 branches missed.">                    if (!isInteractive) {</span>
+                        // If non interactive and force is set, then delete old
+                        // data.
+<span class="nc bnc" id="L1484" title="All 2 branches missed.">                        if (force) {</span>
+<span class="nc" id="L1485">                            confirm = true;</span>
+                        } else {
+<span class="nc" id="L1487">                            confirm = false;</span>
+                        }
+                    } else {
+<span class="nc" id="L1490">                        confirm = IOUtils</span>
+<span class="nc" id="L1491">                                .confirmPrompt(&quot;Are you sure to format Bookie data..?&quot;);</span>
+                    }
+
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">                    if (!confirm) {</span>
+<span class="nc" id="L1495">                        LOG.error(&quot;Bookie format aborted!!&quot;);</span>
+<span class="nc" id="L1496">                        return false;</span>
+                    }
+<span class="nc" id="L1498">                } catch (IOException e) {</span>
+<span class="nc" id="L1499">                    LOG.error(&quot;Error during bookie format&quot;, e);</span>
+<span class="nc" id="L1500">                    return false;</span>
+<span class="nc" id="L1501">                }</span>
+            }
+<span class="nc bnc" id="L1503" title="All 2 branches missed.">            if (!cleanDir(journalDir)) {</span>
+<span class="nc" id="L1504">                LOG.error(&quot;Formatting journal directory failed&quot;);</span>
+<span class="nc" id="L1505">                return false;</span>
+            }
+
+<span class="nc" id="L1508">            File[] ledgerDirs = conf.getLedgerDirs();</span>
+<span class="nc bnc" id="L1509" title="All 2 branches missed.">            for (File dir : ledgerDirs) {</span>
+<span class="nc bnc" id="L1510" title="All 2 branches missed.">                if (!cleanDir(dir)) {</span>
+<span class="nc" id="L1511">                    LOG.error(&quot;Formatting ledger directory &quot; + dir + &quot; failed&quot;);</span>
+<span class="nc" id="L1512">                    return false;</span>
+                }
+            }
+
+            // Clean up index directories if they are separate from the ledger dirs
+<span class="nc" id="L1517">            File[] indexDirs = conf.getIndexDirs();</span>
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">            if (null != indexDirs) {</span>
+<span class="nc bnc" id="L1519" title="All 2 branches missed.">                for (File dir : indexDirs) {</span>
+<span class="nc bnc" id="L1520" title="All 2 branches missed.">                    if (!cleanDir(dir)) {</span>
+<span class="nc" id="L1521">                        LOG.error(&quot;Formatting ledger directory &quot; + dir + &quot; failed&quot;);</span>
+<span class="nc" id="L1522">                        return false;</span>
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L1528">        LOG.info(&quot;Bookie format completed successfully&quot;);</span>
+<span class="nc" id="L1529">        return true;</span>
+    }
+
+    private static boolean cleanDir(File dir) {
+<span class="nc bnc" id="L1533" title="All 2 branches missed.">        if (dir.exists()) {</span>
+<span class="nc" id="L1534">            File[] files = dir.listFiles();</span>
+<span class="nc bnc" id="L1535" title="All 2 branches missed.">            if (files != null) {</span>
+<span class="nc bnc" id="L1536" title="All 2 branches missed.">                for (File child : files) {</span>
+<span class="nc" id="L1537">                    boolean delete = FileUtils.deleteQuietly(child);</span>
+<span class="nc bnc" id="L1538" title="All 2 branches missed.">                    if (!delete) {</span>
+<span class="nc" id="L1539">                        LOG.error(&quot;Not able to delete &quot; + child);</span>
+<span class="nc" id="L1540">                        return false;</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L1544" title="All 2 branches missed.">        } else if (!dir.mkdirs()) {</span>
+<span class="nc" id="L1545">            LOG.error(&quot;Not able to create the directory &quot; + dir);</span>
+<span class="nc" id="L1546">            return false;</span>
+        }
+<span class="nc" id="L1548">        return true;</span>
+    }
+
+    /**
+     * @param args
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public static void main(String[] args)
+            throws IOException, InterruptedException, BookieException, KeeperException {
+<span class="nc" id="L1558">        Bookie b = new Bookie(new ServerConfiguration());</span>
+<span class="nc" id="L1559">        b.start();</span>
+<span class="nc" id="L1560">        CounterCallback cb = new CounterCallback();</span>
+<span class="nc" id="L1561">        long start = MathUtils.now();</span>
+<span class="nc bnc" id="L1562" title="All 2 branches missed.">        for (int i = 0; i &lt; 100000; i++) {</span>
+<span class="nc" id="L1563">            ByteBuf buff = Unpooled.buffer(1024);</span>
+<span class="nc" id="L1564">            buff.writeLong(1);</span>
+<span class="nc" id="L1565">            buff.writeLong(i);</span>
+<span class="nc" id="L1566">            cb.incCount();</span>
+<span class="nc" id="L1567">            b.addEntry(buff, cb, null, new byte[0]);</span>
+        }
+<span class="nc" id="L1569">        cb.waitZero();</span>
+<span class="nc" id="L1570">        long end = MathUtils.now();</span>
+<span class="nc" id="L1571">        System.out.println(&quot;Took &quot; + (end - start) + &quot;ms&quot;);</span>
+<span class="nc" id="L1572">    }</span>
+
+    /**
+     * Returns exit code - cause of failure.
+     *
+     * @return {@link ExitCode}
+     */
+    public int getExitCode() {
+<span class="nc" id="L1580">        return exitCode;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,866 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RackawareEnsemblePlacementPolicyImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.client</a> &gt; <span class="el_source">RackawareEnsemblePlacementPolicyImpl.java</span></div><h1>RackawareEnsemblePlacementPolicyImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.bookkeeper.client;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import com.google.common.base.Preconditions;
+import org.apache.bookkeeper.bookie.BookKeeperServerStats;
+import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
+import org.apache.bookkeeper.client.BookieInfoReader.BookieInfo;
+import org.apache.bookkeeper.client.WeightedRandomSelection.WeightedObject;
+import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.bookkeeper.conf.Configurable;
+import org.apache.bookkeeper.feature.FeatureProvider;
+import org.apache.bookkeeper.net.*;
+import org.apache.bookkeeper.stats.OpStatsLogger;
+import org.apache.bookkeeper.stats.StatsLogger;
+import org.apache.bookkeeper.util.ReflectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+
+import io.netty.util.HashedWheelTimer;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+/**
+ * Simple rackware ensemble placement policy.
+ *
+ * Make most of the class and methods as protected, so it could be extended to implement other algorithms.
+ */
+class RackawareEnsemblePlacementPolicyImpl extends TopologyAwareEnsemblePlacementPolicy {
+
+<span class="fc" id="L65">    static final Logger LOG = LoggerFactory.getLogger(RackawareEnsemblePlacementPolicyImpl.class);</span>
+    boolean isWeighted;
+    int maxWeightMultiple;
+<span class="fc" id="L68">    private Map&lt;BookieNode, WeightedObject&gt; bookieInfoMap = new HashMap&lt;BookieNode, WeightedObject&gt;();</span>
+    private WeightedRandomSelection&lt;BookieNode&gt; weightedSelection;
+
+    public static final String REPP_DNS_RESOLVER_CLASS = &quot;reppDnsResolverClass&quot;;
+    public static final String REPP_RANDOM_READ_REORDERING = &quot;ensembleRandomReadReordering&quot;;
+
+    static final int RACKNAME_DISTANCE_FROM_LEAVES = 1;
+
+    // masks for reordering
+    static final int LOCAL_MASK       = 0x01 &lt;&lt; 24;
+    static final int LOCAL_FAIL_MASK  = 0x02 &lt;&lt; 24;
+    static final int REMOTE_MASK      = 0x04 &lt;&lt; 24;
+    static final int REMOTE_FAIL_MASK = 0x08 &lt;&lt; 24;
+    static final int READ_ONLY_MASK   = 0x10 &lt;&lt; 24;
+    static final int UNAVAIL_MASK     = 0x20 &lt;&lt; 24;
+    static final int MASK_BITS        = 0xFFF &lt;&lt; 20;
+
+    static class DefaultResolver implements DNSToSwitchMapping {
+
+        final Supplier&lt;String&gt; defaultRackSupplier;
+
+        // for backwards compat
+        public DefaultResolver() {
+<span class="nc" id="L91">            this(() -&gt; NetworkTopology.DEFAULT_REGION_AND_RACK);</span>
+<span class="nc" id="L92">        }</span>
+
+<span class="nc" id="L94">        public DefaultResolver(Supplier&lt;String&gt; defaultRackSupplier) {</span>
+<span class="nc" id="L95">            Preconditions.checkNotNull(defaultRackSupplier, &quot;defaultRackSupplier should not be null&quot;);</span>
+<span class="nc" id="L96">            this.defaultRackSupplier = defaultRackSupplier;</span>
+<span class="nc" id="L97">        }</span>
+
+        @Override
+        public List&lt;String&gt; resolve(List&lt;String&gt; names) {
+<span class="nc" id="L101">            List&lt;String&gt; rNames = new ArrayList&lt;String&gt;(names.size());</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            for (@SuppressWarnings(&quot;unused&quot;) String name : names) {</span>
+<span class="nc" id="L103">                final String defaultRack = defaultRackSupplier.get();</span>
+<span class="nc" id="L104">                Preconditions.checkNotNull(defaultRack, &quot;defaultRack cannot be null&quot;);</span>
+<span class="nc" id="L105">                rNames.add(defaultRack);</span>
+<span class="nc" id="L106">            }</span>
+<span class="nc" id="L107">            return rNames;</span>
+        }
+
+        @Override
+        public void reloadCachedMappings() {
+            // nop
+<span class="nc" id="L113">        }</span>
+
+    }
+
+    /**
+     * Decorator for any existing dsn resolver.
+     * Backfills returned data with appropriate default rack info.
+     */
+    static class DNSResolverDecorator implements DNSToSwitchMapping {
+
+        final Supplier&lt;String&gt; defaultRackSupplier;
+        final DNSToSwitchMapping resolver;
+
+<span class="fc" id="L126">        DNSResolverDecorator(DNSToSwitchMapping resolver, Supplier&lt;String&gt; defaultRackSupplier) {</span>
+<span class="fc" id="L127">            Preconditions.checkNotNull(resolver, &quot;Resolver cannot be null&quot;);</span>
+<span class="fc" id="L128">            Preconditions.checkNotNull(defaultRackSupplier, &quot;defaultRackSupplier should not be null&quot;);</span>
+<span class="fc" id="L129">            this.defaultRackSupplier = defaultRackSupplier;</span>
+<span class="fc" id="L130">            this.resolver= resolver;</span>
+<span class="fc" id="L131">        }</span>
+
+        public List&lt;String&gt; resolve(List&lt;String&gt; names) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (names == null) {</span>
+<span class="nc" id="L135">                return Collections.emptyList();</span>
+            }
+<span class="fc" id="L137">            final String defaultRack = defaultRackSupplier.get();</span>
+<span class="fc" id="L138">            Preconditions.checkNotNull(defaultRack, &quot;Default rack cannot be null&quot;);</span>
+
+<span class="fc" id="L140">            List&lt;String&gt; rNames = resolver.resolve(names);</span>
+<span class="pc bpc" id="L141" title="3 of 4 branches missed.">            if (rNames != null &amp;&amp; rNames.size() == names.size()) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                for (int i = 0; i &lt; rNames.size(); ++i) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                    if (rNames.get(i) == null) {</span>
+<span class="nc" id="L144">                        LOG.warn(&quot;Failed to resolve network location for {}, using default rack for it : {}.&quot;,</span>
+<span class="nc" id="L145">                                names.get(i), defaultRack);</span>
+<span class="nc" id="L146">                        rNames.set(i, defaultRack);</span>
+                    }
+                }
+<span class="nc" id="L149">                return rNames;</span>
+            }
+
+<span class="fc" id="L152">            LOG.warn(&quot;Failed to resolve network location for {}, using default rack for them : {}.&quot;, names,</span>
+                    defaultRack);
+<span class="fc" id="L154">            rNames = new ArrayList&lt;&gt;(names.size());</span>
+
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (int i = 0; i &lt; names.size(); ++i) {</span>
+<span class="fc" id="L157">                rNames.add(defaultRack);</span>
+            }
+<span class="fc" id="L159">            return rNames;</span>
+        }
+
+        @Override
+        public boolean useHostName() {
+<span class="fc" id="L164">            return resolver.useHostName();</span>
+        }
+
+        @Override
+        public void reloadCachedMappings() {
+<span class="nc" id="L169">            resolver.reloadCachedMappings();</span>
+<span class="nc" id="L170">        }</span>
+    }
+
+    // for now, we just maintain the writable bookies' topology
+    protected NetworkTopology topology;
+    protected DNSToSwitchMapping dnsResolver;
+    protected HashedWheelTimer timer;
+    protected final Map&lt;BookieSocketAddress, BookieNode&gt; knownBookies;
+    protected BookieNode localNode;
+    protected final ReentrantReadWriteLock rwLock;
+<span class="fc" id="L180">    protected ImmutableSet&lt;BookieSocketAddress&gt; readOnlyBookies = null;</span>
+<span class="fc" id="L181">    protected boolean reorderReadsRandom = false;</span>
+<span class="fc" id="L182">    protected boolean enforceDurability = false;</span>
+<span class="fc" id="L183">    protected int stabilizePeriodSeconds = 0;</span>
+    // looks like these only assigned in the same thread as constructor, immediately after constructor; 
+    // no need to make volatile
+<span class="fc" id="L186">    protected StatsLogger statsLogger = null;</span>
+<span class="fc" id="L187">    protected OpStatsLogger bookiesJoinedCounter = null;</span>
+<span class="fc" id="L188">    protected OpStatsLogger bookiesLeftCounter = null;</span>
+
+<span class="fc" id="L190">    private String defaultRack = NetworkTopology.DEFAULT_RACK;</span>
+
+    RackawareEnsemblePlacementPolicyImpl() {
+<span class="fc" id="L193">        this(false);</span>
+<span class="fc" id="L194">    }</span>
+
+<span class="fc" id="L196">    RackawareEnsemblePlacementPolicyImpl(boolean enforceDurability) {</span>
+<span class="fc" id="L197">        this.enforceDurability = enforceDurability;</span>
+<span class="fc" id="L198">        topology = new NetworkTopologyImpl();</span>
+<span class="fc" id="L199">        knownBookies = new HashMap&lt;BookieSocketAddress, BookieNode&gt;();</span>
+
+<span class="fc" id="L201">        rwLock = new ReentrantReadWriteLock();</span>
+<span class="fc" id="L202">    }</span>
+
+    protected BookieNode createBookieNode(BookieSocketAddress addr) {
+<span class="fc" id="L205">        return new BookieNode(addr, resolveNetworkLocation(addr));</span>
+    }
+
+    /**
+     * Initialize the policy.
+     *
+     * @param dnsResolver the object used to resolve addresses to their network address
+     * @return initialized ensemble placement policy
+     */
+    protected RackawareEnsemblePlacementPolicyImpl initialize(DNSToSwitchMapping dnsResolver,
+                                                              HashedWheelTimer timer,
+                                                              boolean reorderReadsRandom,
+                                                              int stabilizePeriodSeconds,
+                                                              boolean isWeighted,
+                                                              int maxWeightMultiple,
+                                                              StatsLogger statsLogger) {
+<span class="fc" id="L221">        Preconditions.checkNotNull(statsLogger, &quot;statsLogger should not be null, use NullStatsLogger instead.&quot;);</span>
+<span class="fc" id="L222">        this.statsLogger = statsLogger;</span>
+<span class="fc" id="L223">        this.bookiesJoinedCounter = statsLogger.getOpStatsLogger(BookKeeperServerStats.BOOKIES_JOINED);</span>
+<span class="fc" id="L224">        this.bookiesLeftCounter = statsLogger.getOpStatsLogger(BookKeeperServerStats.BOOKIES_LEFT);</span>
+<span class="fc" id="L225">        this.reorderReadsRandom = reorderReadsRandom;</span>
+<span class="fc" id="L226">        this.stabilizePeriodSeconds = stabilizePeriodSeconds;</span>
+<span class="fc" id="L227">        this.dnsResolver = new DNSResolverDecorator(dnsResolver, () -&gt; this.getDefaultRack());</span>
+<span class="fc" id="L228">        this.timer = timer;</span>
+
+        // create the network topology
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (stabilizePeriodSeconds &gt; 0) {</span>
+<span class="nc" id="L232">            this.topology = new StabilizeNetworkTopology(timer, stabilizePeriodSeconds);</span>
+        } else {
+<span class="fc" id="L234">            this.topology = new NetworkTopologyImpl();</span>
+        }
+
+        BookieNode bn;
+        try {
+<span class="fc" id="L239">            bn = createBookieNode(new BookieSocketAddress(InetAddress.getLocalHost().getHostAddress(), 0));</span>
+<span class="nc" id="L240">        } catch (UnknownHostException e) {</span>
+<span class="nc" id="L241">            LOG.error(&quot;Failed to get local host address : &quot;, e);</span>
+<span class="nc" id="L242">            bn = null;</span>
+<span class="fc" id="L243">        }</span>
+<span class="fc" id="L244">        localNode = bn;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        LOG.info(&quot;Initialize rackaware ensemble placement policy @ {} @ {} : {}.&quot;,</span>
+<span class="fc" id="L246">            new Object[] { localNode, null == localNode ? &quot;Unknown&quot; : localNode.getNetworkLocation(),</span>
+<span class="fc" id="L247">                dnsResolver.getClass().getName() });</span>
+
+<span class="fc" id="L249">        this.isWeighted = isWeighted;</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (this.isWeighted) {</span>
+<span class="nc" id="L251">            this.maxWeightMultiple = maxWeightMultiple;</span>
+<span class="nc" id="L252">            this.weightedSelection = new WeightedRandomSelection&lt;BookieNode&gt;(this.maxWeightMultiple);</span>
+<span class="nc" id="L253">            LOG.info(&quot;Weight based placement with max multiple of &quot; + this.maxWeightMultiple);</span>
+        } else {
+<span class="fc" id="L255">            LOG.info(&quot;Not weighted&quot;);</span>
+        }
+<span class="fc" id="L257">        return this;</span>
+    }
+    
+    /*
+     * sets default rack for the policy.
+     * i.e. region-aware policy may want to have /region/rack while regular
+     * rack-aware policy needs /rack only since we cannot mix both styles 
+     */
+    public RackawareEnsemblePlacementPolicyImpl withDefaultRack(String rack) {
+<span class="nc" id="L266">        Preconditions.checkNotNull(rack, &quot;Default rack cannot be null&quot;);</span>
+
+<span class="nc" id="L268">        this.defaultRack = rack;</span>
+<span class="nc" id="L269">        return this;</span>
+    }
+
+    public String getDefaultRack() {
+<span class="fc" id="L273">        return defaultRack;</span>
+    }
+
+    @Override
+    public RackawareEnsemblePlacementPolicyImpl initialize(ClientConfiguration conf,
+                                                           Optional&lt;DNSToSwitchMapping&gt; optionalDnsResolver,
+                                                           HashedWheelTimer timer,
+                                                           FeatureProvider featureProvider,
+                                                           StatsLogger statsLogger) {
+        DNSToSwitchMapping dnsResolver;
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (optionalDnsResolver.isPresent()) {</span>
+<span class="nc" id="L284">            dnsResolver = optionalDnsResolver.get();</span>
+        } else {
+<span class="fc" id="L286">            String dnsResolverName = conf.getString(REPP_DNS_RESOLVER_CLASS, ScriptBasedMapping.class.getName());</span>
+            try {
+<span class="fc" id="L288">                dnsResolver = ReflectionUtils.newInstance(dnsResolverName, DNSToSwitchMapping.class);</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                if (dnsResolver instanceof Configurable) {</span>
+<span class="fc" id="L290">                    ((Configurable) dnsResolver).setConf(conf);</span>
+                }
+<span class="nc" id="L292">            } catch (RuntimeException re) {</span>
+<span class="nc" id="L293">                LOG.info(&quot;Failed to initialize DNS Resolver {}, used default subnet resolver.&quot;, dnsResolverName, re);</span>
+<span class="nc" id="L294">                dnsResolver = new DefaultResolver(() -&gt; this.getDefaultRack());</span>
+<span class="fc" id="L295">            }</span>
+        }
+<span class="fc" id="L297">        return initialize(</span>
+                dnsResolver,
+                timer,
+<span class="fc" id="L300">                conf.getBoolean(REPP_RANDOM_READ_REORDERING, false),</span>
+<span class="fc" id="L301">                conf.getNetworkTopologyStabilizePeriodSeconds(),</span>
+<span class="fc" id="L302">                conf.getDiskWeightBasedPlacementEnabled(),</span>
+<span class="fc" id="L303">                conf.getBookieMaxWeightMultipleForWeightBasedPlacement(),</span>
+                statsLogger);
+    }
+
+    @Override
+    public void uninitalize() {
+        // do nothing
+<span class="nc" id="L310">    }</span>
+
+    protected String resolveNetworkLocation(BookieSocketAddress addr) {
+<span class="fc" id="L313">        return NetUtils.resolveNetworkLocation(dnsResolver, addr.getSocketAddress());</span>
+    }
+
+    @Override
+    public Set&lt;BookieSocketAddress&gt; onClusterChanged(Set&lt;BookieSocketAddress&gt; writableBookies,
+            Set&lt;BookieSocketAddress&gt; readOnlyBookies) {
+<span class="fc" id="L319">        rwLock.writeLock().lock();</span>
+        try {
+            ImmutableSet&lt;BookieSocketAddress&gt; joinedBookies, leftBookies, deadBookies;
+<span class="fc" id="L322">            Set&lt;BookieSocketAddress&gt; oldBookieSet = knownBookies.keySet();</span>
+            // left bookies : bookies in known bookies, but not in new writable bookie cluster.
+<span class="fc" id="L324">            leftBookies = Sets.difference(oldBookieSet, writableBookies).immutableCopy();</span>
+            // joined bookies : bookies in new writable bookie cluster, but not in known bookies
+<span class="fc" id="L326">            joinedBookies = Sets.difference(writableBookies, oldBookieSet).immutableCopy();</span>
+            // dead bookies.
+<span class="fc" id="L328">            deadBookies = Sets.difference(leftBookies, readOnlyBookies).immutableCopy();</span>
+<span class="fc" id="L329">            LOG.debug(&quot;Cluster changed : left bookies are {}, joined bookies are {}, while dead bookies are {}.&quot;,</span>
+                    leftBookies, joinedBookies, deadBookies);
+<span class="fc" id="L331">            handleBookiesThatLeft(leftBookies);</span>
+<span class="fc" id="L332">            handleBookiesThatJoined(joinedBookies);</span>
+<span class="pc bpc" id="L333" title="5 of 6 branches missed.">            if (this.isWeighted &amp;&amp; (leftBookies.size() &gt; 0 || joinedBookies.size() &gt; 0)) {</span>
+<span class="nc" id="L334">                this.weightedSelection.updateMap(this.bookieInfoMap);</span>
+            }
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            if (!readOnlyBookies.isEmpty()) {</span>
+<span class="nc" id="L337">                this.readOnlyBookies = ImmutableSet.copyOf(readOnlyBookies);</span>
+            }
+
+<span class="fc" id="L340">            return deadBookies;</span>
+        } finally {
+<span class="fc" id="L342">            rwLock.writeLock().unlock();</span>
+        }
+    }
+
+    @Override
+    public void handleBookiesThatLeft(Set&lt;BookieSocketAddress&gt; leftBookies) {
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        for (BookieSocketAddress addr : leftBookies) {</span>
+            try {
+<span class="nc" id="L350">                BookieNode node = knownBookies.remove(addr);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                if(null != node) {</span>
+<span class="nc" id="L352">                    topology.remove(node);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                    if (this.isWeighted) {</span>
+<span class="nc" id="L354">                        this.bookieInfoMap.remove(node);</span>
+                    }
+
+<span class="nc" id="L357">                    bookiesLeftCounter.registerSuccessfulValue(1L);</span>
+
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                    if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L360">                        LOG.debug(&quot;Cluster changed : bookie {} left from cluster.&quot;, addr);</span>
+                    }
+                }
+<span class="nc" id="L363">            } catch (Throwable t) {</span>
+<span class="nc" id="L364">                LOG.error(&quot;Unexpected exception while handling leaving bookie {}&quot;, addr, t);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (bookiesLeftCounter != null ) {</span>
+<span class="nc" id="L366">                    bookiesLeftCounter.registerFailedValue(1L);</span>
+                }
+                // no need to re-throw; we want to process the rest of the bookies
+                // exception anyways will be caught/logged/suppressed in the ZK's event handler
+<span class="nc" id="L370">            }</span>
+<span class="nc" id="L371">        }</span>
+<span class="fc" id="L372">    }</span>
+
+    @Override
+    public void handleBookiesThatJoined(Set&lt;BookieSocketAddress&gt; joinedBookies) {
+        // node joined
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        for (BookieSocketAddress addr : joinedBookies) {</span>
+            try {
+<span class="fc" id="L379">                BookieNode node = createBookieNode(addr);</span>
+<span class="fc" id="L380">                topology.add(node);</span>
+<span class="fc" id="L381">                knownBookies.put(addr, node);</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">                if (this.isWeighted) {</span>
+<span class="nc" id="L383">                    this.bookieInfoMap.putIfAbsent(node, new BookieInfo());</span>
+                }
+
+<span class="fc" id="L386">                bookiesJoinedCounter.registerSuccessfulValue(1L);</span>
+
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L389">                    LOG.debug(&quot;Cluster changed : bookie {} joined the cluster.&quot;, addr);</span>
+                }
+<span class="nc" id="L391">            } catch (Throwable t) {</span>
+                // topology.add() throws unchecked exception
+<span class="nc" id="L393">                LOG.error(&quot;Unexpected exception while handling joining bookie {}&quot;, addr, t);</span>
+
+<span class="nc" id="L395">                bookiesJoinedCounter.registerFailedValue(1L);</span>
+                // no need to re-throw; we want to process the rest of the bookies
+                // exception anyways will be caught/logged/suppressed in the ZK's event handler
+<span class="fc" id="L398">            }</span>
+<span class="fc" id="L399">        }</span>
+<span class="fc" id="L400">    }</span>
+
+    protected Set&lt;Node&gt; convertBookiesToNodes(Set&lt;BookieSocketAddress&gt; excludeBookies) {
+<span class="fc" id="L403">        Set&lt;Node&gt; nodes = new HashSet&lt;Node&gt;();</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        for (BookieSocketAddress addr : excludeBookies) {</span>
+<span class="nc" id="L405">            BookieNode bn = knownBookies.get(addr);</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">            if (null == bn) {</span>
+<span class="nc" id="L407">                bn = createBookieNode(addr);</span>
+            }
+<span class="nc" id="L409">            nodes.add(bn);</span>
+<span class="nc" id="L410">        }</span>
+<span class="fc" id="L411">        return nodes;</span>
+    }
+
+    @Override
+    public ArrayList&lt;BookieSocketAddress&gt; newEnsemble(int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map&lt;String, byte[]&gt; customMetadata, Set&lt;BookieSocketAddress&gt; excludeBookies)
+            throws BKNotEnoughBookiesException {
+<span class="fc" id="L417">        return newEnsembleInternal(ensembleSize, writeQuorumSize, excludeBookies, null, null);</span>
+    }
+
+    protected ArrayList&lt;BookieSocketAddress&gt; newEnsembleInternal(int ensembleSize,
+                                                               int writeQuorumSize,
+                                                               Set&lt;BookieSocketAddress&gt; excludeBookies,
+                                                               Ensemble&lt;BookieNode&gt; parentEnsemble,
+                                                               Predicate&lt;BookieNode&gt; parentPredicate)
+            throws BKNotEnoughBookiesException {
+<span class="fc" id="L426">        return newEnsembleInternal(</span>
+                ensembleSize,
+                writeQuorumSize,
+                writeQuorumSize,
+                excludeBookies,
+                parentEnsemble,
+                parentPredicate);
+    }
+
+    @Override
+    public ArrayList&lt;BookieSocketAddress&gt; newEnsemble(int ensembleSize,
+                                                    int writeQuorumSize,
+                                                    int ackQuorumSize,
+                                                    Set&lt;BookieSocketAddress&gt; excludeBookies,
+                                                    Ensemble&lt;BookieNode&gt; parentEnsemble,
+                                                    Predicate&lt;BookieNode&gt; parentPredicate)
+            throws BKNotEnoughBookiesException {
+<span class="nc" id="L443">        return newEnsembleInternal(</span>
+                ensembleSize,
+                writeQuorumSize,
+                ackQuorumSize,
+                excludeBookies,
+                parentEnsemble,
+                parentPredicate);
+    }
+
+    protected ArrayList&lt;BookieSocketAddress&gt; newEnsembleInternal(
+            int ensembleSize,
+            int writeQuorumSize,
+            int ackQuorumSize,
+            Set&lt;BookieSocketAddress&gt; excludeBookies,
+            Ensemble&lt;BookieNode&gt; parentEnsemble,
+            Predicate&lt;BookieNode&gt; parentPredicate) throws BKNotEnoughBookiesException {
+<span class="fc" id="L459">        rwLock.readLock().lock();</span>
+        try {
+<span class="fc" id="L461">            Set&lt;Node&gt; excludeNodes = convertBookiesToNodes(excludeBookies);</span>
+<span class="fc" id="L462">            RRTopologyAwareCoverageEnsemble ensemble =</span>
+                    new RRTopologyAwareCoverageEnsemble(
+                            ensembleSize,
+                            writeQuorumSize,
+                            ackQuorumSize,
+                            RACKNAME_DISTANCE_FROM_LEAVES,
+                            parentEnsemble,
+                            parentPredicate);
+<span class="fc" id="L470">            BookieNode prevNode = null;</span>
+<span class="fc" id="L471">            int numRacks = topology.getNumOfRacks();</span>
+            // only one rack, use the random algorithm.
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            if (numRacks &lt; 2) {</span>
+<span class="fc" id="L474">                List&lt;BookieNode&gt; bns = selectRandom(ensembleSize, excludeNodes, TruePredicate.instance,</span>
+                        ensemble);
+<span class="fc" id="L476">                ArrayList&lt;BookieSocketAddress&gt; addrs = new ArrayList&lt;BookieSocketAddress&gt;(ensembleSize);</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                for (BookieNode bn : bns) {</span>
+<span class="fc" id="L478">                    addrs.add(bn.getAddr());</span>
+<span class="fc" id="L479">                }</span>
+<span class="fc" id="L480">                return addrs;</span>
+            }
+            // pick nodes by racks, to ensure there is at least two racks per write quorum.
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            for (int i = 0; i &lt; ensembleSize; i++) {</span>
+                String curRack;
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                if (null == prevNode) {</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                    if ((null == localNode) ||</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                            defaultRack.equals(localNode.getNetworkLocation())) {</span>
+<span class="nc" id="L488">                        curRack = NodeBase.ROOT;</span>
+                    } else {
+<span class="nc" id="L490">                        curRack = localNode.getNetworkLocation();</span>
+                    }
+                } else {
+<span class="nc" id="L493">                    curRack = &quot;~&quot; + prevNode.getNetworkLocation();</span>
+                }
+<span class="nc" id="L495">                prevNode = selectFromNetworkLocation(curRack, excludeNodes, ensemble, ensemble);</span>
+            }
+<span class="nc" id="L497">            ArrayList&lt;BookieSocketAddress&gt; bookieList = ensemble.toList();</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">            if (ensembleSize != bookieList.size()) {</span>
+<span class="nc" id="L499">                LOG.error(&quot;Not enough {} bookies are available to form an ensemble : {}.&quot;,</span>
+<span class="nc" id="L500">                          ensembleSize, bookieList);</span>
+<span class="nc" id="L501">                throw new BKNotEnoughBookiesException();</span>
+            }
+<span class="nc" id="L503">            return bookieList;</span>
+        } finally {
+<span class="fc" id="L505">            rwLock.readLock().unlock();</span>
+        }
+    }
+
+    @Override
+    public BookieSocketAddress replaceBookie(int ensembleSize, int writeQuorumSize, int ackQuorumSize, java.util.Map&lt;String, byte[]&gt; customMetadata, Collection&lt;BookieSocketAddress&gt; currentEnsemble, BookieSocketAddress bookieToReplace, Set&lt;BookieSocketAddress&gt; excludeBookies)
+            throws BKNotEnoughBookiesException {
+<span class="nc" id="L512">        rwLock.readLock().lock();</span>
+        try {
+<span class="nc" id="L514">            excludeBookies.addAll(currentEnsemble);</span>
+<span class="nc" id="L515">            BookieNode bn = knownBookies.get(bookieToReplace);</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">            if (null == bn) {</span>
+<span class="nc" id="L517">                bn = createBookieNode(bookieToReplace);</span>
+            }
+
+<span class="nc" id="L520">            Set&lt;Node&gt; excludeNodes = convertBookiesToNodes(excludeBookies);</span>
+            // add the bookie to replace in exclude set
+<span class="nc" id="L522">            excludeNodes.add(bn);</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">            if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L524">                LOG.debug(&quot;Try to choose a new bookie to replace {}, excluding {}.&quot;, bookieToReplace,</span>
+                        excludeNodes);
+            }
+            // pick a candidate from same rack to replace
+<span class="nc" id="L528">            BookieNode candidate = selectFromNetworkLocation(</span>
+<span class="nc" id="L529">                    bn.getNetworkLocation(),</span>
+                    excludeNodes,
+                    TruePredicate.instance,
+                    EnsembleForReplacementWithNoConstraints.instance);
+<span class="nc bnc" id="L533" title="All 2 branches missed.">            if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L534">                LOG.debug(&quot;Bookie {} is chosen to replace bookie {}.&quot;, candidate, bn);</span>
+            }
+<span class="nc" id="L536">            return candidate.getAddr();</span>
+        } finally {
+<span class="nc" id="L538">            rwLock.readLock().unlock();</span>
+        }
+    }
+
+    @Override
+    public void updateBookieInfo(Map&lt;BookieSocketAddress, BookieInfo&gt; bookieInfoMap) {
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        if (!isWeighted) {</span>
+<span class="nc" id="L545">            LOG.info(&quot;bookieFreeDiskInfo callback called even without weighted placement policy being used.&quot;);</span>
+<span class="nc" id="L546">            return;</span>
+        }
+<span class="nc" id="L548">         List&lt;BookieNode&gt; allBookies = new ArrayList&lt;BookieNode&gt;(knownBookies.values());</span>
+
+         // create a new map to reflect the new mapping
+<span class="nc" id="L551">        Map&lt;BookieNode, WeightedObject&gt; map = new HashMap&lt;BookieNode, WeightedObject&gt;();</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        for (BookieNode bookie : allBookies) {</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">            if (bookieInfoMap.containsKey(bookie.getAddr())) {</span>
+<span class="nc" id="L554">                map.put(bookie, bookieInfoMap.get(bookie.getAddr()));</span>
+            } else {
+<span class="nc" id="L556">                map.put(bookie, new BookieInfo());</span>
+            }
+<span class="nc" id="L558">        }</span>
+<span class="nc" id="L559">        rwLock.writeLock().lock();</span>
+        try {
+<span class="nc" id="L561">            this.bookieInfoMap = map;</span>
+<span class="nc" id="L562">            this.weightedSelection.updateMap(this.bookieInfoMap);</span>
+        } finally {
+<span class="nc" id="L564">            rwLock.writeLock().unlock();</span>
+        }
+<span class="nc" id="L566">    }</span>
+
+    @Override
+    public BookieNode selectFromNetworkLocation(
+            String networkLoc,
+            Set&lt;Node&gt; excludeBookies,
+            Predicate&lt;BookieNode&gt; predicate,
+            Ensemble&lt;BookieNode&gt; ensemble)
+            throws BKNotEnoughBookiesException {
+        // select one from local rack
+        try {
+<span class="nc" id="L577">            return selectRandomFromRack(networkLoc, excludeBookies, predicate, ensemble);</span>
+<span class="nc" id="L578">        } catch (BKNotEnoughBookiesException e) {</span>
+<span class="nc" id="L579">            LOG.warn(&quot;Failed to choose a bookie from {} : &quot;</span>
+                     + &quot;excluded {}, fallback to choose bookie randomly from the cluster.&quot;,
+                     networkLoc, excludeBookies);
+            // randomly choose one from whole cluster, ignore the provided predicate.
+<span class="nc" id="L583">            return selectRandom(1, excludeBookies, predicate, ensemble).get(0);</span>
+        }
+    }
+
+    protected String getRemoteRack(BookieNode node) {
+<span class="nc" id="L588">        return &quot;~&quot; + node.getNetworkLocation();</span>
+    }
+
+    private WeightedRandomSelection&lt;BookieNode&gt; prepareForWeightedSelection(List&lt;Node&gt; leaves) {
+        // create a map of bookieNode-&gt;freeDiskSpace for this rack. The assumption is that
+        // the number of nodes in a rack is of the order of 40, so it shouldn't be too bad
+        // to build it every time during a ledger creation
+<span class="nc" id="L595">        Map&lt;BookieNode, WeightedObject&gt; rackMap = new HashMap&lt;BookieNode, WeightedObject&gt;();</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">        for (Node n : leaves) {</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">            if (!(n instanceof BookieNode)) {</span>
+<span class="nc" id="L598">                continue;</span>
+            }
+<span class="nc" id="L600">            BookieNode bookie = (BookieNode) n;</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">            if (this.bookieInfoMap.containsKey(bookie)) {</span>
+<span class="nc" id="L602">                rackMap.put(bookie, this.bookieInfoMap.get(bookie));</span>
+            } else {
+<span class="nc" id="L604">                rackMap.put(bookie, new BookieInfo());</span>
+            }
+<span class="nc" id="L606">        }</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        if (rackMap.size() == 0) {</span>
+<span class="nc" id="L608">            return null;</span>
+        }
+
+<span class="nc" id="L611">        WeightedRandomSelection&lt;BookieNode&gt; wRSelection = new WeightedRandomSelection&lt;BookieNode&gt;(this.maxWeightMultiple);</span>
+<span class="nc" id="L612">        wRSelection.updateMap(rackMap);</span>
+<span class="nc" id="L613">        return wRSelection;</span>
+    }
+
+    /**
+     * Choose random node under a given network path.
+     *
+     * @param netPath
+     *          network path
+     * @param excludeBookies
+     *          exclude bookies
+     * @param predicate
+     *          predicate to check whether the target is a good target.
+     * @param ensemble
+     *          ensemble structure
+     * @return chosen bookie.
+     */
+    protected BookieNode selectRandomFromRack(String netPath, Set&lt;Node&gt; excludeBookies, Predicate&lt;BookieNode&gt; predicate,
+            Ensemble&lt;BookieNode&gt; ensemble) throws BKNotEnoughBookiesException {
+<span class="nc" id="L631">        WeightedRandomSelection&lt;BookieNode&gt; wRSelection = null;</span>
+<span class="nc" id="L632">        List&lt;Node&gt; leaves = new ArrayList&lt;Node&gt;(topology.getLeaves(netPath));</span>
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if (!this.isWeighted) {</span>
+<span class="nc" id="L634">            Collections.shuffle(leaves);</span>
+        } else {
+<span class="nc bnc" id="L636" title="All 2 branches missed.">            if (CollectionUtils.subtract(leaves, excludeBookies).size() &lt; 1) {</span>
+<span class="nc" id="L637">                throw new BKNotEnoughBookiesException();</span>
+            }
+<span class="nc" id="L639">            wRSelection = prepareForWeightedSelection(leaves);</span>
+<span class="nc bnc" id="L640" title="All 2 branches missed.">            if (wRSelection == null) {</span>
+<span class="nc" id="L641">                throw new BKNotEnoughBookiesException();</span>
+            }
+        }
+
+<span class="nc" id="L645">        Iterator&lt;Node&gt; it = leaves.iterator();</span>
+<span class="nc" id="L646">        Set&lt;Node&gt; bookiesSeenSoFar = new HashSet&lt;Node&gt;();</span>
+        while (true) {
+            Node n;
+<span class="nc bnc" id="L649" title="All 2 branches missed.">            if (isWeighted) {</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">                if (bookiesSeenSoFar.size() == leaves.size()) {</span>
+                    // Don't loop infinitely.
+<span class="nc" id="L652">                    break;</span>
+                }
+<span class="nc" id="L654">                n = wRSelection.getNextRandom();</span>
+<span class="nc" id="L655">                bookiesSeenSoFar.add(n);</span>
+            } else {
+<span class="nc bnc" id="L657" title="All 2 branches missed.">                if (it.hasNext()) {</span>
+<span class="nc" id="L658">                    n = it.next();</span>
+                } else {
+                    break;
+                }
+            }
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            if (excludeBookies.contains(n)) {</span>
+<span class="nc" id="L664">                continue;</span>
+            }
+<span class="nc bnc" id="L666" title="All 4 branches missed.">            if (!(n instanceof BookieNode) || !predicate.apply((BookieNode) n, ensemble)) {</span>
+<span class="nc" id="L667">                continue;</span>
+            }
+<span class="nc" id="L669">            BookieNode bn = (BookieNode) n;</span>
+            // got a good candidate
+<span class="nc bnc" id="L671" title="All 2 branches missed.">            if (ensemble.addNode(bn)) {</span>
+                // add the candidate to exclude set
+<span class="nc" id="L673">                excludeBookies.add(bn);</span>
+            }
+<span class="nc" id="L675">            return bn;</span>
+        }
+<span class="nc" id="L677">        throw new BKNotEnoughBookiesException();</span>
+    }
+
+    /**
+     * Choose a random node from whole cluster.
+     *
+     * @param numBookies
+     *          number bookies to choose
+     * @param excludeBookies
+     *          bookies set to exclude.
+     * @param ensemble
+     *          ensemble to hold the bookie chosen.
+     * @return the bookie node chosen.
+     * @throws BKNotEnoughBookiesException
+     */
+    protected List&lt;BookieNode&gt; selectRandom(int numBookies,
+                                            Set&lt;Node&gt; excludeBookies,
+                                            Predicate&lt;BookieNode&gt; predicate,
+                                            Ensemble&lt;BookieNode&gt; ensemble)
+            throws BKNotEnoughBookiesException {
+<span class="fc" id="L697">        return selectRandomInternal(null,  numBookies, excludeBookies, predicate, ensemble);</span>
+    }
+
+    protected List&lt;BookieNode&gt; selectRandomInternal(List&lt;BookieNode&gt; bookiesToSelectFrom,
+                                                    int numBookies,
+                                                    Set&lt;Node&gt; excludeBookies,
+                                                    Predicate&lt;BookieNode&gt; predicate,
+                                                    Ensemble&lt;BookieNode&gt; ensemble)
+        throws BKNotEnoughBookiesException {
+<span class="fc" id="L706">        WeightedRandomSelection&lt;BookieNode&gt; wRSelection = null;</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">        if (bookiesToSelectFrom == null) {</span>
+            // If the list is null, we need to select from the entire knownBookies set
+<span class="fc" id="L709">            wRSelection = this.weightedSelection;</span>
+<span class="fc" id="L710">            bookiesToSelectFrom = new ArrayList&lt;BookieNode&gt;(knownBookies.values());</span>
+        }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        if (isWeighted) {</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">            if (CollectionUtils.subtract(bookiesToSelectFrom, excludeBookies).size() &lt; numBookies) {</span>
+<span class="nc" id="L714">                throw new BKNotEnoughBookiesException();</span>
+            }
+<span class="nc bnc" id="L716" title="All 2 branches missed.">            if (wRSelection == null) {</span>
+<span class="nc" id="L717">                Map&lt;BookieNode, WeightedObject&gt; rackMap = new HashMap&lt;BookieNode, WeightedObject&gt;();</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                for (BookieNode n : bookiesToSelectFrom) {</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">                    if (excludeBookies.contains(n)) {</span>
+<span class="nc" id="L720">                        continue;</span>
+                    }
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                    if (this.bookieInfoMap.containsKey(n)) {</span>
+<span class="nc" id="L723">                        rackMap.put(n, this.bookieInfoMap.get(n));</span>
+                    } else {
+<span class="nc" id="L725">                        rackMap.put(n, new BookieInfo());</span>
+                    }
+<span class="nc" id="L727">                }</span>
+<span class="nc" id="L728">                wRSelection = new WeightedRandomSelection&lt;BookieNode&gt;(this.maxWeightMultiple);</span>
+<span class="nc" id="L729">                wRSelection.updateMap(rackMap);</span>
+<span class="nc" id="L730">            }</span>
+        } else {
+<span class="fc" id="L732">            Collections.shuffle(bookiesToSelectFrom);</span>
+        }
+
+        BookieNode bookie;
+<span class="fc" id="L736">        List&lt;BookieNode&gt; newBookies = new ArrayList&lt;BookieNode&gt;(numBookies);</span>
+<span class="fc" id="L737">        Iterator&lt;BookieNode&gt; it = bookiesToSelectFrom.iterator();</span>
+<span class="fc" id="L738">        Set&lt;BookieNode&gt; bookiesSeenSoFar = new HashSet&lt;BookieNode&gt;();</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">        while (numBookies &gt; 0) {</span>
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">            if (isWeighted) {</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">                if (bookiesSeenSoFar.size() == bookiesToSelectFrom.size()) {</span>
+                    // If we have gone through the whole available list of bookies,
+                    // and yet haven't been able to satisfy the ensemble request, bail out.
+                    // We don't want to loop infinitely.
+<span class="nc" id="L745">                    break;</span>
+                }
+<span class="nc" id="L747">                bookie = wRSelection.getNextRandom();</span>
+<span class="nc" id="L748">                bookiesSeenSoFar.add(bookie);</span>
+            } else {
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">                if (it.hasNext()) {</span>
+<span class="fc" id="L751">                    bookie = it.next();</span>
+                } else {
+                    break;
+                }
+            }
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">            if (excludeBookies.contains(bookie)) {</span>
+<span class="nc" id="L757">                continue;</span>
+            }
+
+            // When durability is being enforced; we must not violate the
+            // predicate even when selecting a random bookie; as durability
+            // guarantee is not best effort; correctness is implied by it
+<span class="pc bpc" id="L763" title="3 of 4 branches missed.">            if (enforceDurability &amp;&amp; !predicate.apply(bookie, ensemble)) {</span>
+<span class="nc" id="L764">                continue;</span>
+            }
+
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">            if (ensemble.addNode(bookie)) {</span>
+<span class="fc" id="L768">                excludeBookies.add(bookie);</span>
+<span class="fc" id="L769">                newBookies.add(bookie);</span>
+<span class="fc" id="L770">                --numBookies;</span>
+            }
+        }
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">        if (numBookies == 0) {</span>
+<span class="fc" id="L774">            return newBookies;</span>
+        }
+<span class="nc" id="L776">        LOG.warn(&quot;Failed to find {} bookies : excludeBookies {}, allBookies {}.&quot;, </span>
+<span class="nc" id="L777">            numBookies, excludeBookies, bookiesToSelectFrom);</span>
+        
+<span class="nc" id="L779">        throw new BKNotEnoughBookiesException();</span>
+    }
+
+    @Override
+    public DistributionSchedule.WriteSet reorderReadSequence(
+            ArrayList&lt;BookieSocketAddress&gt; ensemble,
+            Map&lt;BookieSocketAddress, Long&gt; bookieFailureHistory,
+            DistributionSchedule.WriteSet writeSet) {
+<span class="nc" id="L787">        int ensembleSize = ensemble.size();</span>
+
+<span class="nc bnc" id="L789" title="All 2 branches missed.">        for (int i = 0; i &lt; writeSet.size(); i++) {</span>
+<span class="nc" id="L790">            int idx = writeSet.get(i);</span>
+<span class="nc" id="L791">            BookieSocketAddress address = ensemble.get(idx);</span>
+<span class="nc" id="L792">            Long lastFailedEntryOnBookie = bookieFailureHistory.get(address);</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">            if (null == knownBookies.get(address)) {</span>
+                // there isn't too much differences between readonly bookies
+                // from unavailable bookies. since there
+                // is no write requests to them, so we shouldn't try reading
+                // from readonly bookie in prior to writable
+                // bookies.
+<span class="nc bnc" id="L799" title="All 2 branches missed.">                if ((null == readOnlyBookies)</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">                        || !readOnlyBookies.contains(address)) {</span>
+<span class="nc" id="L801">                    writeSet.set(i, idx | UNAVAIL_MASK);</span>
+                } else {
+<span class="nc" id="L803">                    writeSet.set(i, idx | READ_ONLY_MASK);</span>
+                }
+            } else {
+<span class="nc bnc" id="L806" title="All 2 branches missed.">                if ((lastFailedEntryOnBookie == null)</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                        || (lastFailedEntryOnBookie &lt; 0)) {</span>
+<span class="nc" id="L808">                    writeSet.set(i, idx | LOCAL_MASK);</span>
+                } else {
+<span class="nc" id="L810">                    long failIdx = lastFailedEntryOnBookie * ensembleSize + idx;</span>
+<span class="nc" id="L811">                    writeSet.set(i,</span>
+                                 (int)(failIdx &amp; ~MASK_BITS) | LOCAL_FAIL_MASK);
+                }
+            }
+        }
+
+        // Add a mask to ensure the sort is stable, sort,
+        // and then remove mask. This maintains stability as
+        // long as there are fewer than 16 bookies in the write set.
+<span class="nc bnc" id="L820" title="All 2 branches missed.">        for (int i = 0; i &lt; writeSet.size(); i++) {</span>
+<span class="nc" id="L821">            writeSet.set(i, writeSet.get(i) | ((i &amp; 0xF) &lt;&lt; 20));</span>
+        }
+<span class="nc" id="L823">        writeSet.sort();</span>
+<span class="nc bnc" id="L824" title="All 2 branches missed.">        for (int i = 0; i &lt; writeSet.size(); i++) {</span>
+<span class="nc" id="L825">            writeSet.set(i, writeSet.get(i) &amp; ~((0xF) &lt;&lt; 20));</span>
+        }
+
+<span class="nc bnc" id="L828" title="All 2 branches missed.">        if (reorderReadsRandom) {</span>
+<span class="nc" id="L829">            shuffleWithMask(writeSet, LOCAL_MASK, MASK_BITS);</span>
+<span class="nc" id="L830">            shuffleWithMask(writeSet, READ_ONLY_MASK, MASK_BITS);</span>
+<span class="nc" id="L831">            shuffleWithMask(writeSet, UNAVAIL_MASK, MASK_BITS);</span>
+        }
+
+        // remove all masks
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        for (int i = 0; i &lt; writeSet.size(); i++) {</span>
+<span class="nc" id="L836">            writeSet.set(i, (writeSet.get(i) &amp; ~MASK_BITS) % ensembleSize);</span>
+        }
+
+<span class="nc" id="L839">        return writeSet;</span>
+    }
+
+    /**
+     * Shuffle all the entries of an array that matches a mask.
+     * It assumes all entries with the same mask are contiguous in the array.
+     */
+    static void shuffleWithMask(DistributionSchedule.WriteSet writeSet,
+                                int mask, int bits) {
+<span class="nc" id="L848">        int first = -1;</span>
+<span class="nc" id="L849">        int last = -1;</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">        for (int i = 0; i &lt; writeSet.size(); i++) {</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">            if ((writeSet.get(i) &amp; bits) == mask) {</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">                if (first == -1) {</span>
+<span class="nc" id="L853">                    first = i;</span>
+                }
+<span class="nc" id="L855">                last = i;</span>
+            }
+        }
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        if (first != -1) {</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            for (int i = last + 1; i &gt; first; i--) {</span>
+<span class="nc" id="L860">                int swapWith = ThreadLocalRandom.current().nextInt(i);</span>
+<span class="nc" id="L861">                writeSet.set(swapWith, writeSet.set(i, writeSet.get(swapWith)));</span>
+            }
+        }
+<span class="nc" id="L864">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScanAndCompareGarbageCollector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.bookie</a> &gt; <span class="el_source">ScanAndCompareGarbageCollector.java</span></div><h1>ScanAndCompareGarbageCollector.java</h1><pre class="source lang-java linenums">/**
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+
+package org.apache.bookkeeper.bookie;
+
+import com.google.common.collect.Sets;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import org.apache.bookkeeper.client.BKException;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LedgerManager;
+import org.apache.bookkeeper.meta.LedgerManager.LedgerRange;
+import org.apache.bookkeeper.meta.LedgerManager.LedgerRangeIterator;
+import org.apache.bookkeeper.meta.ZkLedgerUnderreplicationManager;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
+import org.apache.bookkeeper.util.MathUtils;
+import org.apache.bookkeeper.util.ZkUtils;
+import org.apache.bookkeeper.zookeeper.ZooKeeperClient;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Garbage collector implementation using scan and compare.
+ *
+ * &lt;p&gt;
+ * Garbage collection is processed as below:
+ * &lt;ul&gt;
+ * &lt;li&gt; fetch all existing ledgers from zookeeper or metastore according to
+ * the LedgerManager, called &lt;b&gt;globalActiveLedgers&lt;/b&gt;
+ * &lt;li&gt; fetch all active ledgers from bookie server, said &lt;b&gt;bkActiveLedgers&lt;/b&gt;
+ * &lt;li&gt; loop over &lt;b&gt;bkActiveLedgers&lt;/b&gt; to find those ledgers that are not in
+ * &lt;b&gt;globalActiveLedgers&lt;/b&gt;, do garbage collection on them.
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ */
+public class ScanAndCompareGarbageCollector implements GarbageCollector{
+
+<span class="fc" id="L67">    static final Logger LOG = LoggerFactory.getLogger(ScanAndCompareGarbageCollector.class);</span>
+    static final int MAX_CONCURRENT_ZK_REQUESTS = 1000;
+
+    private final LedgerManager ledgerManager;
+    private final CompactableLedgerStorage ledgerStorage;
+    private final ServerConfiguration conf;
+    private final BookieSocketAddress selfBookieAddress;
+<span class="fc" id="L74">    private ZooKeeper zk = null;</span>
+    private boolean enableGcOverReplicatedLedger;
+    private final long gcOverReplicatedLedgerIntervalMillis;
+    private long lastOverReplicatedLedgerGcTimeMillis;
+    private final String zkLedgersRootPath;
+
+    public ScanAndCompareGarbageCollector(LedgerManager ledgerManager, CompactableLedgerStorage ledgerStorage,
+<span class="fc" id="L81">            ServerConfiguration conf) throws IOException {</span>
+<span class="fc" id="L82">        this.ledgerManager = ledgerManager;</span>
+<span class="fc" id="L83">        this.ledgerStorage = ledgerStorage;</span>
+<span class="fc" id="L84">        this.conf = conf;</span>
+<span class="fc" id="L85">        this.selfBookieAddress = Bookie.getBookieAddress(conf);</span>
+<span class="fc" id="L86">        this.gcOverReplicatedLedgerIntervalMillis = conf.getGcOverreplicatedLedgerWaitTimeMillis();</span>
+<span class="fc" id="L87">        this.lastOverReplicatedLedgerGcTimeMillis = MathUtils.now();</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (gcOverReplicatedLedgerIntervalMillis &gt; 0) {</span>
+<span class="fc" id="L89">            this.enableGcOverReplicatedLedger = true;</span>
+        }
+<span class="fc" id="L91">        this.zkLedgersRootPath = conf.getZkLedgersRootPath();</span>
+<span class="fc" id="L92">        LOG.info(&quot;Over Replicated Ledger Deletion : enabled=&quot; + enableGcOverReplicatedLedger + &quot;, interval=&quot;</span>
+                + gcOverReplicatedLedgerIntervalMillis);
+<span class="fc" id="L94">    }</span>
+
+    @Override
+    public void gc(GarbageCleaner garbageCleaner) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (null == ledgerManager) {</span>
+            // if ledger manager is null, the bookie is not started to connect to metadata store.
+            // so skip garbage collection
+<span class="nc" id="L101">            return;</span>
+        }
+
+        try {
+            // Get a set of all ledgers on the bookie
+<span class="fc" id="L106">            NavigableSet&lt;Long&gt; bkActiveLedgers = Sets.newTreeSet(ledgerStorage.getActiveLedgersInRange(0,</span>
+                    Long.MAX_VALUE));
+
+            // Iterate over all the ledger on the metadata store
+<span class="fc" id="L110">            LedgerRangeIterator ledgerRangeIterator = ledgerManager.getLedgerRanges();</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (!ledgerRangeIterator.hasNext()) {</span>
+                // Empty global active ledgers, need to remove all local active ledgers.
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                for (long ledgerId : bkActiveLedgers) {</span>
+<span class="nc" id="L115">                    garbageCleaner.clean(ledgerId);</span>
+<span class="nc" id="L116">                }</span>
+            }
+
+<span class="fc" id="L119">            long lastEnd = -1;</span>
+
+<span class="fc" id="L121">            long curTime = MathUtils.now();</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            boolean checkOverreplicatedLedgers = (enableGcOverReplicatedLedger &amp;&amp; curTime</span>
+                    - lastOverReplicatedLedgerGcTimeMillis &gt; gcOverReplicatedLedgerIntervalMillis);
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (checkOverreplicatedLedgers) {</span>
+<span class="nc" id="L125">                zk = ZooKeeperClient.newBuilder().connectString(conf.getZkServers())</span>
+<span class="nc" id="L126">                        .sessionTimeoutMs(conf.getZkTimeout()).build();</span>
+                // remove all the overreplicated ledgers from the local bookie
+<span class="nc" id="L128">                Set&lt;Long&gt; overReplicatedLedgers = removeOverReplicatedledgers(bkActiveLedgers, garbageCleaner);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                if (overReplicatedLedgers.isEmpty()) {</span>
+<span class="nc" id="L130">                    LOG.info(&quot;No over-replicated ledgers found.&quot;);</span>
+                } else {
+<span class="nc" id="L132">                    LOG.info(&quot;Removed over-replicated ledgers: {}&quot;, overReplicatedLedgers);</span>
+                }
+<span class="nc" id="L134">                lastOverReplicatedLedgerGcTimeMillis = MathUtils.now();</span>
+            }
+
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            while (ledgerRangeIterator.hasNext()) {</span>
+<span class="fc" id="L138">                LedgerRange lRange = ledgerRangeIterator.next();</span>
+
+<span class="fc" id="L140">                Long start = lastEnd + 1;</span>
+<span class="fc" id="L141">                Long end = lRange.end();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (!ledgerRangeIterator.hasNext()) {</span>
+<span class="fc" id="L143">                    end = Long.MAX_VALUE;</span>
+                }
+
+<span class="fc" id="L146">                Iterable&lt;Long&gt; subBkActiveLedgers = bkActiveLedgers.subSet(start, true, end, true);</span>
+
+<span class="fc" id="L148">                Set&lt;Long&gt; ledgersInMetadata = lRange.getLedgers();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L150">                    LOG.debug(&quot;Active in metadata {}, Active in bookie {}&quot;, ledgersInMetadata, subBkActiveLedgers);</span>
+                }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                for (Long bkLid : subBkActiveLedgers) {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    if (!ledgersInMetadata.contains(bkLid)) {</span>
+<span class="nc" id="L154">                        garbageCleaner.clean(bkLid);</span>
+                    }
+<span class="fc" id="L156">                }</span>
+<span class="fc" id="L157">                lastEnd = end;</span>
+<span class="fc" id="L158">            }</span>
+<span class="fc" id="L159">        } catch (Throwable t) {</span>
+            // ignore exception, collecting garbage next time
+<span class="fc" id="L161">            LOG.warn(&quot;Exception when iterating over the metadata {}&quot;, t);</span>
+        } finally {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (zk != null) {</span>
+                try {
+<span class="nc" id="L165">                    zk.close();</span>
+<span class="nc" id="L166">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L167">                    LOG.error(&quot;Error closing zk session&quot;, e);</span>
+<span class="nc" id="L168">                }</span>
+<span class="nc" id="L169">                zk = null;</span>
+            }
+        }
+<span class="fc" id="L172">    }</span>
+
+    private Set&lt;Long&gt; removeOverReplicatedledgers(Set&lt;Long&gt; bkActiveledgers, final GarbageCleaner garbageCleaner)
+            throws InterruptedException, KeeperException {
+<span class="nc" id="L176">        final List&lt;ACL&gt; zkAcls = ZkUtils.getACLs(conf);</span>
+<span class="nc" id="L177">        final Set&lt;Long&gt; overReplicatedLedgers = Sets.newHashSet();</span>
+<span class="nc" id="L178">        final Semaphore semaphore = new Semaphore(MAX_CONCURRENT_ZK_REQUESTS);</span>
+<span class="nc" id="L179">        final CountDownLatch latch = new CountDownLatch(bkActiveledgers.size());</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        for (final Long ledgerId : bkActiveledgers) {</span>
+            try {
+                // check if the ledger is being replicated already by the replication worker
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (ZkLedgerUnderreplicationManager.isLedgerBeingReplicated(zk, zkLedgersRootPath, ledgerId)) {</span>
+<span class="nc" id="L184">                    latch.countDown();</span>
+<span class="nc" id="L185">                    continue;</span>
+                }
+                // we try to acquire the underreplicated ledger lock to not let the bookie replicate the ledger that is
+                // already being checked for deletion, since that might change the ledger ensemble to include the
+                // current bookie again and, in that case, we cannot remove the ledger from local storage
+<span class="nc" id="L190">                ZkLedgerUnderreplicationManager.acquireUnderreplicatedLedgerLock(zk, zkLedgersRootPath, ledgerId,</span>
+                        zkAcls);
+<span class="nc" id="L192">                semaphore.acquire();</span>
+<span class="nc" id="L193">                ledgerManager.readLedgerMetadata(ledgerId, new GenericCallback&lt;LedgerMetadata&gt;() {</span>
+
+                    @Override
+                    public void operationComplete(int rc, LedgerMetadata ledgerMetadata) {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                        if (rc == BKException.Code.OK) {</span>
+                            // do not delete a ledger that is not closed, since the ensemble might change again and
+                            // include the current bookie while we are deleting it
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                            if (!ledgerMetadata.isClosed()) {</span>
+<span class="nc" id="L201">                                release();</span>
+<span class="nc" id="L202">                                return;</span>
+                            }
+<span class="nc" id="L204">                            SortedMap&lt;Long, ArrayList&lt;BookieSocketAddress&gt;&gt; ensembles = ledgerMetadata.getEnsembles();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                            for (ArrayList&lt;BookieSocketAddress&gt; ensemble : ensembles.values()) {</span>
+                                // check if this bookie is supposed to have this ledger
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                                if (ensemble.contains(selfBookieAddress)) {</span>
+<span class="nc" id="L208">                                    release();</span>
+<span class="nc" id="L209">                                    return;</span>
+                                }
+<span class="nc" id="L211">                            }</span>
+                            // this bookie is not supposed to have this ledger, thus we can delete this ledger now
+<span class="nc" id="L213">                            overReplicatedLedgers.add(ledgerId);</span>
+<span class="nc" id="L214">                            garbageCleaner.clean(ledgerId);</span>
+                        }
+<span class="nc" id="L216">                        release();</span>
+<span class="nc" id="L217">                    }</span>
+
+                    private void release() {
+<span class="nc" id="L220">                        semaphore.release();</span>
+<span class="nc" id="L221">                        latch.countDown();</span>
+                        try {
+<span class="nc" id="L223">                            ZkLedgerUnderreplicationManager.releaseUnderreplicatedLedgerLock(zk, zkLedgersRootPath,</span>
+<span class="nc" id="L224">                                    ledgerId);</span>
+<span class="nc" id="L225">                        } catch (Throwable t) {</span>
+<span class="nc" id="L226">                            LOG.error(&quot;Exception when removing underreplicated lock for ledger {}&quot;, ledgerId, t);</span>
+<span class="nc" id="L227">                        }</span>
+<span class="nc" id="L228">                    }</span>
+                });
+<span class="nc" id="L230">            } catch (Throwable t) {</span>
+<span class="nc" id="L231">                LOG.error(&quot;Exception when iterating through the ledgers to check for over-replication&quot;, t);</span>
+<span class="nc" id="L232">                latch.countDown();</span>
+<span class="nc" id="L233">            }</span>
+<span class="nc" id="L234">        }</span>
+<span class="nc" id="L235">        latch.await();</span>
+<span class="nc" id="L236">        bkActiveledgers.removeAll(overReplicatedLedgers);</span>
+<span class="nc" id="L237">        return overReplicatedLedgers;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

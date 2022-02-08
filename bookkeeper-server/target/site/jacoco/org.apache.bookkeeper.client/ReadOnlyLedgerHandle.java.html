@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReadOnlyLedgerHandle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.client</a> &gt; <span class="el_source">ReadOnlyLedgerHandle.java</span></div><h1>ReadOnlyLedgerHandle.java</h1><pre class="source lang-java linenums">/*
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.apache.bookkeeper.client;
+
+import java.security.GeneralSecurityException;
+import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
+
+import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
+import org.apache.bookkeeper.client.AsyncCallback.CloseCallback;
+import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
+import org.apache.bookkeeper.util.SafeRunnable;
+import org.apache.bookkeeper.versioning.Version;
+
+/**
+ * Read only ledger handle. This ledger handle allows you to
+ * read from a ledger but not to write to it. It overrides all
+ * the public write operations from LedgerHandle.
+ * It should be returned for BookKeeper#openLedger operations.
+ */
+class ReadOnlyLedgerHandle extends LedgerHandle implements LedgerMetadataListener {
+
+    class MetadataUpdater extends SafeRunnable {
+
+        final LedgerMetadata m;
+
+<span class="nc" id="L47">        MetadataUpdater(LedgerMetadata metadata) {</span>
+<span class="nc" id="L48">            this.m = metadata;</span>
+<span class="nc" id="L49">        }</span>
+
+        @Override
+        public void safeRun() {
+<span class="nc" id="L53">            Version.Occurred occurred =</span>
+<span class="nc" id="L54">                    ReadOnlyLedgerHandle.this.metadata.getVersion().compare(this.m.getVersion());</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (Version.Occurred.BEFORE == occurred) {</span>
+<span class="nc" id="L56">                LOG.info(&quot;Updated ledger metadata for ledger {} to {}.&quot;, ledgerId, this.m);</span>
+<span class="nc" id="L57">                synchronized (ReadOnlyLedgerHandle.this) {</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                    if (this.m.isClosed()) {</span>
+<span class="nc" id="L59">                            ReadOnlyLedgerHandle.this.lastAddConfirmed = this.m.getLastEntryId();</span>
+<span class="nc" id="L60">                            ReadOnlyLedgerHandle.this.length = this.m.getLength();</span>
+                    }
+<span class="nc" id="L62">                    ReadOnlyLedgerHandle.this.metadata = this.m;</span>
+<span class="nc" id="L63">                }</span>
+            }
+<span class="nc" id="L65">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L69">            return String.format(&quot;MetadataUpdater(%d)&quot;, ledgerId);</span>
+        }
+    }
+
+    ReadOnlyLedgerHandle(BookKeeper bk, long ledgerId, LedgerMetadata metadata,
+                         DigestType digestType, byte[] password, boolean watch)
+            throws GeneralSecurityException, NumberFormatException {
+<span class="nc" id="L76">        super(bk, ledgerId, metadata, digestType, password);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (watch) {</span>
+<span class="nc" id="L78">            bk.getLedgerManager().registerLedgerMetadataListener(ledgerId, this);</span>
+        }
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public void close()
+            throws InterruptedException, BKException {
+<span class="nc" id="L85">        bk.getLedgerManager().unregisterLedgerMetadataListener(ledgerId, this);</span>
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    public void asyncClose(CloseCallback cb, Object ctx) {
+<span class="nc" id="L90">        bk.getLedgerManager().unregisterLedgerMetadataListener(ledgerId, this);</span>
+<span class="nc" id="L91">        cb.closeComplete(BKException.Code.OK, this, ctx);</span>
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public long addEntry(byte[] data) throws InterruptedException, BKException {
+<span class="nc" id="L96">        return addEntry(data, 0, data.length);</span>
+    }
+
+    @Override
+    public long addEntry(byte[] data, int offset, int length)
+            throws InterruptedException, BKException {
+<span class="nc" id="L102">        LOG.error(&quot;Tried to add entry on a Read-Only ledger handle, ledgerid=&quot; + ledgerId);</span>
+<span class="nc" id="L103">        throw BKException.create(BKException.Code.IllegalOpException);</span>
+    }
+
+    @Override
+    public void asyncAddEntry(final byte[] data, final AddCallback cb,
+                              final Object ctx) {
+<span class="nc" id="L109">        asyncAddEntry(data, 0, data.length, cb, ctx);</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public void asyncAddEntry(final byte[] data, final int offset, final int length,
+                              final AddCallback cb, final Object ctx) {
+<span class="nc" id="L115">        LOG.error(&quot;Tried to add entry on a Read-Only ledger handle, ledgerid=&quot; + ledgerId);</span>
+<span class="nc" id="L116">        cb.addComplete(BKException.Code.IllegalOpException, this,</span>
+                       LedgerHandle.INVALID_ENTRY_ID, ctx);
+<span class="nc" id="L118">    }</span>
+
+    @Override
+    void handleBookieFailure(final Map&lt;Integer, BookieSocketAddress&gt; failedBookies) {
+<span class="nc" id="L122">        blockAddCompletions.incrementAndGet();</span>
+<span class="nc" id="L123">        synchronized (metadata) {</span>
+            try {
+<span class="nc" id="L125">                EnsembleInfo ensembleInfo = replaceBookieInMetadata(failedBookies,</span>
+<span class="nc" id="L126">                        numEnsembleChanges.incrementAndGet());</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                if (ensembleInfo.replacedBookies.isEmpty()) {</span>
+<span class="nc" id="L128">                    blockAddCompletions.decrementAndGet();</span>
+<span class="nc" id="L129">                    return;</span>
+                }
+<span class="nc" id="L131">                blockAddCompletions.decrementAndGet();</span>
+                // the failed bookie has been replaced
+<span class="nc" id="L133">                unsetSuccessAndSendWriteRequest(ensembleInfo.replacedBookies);</span>
+<span class="nc" id="L134">            } catch (BKException.BKNotEnoughBookiesException e) {</span>
+<span class="nc" id="L135">                LOG.error(&quot;Could not get additional bookie to &quot;</span>
+                          + &quot;remake ensemble, closing ledger: &quot; + ledgerId);
+<span class="nc" id="L137">                handleUnrecoverableErrorDuringAdd(e.getCode());</span>
+<span class="nc" id="L138">                return;</span>
+<span class="nc" id="L139">            }</span>
+<span class="nc" id="L140">        }</span>
+<span class="nc" id="L141">    }</span>
+
+    @Override
+    public void onChanged(long lid, LedgerMetadata newMetadata) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L146">            LOG.debug(&quot;Received ledger metadata update on {} : {}&quot;, lid, newMetadata);</span>
+        }
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (this.ledgerId != lid) {</span>
+<span class="nc" id="L149">            return;</span>
+        }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (null == newMetadata) {</span>
+<span class="nc" id="L152">            return;</span>
+        }
+<span class="nc" id="L154">        Version.Occurred occurred =</span>
+<span class="nc" id="L155">                this.metadata.getVersion().compare(newMetadata.getVersion());</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (LOG.isDebugEnabled()) {</span>
+<span class="nc" id="L157">            LOG.debug(&quot;Try to update metadata from {} to {} : {}&quot;,</span>
+                    new Object[] { this.metadata, newMetadata, occurred });
+        }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (Version.Occurred.BEFORE == occurred) { // the metadata is updated</span>
+            try {
+<span class="nc" id="L162">                bk.getMainWorkerPool().submitOrdered(ledgerId, new MetadataUpdater(newMetadata));</span>
+<span class="nc" id="L163">            } catch (RejectedExecutionException ree) {</span>
+<span class="nc" id="L164">                LOG.error(&quot;Failed on submitting updater to update ledger metadata on ledger {} : {}&quot;,</span>
+<span class="nc" id="L165">                        ledgerId, newMetadata);</span>
+<span class="nc" id="L166">            }</span>
+        }
+<span class="nc" id="L168">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L172">        return String.format(&quot;ReadOnlyLedgerHandle(lid = %d, id = %d)&quot;, ledgerId, super.hashCode());</span>
+    }
+
+    @Override
+    protected void initializeExplicitLacFlushPolicy() {
+<span class="nc" id="L177">        explicitLacFlushPolicy = ExplicitLacFlushPolicy.VOID_EXPLICITLAC_FLUSH_POLICY;</span>
+<span class="nc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>

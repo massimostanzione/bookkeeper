@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlatLedgerManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache BookKeeper :: Server</a> &gt; <a href="index.source.html" class="el_package">org.apache.bookkeeper.meta</a> &gt; <span class="el_source">FlatLedgerManager.java</span></div><h1>FlatLedgerManager.java</h1><pre class="source lang-java linenums">package org.apache.bookkeeper.meta;
+
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.io.IOException;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import org.apache.bookkeeper.conf.AbstractConfiguration;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
+import org.apache.bookkeeper.util.StringUtils;
+import org.apache.bookkeeper.util.ZkUtils;
+import org.apache.zookeeper.AsyncCallback;
+import org.apache.zookeeper.ZooKeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Manage all ledgers in a single zk node.
+ *
+ * &lt;p&gt;
+ * All ledgers' metadata are put in a single zk node, created using zk sequential node.
+ * Each ledger node is prefixed with 'L'.
+ * &lt;/p&gt;
+ */
+class FlatLedgerManager extends AbstractZkLedgerManager {
+
+<span class="fc" id="L44">    static final Logger LOG = LoggerFactory.getLogger(FlatLedgerManager.class);</span>
+    // path prefix to store ledger znodes
+    private final String ledgerPrefix;
+
+    /**
+     * Constructor
+     *
+     * @param conf
+     *          Configuration object
+     * @param zk
+     *          ZooKeeper Client Handle
+     * @throws IOException when version is not compatible
+     */
+    public FlatLedgerManager(AbstractConfiguration conf, ZooKeeper zk) {
+<span class="fc" id="L58">        super(conf, zk);</span>
+
+<span class="fc" id="L60">        ledgerPrefix = ledgerRootPath + &quot;/&quot; + StringUtils.LEDGER_NODE_PREFIX;</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public String getLedgerPath(long ledgerId) {
+<span class="fc" id="L65">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L66">        sb.append(ledgerPrefix)</span>
+<span class="fc" id="L67">          .append(StringUtils.getZKStringId(ledgerId));</span>
+<span class="fc" id="L68">        return sb.toString();</span>
+    }
+
+    @Override
+    public long getLedgerId(String nodeName) throws IOException {
+        long ledgerId;
+        try {
+<span class="fc" id="L75">            String parts[] = nodeName.split(ledgerPrefix);</span>
+<span class="fc" id="L76">            ledgerId = Long.parseLong(parts[parts.length - 1]);</span>
+<span class="fc" id="L77">        } catch (NumberFormatException e) {</span>
+<span class="fc" id="L78">            throw new IOException(e);</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        return ledgerId;</span>
+    }
+
+    @Override
+    public void asyncProcessLedgers(final Processor&lt;Long&gt; processor,
+                                    final AsyncCallback.VoidCallback finalCb, final Object ctx,
+                                    final int successRc, final int failureRc) {
+<span class="nc" id="L87">        asyncProcessLedgersInSingleNode(ledgerRootPath, processor, finalCb, ctx, successRc, failureRc);</span>
+<span class="nc" id="L88">    }</span>
+
+    
+    protected static boolean isSpecialZnode(String znode) {
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        return znode.startsWith(ZkLedgerIdGenerator.LEDGER_ID_GEN_PREFIX) || AbstractZkLedgerManager.isSpecialZnode(znode);</span>
+    }
+
+    @Override
+    public LedgerRangeIterator getLedgerRanges() {
+<span class="fc" id="L97">        return new LedgerRangeIterator() {</span>
+            // single iterator, can visit only one time
+<span class="fc" id="L99">            boolean nextCalled = false;</span>
+<span class="fc" id="L100">            LedgerRange nextRange = null;</span>
+
+            synchronized private void preload() throws IOException {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (nextRange != null) {</span>
+<span class="fc" id="L104">                    return;</span>
+                }
+<span class="fc" id="L106">                Set&lt;Long&gt; zkActiveLedgers = null;</span>
+
+                try {
+<span class="fc" id="L109">                    zkActiveLedgers = ledgerListToSet(</span>
+<span class="fc" id="L110">                            ZkUtils.getChildrenInSingleNode(zk, ledgerRootPath), ledgerRootPath);</span>
+<span class="fc" id="L111">                    nextRange = new LedgerRange(zkActiveLedgers);</span>
+<span class="fc" id="L112">                } catch (InterruptedException ie) {</span>
+<span class="fc" id="L113">                    Thread.currentThread().interrupt();</span>
+<span class="fc" id="L114">                    throw new IOException(&quot;Error when get child nodes from zk&quot;, ie);</span>
+<span class="fc" id="L115">                }</span>
+<span class="fc" id="L116">            }</span>
+
+            @Override
+            synchronized public boolean hasNext() throws IOException {
+<span class="fc" id="L120">                preload();</span>
+<span class="pc bpc" id="L121" title="1 of 6 branches missed.">                return nextRange != null &amp;&amp; nextRange.size() &gt; 0 &amp;&amp; !nextCalled;</span>
+            }
+
+            @Override
+            synchronized public LedgerRange next() throws IOException {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                if (!hasNext()) {</span>
+<span class="nc" id="L127">                    throw new NoSuchElementException();</span>
+                }
+<span class="fc" id="L129">                nextCalled = true;</span>
+<span class="fc" id="L130">                return nextRange;</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.2.201808211720</span></div></body></html>
