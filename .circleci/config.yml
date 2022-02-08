@@ -1,0 +1,22 @@
+version: 2.1
+
+# jobs definitions
+jobs:
+  test-and-analysis:
+    docker:
+      - image: cimg/openjdk:11.0
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Test
+          command: mvn clean test --projects bookkeeper-server -Pcoverage
+      - run:
+          name: Analyze on SonarCloud
+          command: mvn sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper
+
+# invoking jobs via workflows
+workflows:
+  build-and-test:
+    jobs:
+      - test-and-analysis

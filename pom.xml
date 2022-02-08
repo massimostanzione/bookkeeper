@@ -48,8 +48,8 @@
         <url>https://issues.apache.org/jira/browse/BOOKKEEPER</url>
     </issueManagement>
     <ciManagement>
-        <system>Jenkins</system>
-        <url>https://builds.apache.org/job/bookkeeper-master</url>
+        <system>CircleCI</system>
+        <url>https://app.circleci.com/pipelines/github/massimostanzione/bookkeeper</url>
     </ciManagement>
     <modules>
         <module>buildtools</module>
@@ -125,6 +125,8 @@
         <maven-source-plugin.version>2.2.1</maven-source-plugin.version>
         <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
         <maven-assembly-plugin.version>2.2.1</maven-assembly-plugin.version>
+            <sonar.organization>massimostanzione</sonar.organization>
+            <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
     <!-- dependencies for all modules -->
