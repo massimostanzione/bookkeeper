@@ -8,12 +8,9 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-#      - run:
-#          name: Test
-#          command: mvn clean test --projects bookkeeper-server -Pcoverage
       - run:
           name: Analyze on SonarCloud
-          command: mvn sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper --projects .,bookkeeper-server
+          command: mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper-maven-debug --projects .,bookkeeper-server -Pcoverage
 
 # invoking jobs via workflows
 workflows:

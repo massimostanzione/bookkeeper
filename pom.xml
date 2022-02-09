@@ -127,7 +127,6 @@
         <maven-assembly-plugin.version>2.2.1</maven-assembly-plugin.version>
         <sonar.organization>massimostanzione</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-
     </properties>
 
     <!-- dependencies for all modules -->
