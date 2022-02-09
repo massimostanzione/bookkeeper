@@ -10,7 +10,7 @@ jobs:
       - checkout
       - run:
           name: Analyze on SonarCloud
-          command: mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper-maven-debug --projects .,bookkeeper-server -Pcoverage
+          command: mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar -Dsonar.projectKey=massimostanzione_bookkeeper --projects .,bookkeeper-server -Pcoverage
 
 # invoking jobs via workflows
 workflows:
