@@ -115,7 +115,7 @@ public class FileInfoReadTest extends BookKeeperClusterTestCase {
      * @return "valid" (allocated) array
      */
     private static ByteBuffer getValidBufferArray() {
-        ByteBuffer validBuf = ByteBuffer.allocate(VALID_STRING.length());//TODO const
+        ByteBuffer validBuf = ByteBuffer.allocate(VALID_STRING.length());
         return validBuf;
     }
 

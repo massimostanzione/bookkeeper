@@ -20,7 +20,7 @@ public final class ISW2TestUtils {
     // Passing expectations. Only high-level "pass/fail" logic, based on a code-agnostic approach.
     public static final String PASS = "Success.";
     public static final String FAIL = "Fail.";
-    public static final String EXPECTED_TO_FAIL="Test meant to fail, but did not.";
+    public static final String EXPECTED_TO_FAIL = "Test meant to fail, but did not.";
 
     /**
      * Custom exception string.
@@ -30,7 +30,7 @@ public final class ISW2TestUtils {
     public static final String NOT_EXPECTED_EXCEPTION = "Exception raised, but not expected here: ";
 
     // BookKeeper-specific default parameters used in the tests.
-    public static final int BOOKIES_NO=5;
+    public static final int BOOKIES_NO = 5;
     public static final BookKeeper.DigestType DIGEST_TYPE_DEFAULT = BookKeeper.DigestType.CRC32;
     public static final int ENTRIES_NO = 10;
     public static final String TESTFILE_PATHNAME = "/tmp/bookkeeper/test";
